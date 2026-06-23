@@ -1,0 +1,6 @@
+[Added Associations]
+application/x-zerosize=code.desktop;
+
+[Default Applications]
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+x-scheme-handler/antigravity=antigravity.desktop

@@ -1,0 +1,81 @@
+// Place your key bindings in this file to override the defaults
+[
+  {
+    "key": "ctrl+n",
+    "command": "workbench.action.toggleSidebarVisibility"
+  },
+  {
+    "key": "ctrl+h",
+    "command": "workbench.action.focusSideBar",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "f5",
+    "command": "-workbench.action.debug.start"
+  },
+  {
+    "key": "f5",
+    "command": "workbench.action.terminal.killEditor",
+    "when": "terminalEditorFocus && terminalFocus"
+  },
+  {
+    "key": "f5",
+    "command": "workbench.action.createTerminalEditorSide",
+    "when": "!terminalFocus"
+  },
+  {
+    "key": "ctrl+h",
+    "command": "workbench.action.focusActiveEditorGroup",
+    "when": "sideBarFocus"
+  },
+  {
+    "key": "ctrl+\\",
+    "command": "workbench.action.terminal.toggleTerminal"
+  },
+  {
+    "key": "ctrl+shift+6",
+    "command": "workbench.action.openPreviousRecentlyUsedEditorInGroup"
+  },
+  {
+    "key": "ctrl+shift+5",
+    "command": "workbench.action.openNextRecentlyUsedEditorInGroup"
+  },
+  {
+    "key": "ctrl+m",
+    "command": "workbench.action.toggleAuxiliaryBar"
+  },
+  {
+    "key": "ctrl+l",
+    "command": "workbench.action.focusAuxiliaryBar",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+\\",
+    "command": "workbench.action.terminal.new"
+  },
+  {
+    "key": "ctrl+alt+w",
+    "command": "workbench.action.terminal.kill",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "ctrl+[",
+    "command": "workbench.action.focusActiveEditorGroup",
+    "when": "terminalFocus && !terminalEditorFocus"
+  },
+  {
+    "key": "ctrl+[",
+    "command": "workbench.action.focusFirstEditorGroup",
+    "when": "terminalEditorFocus"
+  },
+  {
+    "key": "ctrl+[",
+    "command": "workbench.action.terminal.focus",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+]",
+    "command": "workbench.action.focusSecondEditorGroup",
+    "when": "editorTextFocus"
+  }
+]

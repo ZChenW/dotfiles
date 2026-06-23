@@ -230,7 +230,8 @@ install_package_files() {
     local dry_run="$1"
     local assume_yes="$2"
     local include_machine_local="$3"
-    local repo_root="$4"
+    local include_aur="$4"
+    local repo_root="$5"
     local packages_dir="$repo_root/packages"
 
     local -a package_files=(
@@ -257,6 +258,14 @@ install_package_files() {
     split_official_and_aur official_packages aur_packages "${all_packages[@]}"
 
     install_packages_batch "$dry_run" "$assume_yes" pacman "${official_packages[@]}"
+
+    if [[ "$include_aur" != true ]]; then
+        if ((${#aur_packages[@]} > 0)); then
+            echo "Skipping AUR packages:"
+            printf '  %s\n' "${aur_packages[@]}"
+        fi
+        return 0
+    fi
 
     if ((${#aur_packages[@]} == 0)); then
         return 0
@@ -413,11 +422,12 @@ install_packages_arch() {
     local dry_run="${1:-false}"
     local assume_yes="${2:-false}"
     local include_machine_local="${3:-false}"
-    local repo_root="${4:-}"
+    local include_aur="${4:-true}"
+    local repo_root="${5:-}"
 
     if [[ -z "$repo_root" ]]; then
         repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
     fi
 
-    install_package_files "$dry_run" "$assume_yes" "$include_machine_local" "$repo_root"
+    install_package_files "$dry_run" "$assume_yes" "$include_machine_local" "$include_aur" "$repo_root"
 }

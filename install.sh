@@ -13,20 +13,26 @@ RESTORE_ONLY=false
 PACKAGES_ONLY=false
 FULL_PACKAGES=false
 EXPORT_PACKAGES=false
+NO_AUR=false
+INCLUDE_AUR=true
+
+ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
+SELECTED_GROUPS=()
 
 usage() {
     cat <<'EOF'
 Usage: ./install.sh [OPTIONS]
 
-Arch Linux dotfiles installer. Installs package manifests, backs up existing files,
-copies configs, and verifies the result.
+Arch Linux dotfiles installer. By default, runs interactively in a TTY.
+Use --yes for non-interactive mode (scripts, CI, one-shot restore).
 
 Options:
   --dry-run          Print planned actions without modifying $HOME
-  --yes              Non-interactive mode (assume yes for prompts)
+  --yes              Non-interactive mode with recommended defaults
   --skip-packages    Restore configs only, skip package installation
   --packages-only    Install packages only, skip config restore
   --full-packages    Include machine-local packages from packages/arch-machine-local.txt
+  --no-aur           Skip AUR packages (default in interactive mode)
   --export-packages  Export current machine packages into packages/*.txt
   --restore-only     Skip packages and optional service actions
   --help             Show this help message
@@ -49,6 +55,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --full-packages)
             FULL_PACKAGES=true
+            ;;
+        --no-aur)
+            NO_AUR=true
             ;;
         --export-packages)
             EXPORT_PACKAGES=true
@@ -84,6 +93,218 @@ require_arch_linux() {
     fi
 }
 
+is_tty() {
+    [[ -t 0 && -t 1 ]]
+}
+
+prompt_yes_no() {
+    local prompt="$1"
+    local default="${2:-n}"
+    local hint reply
+
+    if [[ "$default" == y ]]; then
+        hint="Y/n"
+    else
+        hint="y/N"
+    fi
+
+    while true; do
+        read -r -p "$prompt [$hint] " reply
+        reply="${reply:-$default}"
+        case "${reply,,}" in
+            y | yes)
+                return 0
+                ;;
+            n | no)
+                return 1
+                ;;
+            *)
+                echo "Please answer y or n."
+                ;;
+        esac
+    done
+}
+
+resolve_config_groups() {
+    local input="${1:-all}"
+    local -a resolved=()
+    local token normalized
+
+    input="${input// /}"
+    if [[ -z "$input" || "${input,,}" == all || "${input,,}" == "*" ]]; then
+        SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+        return 0
+    fi
+
+    IFS=',' read -ra tokens <<<"$input"
+    for token in "${tokens[@]}"; do
+        [[ -n "$token" ]] || continue
+        normalized="${token,,}"
+        case "$normalized" in
+            1 | shell)
+                resolved+=(shell)
+                ;;
+            2 | desktop)
+                resolved+=(desktop)
+                ;;
+            3 | terminal)
+                resolved+=(terminal)
+                ;;
+            4 | apps)
+                resolved+=(apps)
+                ;;
+            5 | editors)
+                resolved+=(editors)
+                ;;
+            6 | local-bin | localbin)
+                resolved+=(local-bin)
+                ;;
+            *)
+                echo "Unknown config group: $token" >&2
+                return 1
+                ;;
+        esac
+    done
+
+    if ((${#resolved[@]} == 0)); then
+        echo "No config groups selected." >&2
+        return 1
+    fi
+
+    SELECTED_GROUPS=("${resolved[@]}")
+}
+
+print_plan_summary() {
+    echo
+    echo "=== Installation plan ==="
+    echo "Repository: $REPO_ROOT"
+    echo "Dry run: $DRY_RUN"
+
+    if [[ "$SKIP_PACKAGES" == true ]]; then
+        echo "Packages: skip"
+    else
+        echo "Packages: install"
+        if [[ "$INCLUDE_AUR" == true ]]; then
+            echo "AUR: include"
+        else
+            echo "AUR: skip"
+        fi
+        if [[ "$FULL_PACKAGES" == true ]]; then
+            echo "Machine-local packages: include"
+        else
+            echo "Machine-local packages: skip"
+        fi
+    fi
+
+    if [[ "$PACKAGES_ONLY" == true ]]; then
+        echo "Config groups: skip (packages-only)"
+    else
+        echo "Config groups: ${SELECTED_GROUPS[*]}"
+        if printf '%s\n' "${SELECTED_GROUPS[@]}" | grep -qx shell; then
+            echo "Private config: ~/.zshrc.local preserved when present; created from template when missing"
+        fi
+        echo "Config strategy: backup existing targets, then copy real files (no symlinks)"
+    fi
+
+    if [[ "$RESTORE_ONLY" == true ]]; then
+        echo "Restore-only: skip optional service actions"
+    fi
+}
+
+run_interactive_setup() {
+    local mode_choice group_input
+
+    if [[ "$PACKAGES_ONLY" != true && "$SKIP_PACKAGES" != true ]]; then
+        echo
+        echo "=== Step 1: Install mode ==="
+        echo "  1) Full install (packages + configs)"
+        echo "  2) Packages only"
+        echo "  3) Configs only"
+        echo "  4) Dry-run preview (full install)"
+        read -r -p "Choice [1]: " mode_choice
+        case "${mode_choice:-1}" in
+            1) ;;
+            2)
+                PACKAGES_ONLY=true
+                ;;
+            3)
+                SKIP_PACKAGES=true
+                ;;
+            4)
+                DRY_RUN=true
+                ;;
+            *)
+                echo "Invalid choice: $mode_choice" >&2
+                exit 1
+                ;;
+        esac
+    fi
+
+    if [[ "$SKIP_PACKAGES" != true ]]; then
+        echo
+        echo "=== Step 2: Software scope ==="
+        if ! prompt_yes_no "Install packages?" y; then
+            SKIP_PACKAGES=true
+        else
+            if [[ "$NO_AUR" == true ]]; then
+                INCLUDE_AUR=false
+            elif prompt_yes_no "Install AUR packages?" n; then
+                INCLUDE_AUR=true
+            else
+                INCLUDE_AUR=false
+            fi
+
+            if [[ "$FULL_PACKAGES" == true ]]; then
+                :
+            elif prompt_yes_no "Include machine-local packages (arch-machine-local.txt)?" n; then
+                FULL_PACKAGES=true
+            else
+                FULL_PACKAGES=false
+            fi
+        fi
+    fi
+
+    if [[ "$PACKAGES_ONLY" != true ]]; then
+        echo
+        echo "=== Step 3: Config groups ==="
+        echo "Available groups:"
+        echo "  1) shell      - .zshrc, .zshrc.local"
+        echo "  2) desktop    - niri, waybar, fcitx5, mako, environment.d, qt5ct, qt6ct"
+        echo "  3) terminal   - kitty, fastfetch, cava"
+        echo "  4) apps       - waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore"
+        echo "  5) editors    - Code/Cursor settings, keybindings, optional snippets"
+        echo "  6) local-bin  - inir, toggle-niri-shell"
+        read -r -p "Select groups (comma-separated names or numbers, default all): " group_input
+        resolve_config_groups "${group_input:-all}"
+    fi
+
+    echo
+    echo "=== Step 4: Local private config ==="
+    echo "\$HOME/.zshrc.local is only handled when the shell group is selected."
+    echo "Existing regular files are kept. Missing files are created from the template."
+    echo "Existing symlinks are backed up and replaced with a real file."
+
+    print_plan_summary
+    echo
+    echo "=== Step 5: Confirm ==="
+    if ! prompt_yes_no "Proceed?" n; then
+        echo "Aborted."
+        exit 0
+    fi
+}
+
+apply_non_interactive_defaults() {
+    if [[ "$NO_AUR" == true ]]; then
+        INCLUDE_AUR=false
+    else
+        INCLUDE_AUR=true
+    fi
+
+    if [[ "$PACKAGES_ONLY" != true ]]; then
+        SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+    fi
+}
+
 main() {
     echo "Dotfiles installer"
     echo "Repository: $REPO_ROOT"
@@ -99,9 +320,19 @@ main() {
         exit 0
     fi
 
+    if [[ "$ASSUME_YES" == true ]]; then
+        apply_non_interactive_defaults
+    elif is_tty; then
+        run_interactive_setup
+    else
+        echo "Error: non-interactive stdin/stdout requires --yes." >&2
+        echo "Run in a terminal for interactive mode, or pass --yes for scripted installs." >&2
+        exit 1
+    fi
+
     if [[ "$SKIP_PACKAGES" != true ]]; then
         echo "==> Installing packages"
-        install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$REPO_ROOT"
+        install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"
     else
         echo "==> Skipping package installation"
     fi
@@ -134,14 +365,14 @@ main() {
     fi
 
     echo "==> Syncing configs"
-    sync_configs "$REPO_ROOT" "$backup_root" "$DRY_RUN"
+    sync_configs "$REPO_ROOT" "$backup_root" "$DRY_RUN" "${SELECTED_GROUPS[@]}"
 
     if [[ "$RESTORE_ONLY" == true ]]; then
         echo "==> Restore-only mode: skipping optional service actions"
     fi
 
     echo "==> Verifying installation"
-    verify_installation "$DRY_RUN"
+    verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"
 
     echo
     if [[ "$DRY_RUN" == true ]]; then
