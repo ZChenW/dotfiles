@@ -1,0 +1,16 @@
+#!/usr/bin/env zsh
+
+emulate -L zsh
+setopt null_glob
+
+logo_dir="${FASTFETCH_LOGO_DIR:-$HOME/.config/fastfetch/logo}"
+logos=("$logo_dir"/braille-logo_*.txt)
+
+if (( ${#logos[@]} == 0 )); then
+    print -u2 "fastfetch-random: no logo files found at $logo_dir/braille-logo_*.txt"
+    exec /usr/bin/fastfetch "$@"
+fi
+
+random_logo="${logos[$(( RANDOM % ${#logos[@]} + 1 ))]}"
+
+exec /usr/bin/fastfetch --file "$random_logo" "$@"
