@@ -226,6 +226,89 @@ install_packages_batch() {
     "$helper" "${aur_args[@]}" "${packages[@]}"
 }
 
+find_aur_helper() {
+    if command -v paru >/dev/null 2>&1; then
+        printf '%s\n' paru
+    elif command -v yay >/dev/null 2>&1; then
+        printf '%s\n' yay
+    fi
+}
+
+package_prompt_yes_no() {
+    local prompt="$1"
+    local default="${2:-n}"
+    local hint reply
+
+    if [[ "$default" == y ]]; then
+        hint="Y/n"
+    else
+        hint="y/N"
+    fi
+
+    while true; do
+        read -r -p "$prompt [$hint] " reply
+        reply="${reply:-$default}"
+        case "${reply,,}" in
+            y | yes)
+                return 0
+                ;;
+            n | no)
+                return 1
+                ;;
+            *)
+                echo "Please answer y or n."
+                ;;
+        esac
+    done
+}
+
+bootstrap_paru() {
+    local dry_run="$1"
+    local assume_yes="$2"
+
+    if [[ "$dry_run" == true ]]; then
+        echo "[dry-run] bootstrap AUR helper: paru"
+        echo "[dry-run] sudo pacman -S --needed git base-devel"
+        echo "[dry-run] git clone https://aur.archlinux.org/paru.git /tmp/dotfiles-paru-bootstrap/paru"
+        echo "[dry-run] cd /tmp/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
+        return 0
+    fi
+
+    if [[ "$assume_yes" != true ]]; then
+        if [[ ! -t 0 || ! -t 1 ]]; then
+            echo "Error: AUR packages require paru or yay, and paru bootstrap needs an interactive TTY or --yes." >&2
+            return 1
+        fi
+        if ! package_prompt_yes_no "No paru/yay found. Bootstrap paru from AUR now?" y; then
+            echo "Error: AUR packages require paru or yay." >&2
+            return 1
+        fi
+    fi
+
+    local -a pacman_args=(pacman -S --needed git base-devel)
+    local -a makepkg_args=(-si --needed)
+    if [[ "$assume_yes" == true ]]; then
+        pacman_args+=(--noconfirm)
+        makepkg_args+=(--noconfirm)
+    fi
+
+    local build_root
+    build_root="$(mktemp -d)"
+    (
+        set -euo pipefail
+        trap 'rm -rf "$build_root"' EXIT
+        sudo "${pacman_args[@]}"
+        git clone https://aur.archlinux.org/paru.git "$build_root/paru"
+        cd "$build_root/paru"
+        makepkg "${makepkg_args[@]}"
+    )
+
+    if ! command -v paru >/dev/null 2>&1; then
+        echo "Error: paru bootstrap completed but paru is still not on PATH." >&2
+        return 1
+    fi
+}
+
 install_package_files() {
     local dry_run="$1"
     local assume_yes="$2"
@@ -272,16 +355,11 @@ install_package_files() {
     fi
 
     local aur_helper=""
-    if command -v paru >/dev/null 2>&1; then
-        aur_helper=paru
-    elif command -v yay >/dev/null 2>&1; then
-        aur_helper=yay
-    fi
+    aur_helper="$(find_aur_helper)"
 
     if [[ -z "$aur_helper" ]]; then
-        echo "Error: AUR packages require paru or yay:" >&2
-        printf '  %s\n' "${aur_packages[@]}" >&2
-        return 1
+        bootstrap_paru "$dry_run" "$assume_yes"
+        aur_helper=paru
     fi
 
     install_packages_batch "$dry_run" "$assume_yes" "$aur_helper" "${aur_packages[@]}"

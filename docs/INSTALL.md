@@ -61,7 +61,7 @@ Other flags:
 - `--restore-only` — same as `--skip-packages`, and skip optional service actions
 - `--dry-run` — preview actions without modifying `$HOME`
 
-With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install official packages only. In interactive mode, AUR is off by default unless you choose to include it.
+With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install official packages only. In interactive mode, AUR is off by default unless you choose to include it. If AUR is enabled and neither `paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode or asks before doing so in interactive mode.
 
 ## Config Groups
 
@@ -115,7 +115,7 @@ Official packages are installed with:
 sudo pacman -S --needed ...
 ```
 
-AUR packages use `paru` or `yay` when included. The installer does not bootstrap an AUR helper. When AUR is skipped, those packages are listed and not installed.
+AUR packages use `paru` or `yay` when included, preferring `paru`. If neither helper exists, the installer can bootstrap `paru` from AUR after installing `git` and `base-devel`. When AUR is skipped, those packages are listed and not installed.
 
 ## What Gets Restored
 
