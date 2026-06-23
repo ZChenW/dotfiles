@@ -1,0 +1,24 @@
+# Installer-required and core shell/desktop packages.
+brightnessctl
+clipse
+fastfetch
+fcitx5
+ffmpeg
+fuzzel
+git
+grim
+kanshi
+kitty
+lsd
+mako
+matugen
+niri
+playerctl
+rsync
+slurp
+swayidle
+waybar
+wf-recorder
+wl-clipboard
+yazi
+zsh

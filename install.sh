@@ -10,19 +10,26 @@ DRY_RUN=false
 ASSUME_YES=false
 SKIP_PACKAGES=false
 RESTORE_ONLY=false
+PACKAGES_ONLY=false
+FULL_PACKAGES=false
+EXPORT_PACKAGES=false
 
 usage() {
     cat <<'EOF'
 Usage: ./install.sh [OPTIONS]
 
-Arch Linux dotfiles installer. Backs up existing files, copies configs, and verifies.
+Arch Linux dotfiles installer. Installs package manifests, backs up existing files,
+copies configs, and verifies the result.
 
 Options:
-  --dry-run        Print planned actions without modifying $HOME
-  --yes            Non-interactive mode (assume yes for prompts)
-  --skip-packages  Skip package installation
-  --restore-only   Skip packages and optional service actions
-  --help           Show this help message
+  --dry-run          Print planned actions without modifying $HOME
+  --yes              Non-interactive mode (assume yes for prompts)
+  --skip-packages    Restore configs only, skip package installation
+  --packages-only    Install packages only, skip config restore
+  --full-packages    Include machine-local packages from packages/arch-machine-local.txt
+  --export-packages  Export current machine packages into packages/*.txt
+  --restore-only     Skip packages and optional service actions
+  --help             Show this help message
 EOF
 }
 
@@ -36,6 +43,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-packages)
             SKIP_PACKAGES=true
+            ;;
+        --packages-only)
+            PACKAGES_ONLY=true
+            ;;
+        --full-packages)
+            FULL_PACKAGES=true
+            ;;
+        --export-packages)
+            EXPORT_PACKAGES=true
             ;;
         --restore-only)
             SKIP_PACKAGES=true
@@ -76,19 +92,36 @@ main() {
 
     # shellcheck source=scripts/packages-arch.sh
     source "$REPO_ROOT/scripts/packages-arch.sh"
+
+    if [[ "$EXPORT_PACKAGES" == true ]]; then
+        echo "==> Exporting package snapshot"
+        export_package_snapshot "$REPO_ROOT"
+        exit 0
+    fi
+
+    if [[ "$SKIP_PACKAGES" != true ]]; then
+        echo "==> Installing packages"
+        install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$REPO_ROOT"
+    else
+        echo "==> Skipping package installation"
+    fi
+
+    if [[ "$PACKAGES_ONLY" == true ]]; then
+        echo
+        if [[ "$DRY_RUN" == true ]]; then
+            echo "Packages-only dry run complete. No config changes were made."
+        else
+            echo "Packages-only install complete."
+        fi
+        exit 0
+    fi
+
     # shellcheck source=scripts/backup.sh
     source "$REPO_ROOT/scripts/backup.sh"
     # shellcheck source=scripts/sync-configs.sh
     source "$REPO_ROOT/scripts/sync-configs.sh"
     # shellcheck source=scripts/verify.sh
     source "$REPO_ROOT/scripts/verify.sh"
-
-    if [[ "$SKIP_PACKAGES" != true ]]; then
-        echo "==> Installing packages"
-        install_packages_arch "$DRY_RUN" "$ASSUME_YES"
-    else
-        echo "==> Skipping package installation"
-    fi
 
     local backup_root
     if [[ "$DRY_RUN" == true ]]; then

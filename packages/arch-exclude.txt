@@ -1,0 +1,7 @@
+# Packages excluded from install/export automation.
+archlinuxcn-keyring
+base
+base-devel
+paru
+yay
+yay-debug

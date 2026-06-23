@@ -1,0 +1,26 @@
+# AUR and foreign packages (non machine-local).
+antigravity
+anydesk-bin
+appimagelauncher
+blueberry
+cursor-bin
+ddcutil-service
+freetype2-wps
+hyprmag-git
+libffi7
+linuxqq
+microsoft-edge-beta-bin
+mpvpaper
+obsidian-bin
+ttf-wps-fonts
+visual-studio-code-bin
+waybar-cava-git
+waybar-module-pacman-updates-git
+waybar-niri-taskbar-git
+waypaper-git
+wechat
+wechat-bin
+wlogout
+wps-office-cn
+wps-office-mui-zh-cn
+zoom

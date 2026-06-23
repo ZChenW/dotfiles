@@ -8,10 +8,13 @@ Arch Linux only. The installer checks `/etc/os-release` and exits on other distr
 
 ## Quick Start
 
+Recommended flow on a new machine:
+
 ```bash
 git clone <repo-url> ~/Projects/dotfiles
 cd ~/Projects/dotfiles
-./install.sh
+./install.sh --dry-run
+./install.sh --yes
 ```
 
 Preview planned changes without modifying `$HOME`:
@@ -20,26 +23,55 @@ Preview planned changes without modifying `$HOME`:
 ./install.sh --dry-run
 ```
 
+## Installer Modes
+
+| Command | Behavior |
+|---------|----------|
+| `./install.sh` | Install portable packages + restore configs |
+| `./install.sh --packages-only` | Install packages only |
+| `./install.sh --skip-packages` | Restore configs only |
+| `./install.sh --full-packages` | Include `packages/arch-machine-local.txt` |
+| `./install.sh --export-packages` | Regenerate `packages/*.txt` from this machine |
+
 Other flags:
 
 - `--yes` — non-interactive mode for package prompts
-- `--skip-packages` — restore configs only, skip `pacman`/AUR installs
 - `--restore-only` — same as `--skip-packages`, and skip optional service actions
 
-## What Gets Installed
+## Package Manifests
 
-Official Arch packages (via `sudo pacman -S --needed`):
+Software is managed through files in `packages/`:
 
-| Group | Packages |
-|-------|----------|
-| base | git, rsync, zsh |
-| terminal | kitty, lsd, yazi, fastfetch |
-| desktop | niri, waybar, fuzzel, mako, fcitx5, kanshi, swayidle, brightnessctl, playerctl, wl-clipboard |
-| screenshot/recording | grim, slurp, wf-recorder, ffmpeg |
-| wallpaper/theme | waypaper, matugen |
-| shell helpers | clipse |
+| File | Purpose | Default install |
+|------|---------|-----------------|
+| `arch-essential.txt` | Installer-required and core shell/desktop packages | yes |
+| `arch-desktop.txt` | Fonts, portals, Bluetooth, desktop utilities | yes |
+| `arch-apps.txt` | User applications from official repositories | yes |
+| `arch-aur.txt` | AUR and foreign packages | yes |
+| `arch-machine-local.txt` | Kernel, firmware, boot, GPU, audio stack | no |
+| `arch-exclude.txt` | Packages excluded from automation | never |
 
-Packages not found in the official repos are installed with `paru` or `yay` when available. The installer does not bootstrap an AUR helper.
+By default, the installer restores a portable software set. Machine-local packages are listed separately and skipped unless you pass `--full-packages`.
+
+Regenerate the manifests from the current machine:
+
+```bash
+./install.sh --export-packages
+```
+
+Install software without touching configs:
+
+```bash
+./install.sh --packages-only --yes
+```
+
+Official packages are installed with:
+
+```bash
+sudo pacman -S --needed ...
+```
+
+AUR packages use `paru` or `yay`. The installer does not bootstrap an AUR helper.
 
 ## What Gets Restored
 
@@ -71,6 +103,8 @@ If an existing target is a symlink, the symlink and a `.symlink-info` note are s
 - Secrets, proxy values, tokens, SSH keys, browser profiles, and account-specific auth
 - Machine-local values — use `~/.zshrc.local` instead (see `templates/zshrc.local.example`)
 - Generated noise: `.git/`, `.codex`, `*.bak`, `*.backup`, `__pycache__/`, `*.pyc`
+- Packages listed in `packages/arch-exclude.txt`
+- Machine-local kernel/driver/audio packages unless `--full-packages` is used
 
 ## Rollback
 
