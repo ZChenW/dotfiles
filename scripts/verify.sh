@@ -24,11 +24,17 @@ verify_installation() {
     fi
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] verify: zsh -n \$HOME/.zshrc"
-        echo "[dry-run] verify: niri validate -c \$HOME/.config/niri/config.kdl"
-        echo "[dry-run] verify: fastfetch --version"
-        echo "[dry-run] verify: waybar --version"
-        echo "[dry-run] verify: kitty --version"
+        if group_selected shell "${selected_groups[@]}"; then
+            echo "[dry-run] verify: zsh -n \$HOME/.zshrc"
+        fi
+        if group_selected desktop "${selected_groups[@]}"; then
+            echo "[dry-run] verify: niri validate -c \$HOME/.config/niri/config.kdl"
+            echo "[dry-run] verify: waybar --version"
+        fi
+        if group_selected terminal "${selected_groups[@]}"; then
+            echo "[dry-run] verify: fastfetch --version"
+            echo "[dry-run] verify: kitty --version"
+        fi
         echo "[dry-run] verify restored paths are not symlinks"
         return 0
     fi

@@ -4,5 +4,4 @@
         "command": "workbench.action.toggleUnifiedSidebarFromKeyboard",
         "when": "!isAuxiliaryWindowFocusedContext"
     }
-    
 ]
