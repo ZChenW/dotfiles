@@ -15,6 +15,13 @@ FULL_PACKAGES=false
 EXPORT_PACKAGES=false
 NO_AUR=false
 INCLUDE_AUR=true
+SNAPSHOT=false
+SNAPSHOT_NO_COMMIT=false
+SNAPSHOT_COMMIT=false
+SNAPSHOT_PUSH=false
+UPDATE=false
+UPDATE_WITH_PACKAGES=false
+UPDATE_NO_SNAPSHOT_PROMPT=false
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
 SELECTED_GROUPS=()
@@ -35,6 +42,13 @@ Options:
   --no-aur           Skip AUR packages (default in interactive mode)
   --export-packages  Export current machine packages into packages/*.txt
   --restore-only     Skip packages and optional service actions
+  --snapshot         Refresh package manifests and managed configs from this machine
+  --no-commit        With --snapshot: update files only, do not ask to commit
+  --commit           With --snapshot: commit after checks, do not push
+  --push             With --snapshot: ask, then commit and push
+  --update           Pull repo updates, then apply configs
+  --with-packages    With --update: install package manifests after pulling
+  --no-snapshot-prompt  With --update: do not ask to snapshot before pulling
   --help             Show this help message
 EOF
 }
@@ -66,6 +80,27 @@ while [[ $# -gt 0 ]]; do
             SKIP_PACKAGES=true
             RESTORE_ONLY=true
             ;;
+        --snapshot)
+            SNAPSHOT=true
+            ;;
+        --no-commit)
+            SNAPSHOT_NO_COMMIT=true
+            ;;
+        --commit)
+            SNAPSHOT_COMMIT=true
+            ;;
+        --push)
+            SNAPSHOT_PUSH=true
+            ;;
+        --update)
+            UPDATE=true
+            ;;
+        --with-packages)
+            UPDATE_WITH_PACKAGES=true
+            ;;
+        --no-snapshot-prompt)
+            UPDATE_NO_SNAPSHOT_PROMPT=true
+            ;;
         --help|-h)
             usage
             exit 0
@@ -95,6 +130,44 @@ require_arch_linux() {
 
 is_tty() {
     [[ -t 0 && -t 1 ]]
+}
+
+validate_snapshot_flags() {
+    if [[ "$SNAPSHOT" != true ]]; then
+        if [[ "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
+            echo "Error: --no-commit, --commit, and --push require --snapshot." >&2
+            exit 1
+        fi
+        return 0
+    fi
+
+    if [[ "$SNAPSHOT_NO_COMMIT" == true && "$SNAPSHOT_COMMIT" == true ]]; then
+        echo "Error: --no-commit cannot be combined with --commit." >&2
+        exit 1
+    fi
+    if [[ "$SNAPSHOT_NO_COMMIT" == true && "$SNAPSHOT_PUSH" == true ]]; then
+        echo "Error: --no-commit cannot be combined with --push." >&2
+        exit 1
+    fi
+    if [[ "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true ]]; then
+        echo "Error: --snapshot cannot be combined with install/export mode flags." >&2
+        exit 1
+    fi
+}
+
+validate_update_flags() {
+    if [[ "$UPDATE" != true ]]; then
+        if [[ "$UPDATE_WITH_PACKAGES" == true || "$UPDATE_NO_SNAPSHOT_PROMPT" == true ]]; then
+            echo "Error: --with-packages and --no-snapshot-prompt require --update." >&2
+            exit 1
+        fi
+        return 0
+    fi
+
+    if [[ "$SNAPSHOT" == true || "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true || "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
+        echo "Error: --update cannot be combined with snapshot/install/export mode flags." >&2
+        exit 1
+    fi
 }
 
 prompt_yes_no() {
@@ -313,6 +386,23 @@ main() {
 
     # shellcheck source=scripts/packages-arch.sh
     source "$REPO_ROOT/scripts/packages-arch.sh"
+
+    validate_snapshot_flags
+    validate_update_flags
+
+    if [[ "$UPDATE" == true ]]; then
+        # shellcheck source=scripts/update.sh
+        source "$REPO_ROOT/scripts/update.sh"
+        run_update "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$UPDATE_WITH_PACKAGES" "$UPDATE_NO_SNAPSHOT_PROMPT"
+        exit 0
+    fi
+
+    if [[ "$SNAPSHOT" == true ]]; then
+        # shellcheck source=scripts/snapshot.sh
+        source "$REPO_ROOT/scripts/snapshot.sh"
+        run_snapshot "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$SNAPSHOT_NO_COMMIT" "$SNAPSHOT_COMMIT" "$SNAPSHOT_PUSH"
+        exit 0
+    fi
 
     if [[ "$EXPORT_PACKAGES" == true ]]; then
         echo "==> Exporting package snapshot"

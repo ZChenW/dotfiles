@@ -103,6 +103,28 @@ Regenerate the manifests from the current machine:
 ./install.sh --export-packages
 ```
 
+## Snapshot Current Machine
+
+Use this after changing configs or installing/removing packages:
+
+```bash
+./install.sh --snapshot
+```
+
+The snapshot command refreshes `packages/*.txt` and managed config files from this machine, runs checks, prints changed dotfiles/packages, then asks whether to commit and push. It stages only snapshot-managed files and never uses `git add .`.
+
+Use `--no-commit` to update files only, `--commit` to commit without pushing, and `--push` to request commit+push explicitly.
+
+## Update From Git
+
+Use this on another machine after pushing a snapshot:
+
+```bash
+./install.sh --update
+```
+
+By default, update pulls with `git pull --ff-only` and applies configs only. In a terminal it asks whether to snapshot and push the current machine before pulling. Use `--with-packages` to also install package manifests.
+
 Install software without touching configs:
 
 ```bash

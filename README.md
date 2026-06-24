@@ -19,12 +19,24 @@ Preview first:
 ## Commands
 
 ```bash
-./install.sh --yes            # non-interactive install
-./install.sh --skip-packages  # configs only
-./install.sh --packages-only  # packages only
-./install.sh --no-aur         # skip AUR
-./install.sh --full-packages  # include machine-local packages
-./install.sh --export-packages
+./install.sh                         # interactive install
+./install.sh --yes                   # non-interactive install
+./install.sh --dry-run               # preview install
+./install.sh --skip-packages         # restore configs only
+./install.sh --packages-only         # install packages only
+./install.sh --no-aur                # skip AUR packages
+./install.sh --full-packages         # include machine-local packages
+
+./install.sh --snapshot              # capture this machine, then ask commit+push
+./install.sh --snapshot --no-commit  # capture only
+./install.sh --snapshot --commit     # capture and commit
+./install.sh --snapshot --push       # capture, ask, then commit+push
+
+./install.sh --update                # pull latest dotfiles and apply configs
+./install.sh --update --with-packages # pull and install packages too
+./install.sh --update --yes          # non-interactive update
+
+./install.sh --export-packages       # refresh package manifests only
 ```
 
 ## Notes
