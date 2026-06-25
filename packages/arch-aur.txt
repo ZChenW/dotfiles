@@ -25,7 +25,6 @@ waybar-module-pacman-updates-git
 waybar-niri-taskbar-git
 waypaper-git
 wechat
-wechat-bin
 wlogout
 wps-office-cn
 wps-office-mui-zh-cn

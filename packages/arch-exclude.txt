@@ -3,5 +3,6 @@ archlinuxcn-keyring
 base
 base-devel
 paru
+paru-debug
 yay
 yay-debug
