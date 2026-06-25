@@ -35,7 +35,7 @@ LOG_FILE=""
 LOG_INITIALIZED=false
 INTRO_PRINTED=false
 
-ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
+ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin media)
 SELECTED_GROUPS=()
 
 usage() {
@@ -274,6 +274,9 @@ resolve_config_groups() {
             6 | local-bin | localbin)
                 resolved+=(local-bin)
                 ;;
+            7 | media)
+                resolved+=(media)
+                ;;
             *)
                 ui_error "Unknown config group: $token"
                 return 1
@@ -412,6 +415,7 @@ run_interactive_setup() {
         echo "  4) apps       - waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore"
         echo "  5) editors    - Code/Cursor settings, keybindings, optional snippets"
         echo "  6) local-bin  - inir, toggle-niri-shell"
+        echo "  7) media      - Pictures/wallpapers"
         read -r -p "$(ui_prompt "Select groups (comma-separated names or numbers, default all)" "all")" group_input
         resolve_config_groups "${group_input:-all}"
     fi

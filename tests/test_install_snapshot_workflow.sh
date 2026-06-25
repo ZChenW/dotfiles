@@ -14,7 +14,7 @@ trap cleanup EXIT
 fake_home="$tmp_dir/home"
 fake_repo="$tmp_dir/repo"
 fake_bin="$tmp_dir/bin"
-mkdir -p "$fake_home/.config" "$fake_home/.local/bin" "$fake_bin"
+mkdir -p "$fake_home/.config" "$fake_home/.local/bin" "$fake_home/Pictures/wallpapers" "$fake_bin"
 cp -a "$REPO_ROOT" "$fake_repo"
 
 mkdir -p \
@@ -56,6 +56,7 @@ printf '{}\n' >"$fake_home/.config/Cursor/User/settings.json"
 printf '[]\n' >"$fake_home/.config/Cursor/User/keybindings.json"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/inir"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/toggle-niri-shell"
+printf 'wallpaper\n' >"$fake_home/Pictures/wallpapers/test-wallpaper.txt"
 
 cat >"$fake_bin/pacman" <<'EOF'
 #!/usr/bin/env bash

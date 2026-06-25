@@ -32,6 +32,7 @@ SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
     "file|$HOME/.local/bin/inir|configs/local-bin/inir|required"
     "file|$HOME/.local/bin/toggle-niri-shell|configs/local-bin/toggle-niri-shell|required"
+    "dir|$HOME/Pictures/wallpapers|configs/Pictures/wallpapers|optional"
 )
 
 SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS=(

@@ -9,7 +9,7 @@ source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 
 SYNC_MANIFEST_FILE=".restore-manifest"
 
-ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
+ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin media)
 
 SYNC_BACKUP_COUNT=0
 SYNC_DIR_COUNT=0
@@ -209,6 +209,7 @@ sync_configs() {
         "editors|$config_root/Cursor/User/snippets|$HOME/.config/Cursor/User/snippets|dir|optional"
         "local-bin|$repo_root/configs/local-bin/inir|$HOME/.local/bin/inir|755|required"
         "local-bin|$repo_root/configs/local-bin/toggle-niri-shell|$HOME/.local/bin/toggle-niri-shell|755|required"
+        "media|$repo_root/configs/Pictures/wallpapers|$HOME/Pictures/wallpapers|dir|required"
     )
 
     local manifest="$backup_root/$SYNC_MANIFEST_FILE"
