@@ -72,6 +72,11 @@ SNAPSHOT_SECRET_MARKER_COMMENT_SKIP_FILES=(
     configs/home/.zshrc
 )
 
+SNAPSHOT_RSYNC_EXCLUDES=(
+    .codex
+    "*.bak"
+)
+
 snapshot_managed_paths() {
     local repo_root="$1"
     local mapping mode _src dest _required
@@ -121,6 +126,22 @@ snapshot_has_non_snapshot_changes() {
     return 1
 }
 
+snapshot_non_snapshot_changes() {
+    local repo_root="$1"
+    local line path
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        path="${line:3}"
+        if [[ "$path" == */ ]]; then
+            path="${path%/}"
+        fi
+        if ! snapshot_path_is_managed "$repo_root" "$path"; then
+            printf '%s\n' "$path"
+        fi
+    done < <(git -C "$repo_root" status --porcelain)
+}
+
 snapshot_reject_source_symlinks() {
     local src="$1"
     local mode="$2"
@@ -145,7 +166,7 @@ snapshot_reject_source_symlinks() {
 snapshot_capture_configs() {
     local repo_root="$1"
     local dry_run="$2"
-    local mapping mode src dest required
+    local mapping mode src dest required exclude
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
         IFS='|' read -r mode src dest required <<<"$mapping"
@@ -163,7 +184,7 @@ snapshot_capture_configs() {
 
         if [[ "$dry_run" == true ]]; then
             if [[ "$mode" == dir ]]; then
-                echo "[dry-run] rsync -a --delete $src/ -> $repo_root/$dest/"
+                echo "[dry-run] rsync -a --delete --delete-excluded $src/ -> $repo_root/$dest/"
             else
                 echo "[dry-run] install -Dm644 $src -> $repo_root/$dest"
             fi
@@ -172,7 +193,11 @@ snapshot_capture_configs() {
 
         if [[ "$mode" == dir ]]; then
             mkdir -p "$repo_root/$dest"
-            rsync -a --delete -- "$src/" "$repo_root/$dest/"
+            local -a rsync_args=(-a --delete --delete-excluded)
+            for exclude in "${SNAPSHOT_RSYNC_EXCLUDES[@]}"; do
+                rsync_args+=(--exclude="$exclude")
+            done
+            rsync "${rsync_args[@]}" -- "$src/" "$repo_root/$dest/"
         else
             install -Dm644 -- "$src" "$repo_root/$dest"
         fi
@@ -195,6 +220,66 @@ snapshot_run_package_export() {
     fi
 
     export_package_snapshot "$repo_root"
+}
+
+snapshot_is_text_file() {
+    local file="$1"
+
+    [[ ! -s "$file" ]] || grep -Iq . "$file"
+}
+
+snapshot_normalize_text_file() {
+    local file="$1"
+    local tmp_file
+
+    snapshot_is_text_file "$file" || return 0
+
+    tmp_file="$(mktemp)"
+    awk '
+        {
+            sub(/[ \t]+$/, "")
+            lines[NR] = $0
+        }
+        END {
+            end = NR
+            while (end > 0 && lines[end] == "") {
+                end--
+            }
+            for (i = 1; i <= end; i++) {
+                print lines[i]
+            }
+        }
+    ' "$file" >"$tmp_file"
+    cat "$tmp_file" >"$file"
+    rm -f "$tmp_file"
+}
+
+snapshot_normalize_captured_files() {
+    local repo_root="$1"
+    local -a normalize_paths=()
+    local mapping _mode _src dest _required path found pkg
+
+    for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
+        IFS='|' read -r _mode _src dest _required <<<"$mapping"
+        normalize_paths+=("$repo_root/$dest")
+    done
+
+    for pkg in "$repo_root"/packages/*.txt; do
+        [[ -f "$pkg" ]] || continue
+        normalize_paths+=("$pkg")
+    done
+
+    for path in "${normalize_paths[@]}"; do
+        [[ -e "$path" ]] || continue
+        if [[ -d "$path" ]]; then
+            while IFS= read -r found; do
+                [[ -n "$found" ]] || continue
+                snapshot_normalize_text_file "$found"
+            done < <(find "$path" -type f 2>/dev/null)
+        else
+            snapshot_normalize_text_file "$path"
+        fi
+    done
 }
 
 snapshot_secret_marker_allowed() {
@@ -226,16 +311,17 @@ snapshot_secret_marker_comment_skip() {
 snapshot_file_has_secret_marker() {
     local file="$1"
     local rel_path="$2"
-    local marker scan_input
+    local marker
 
-    if snapshot_secret_marker_comment_skip "$rel_path"; then
-        scan_input="$(grep -Ev '^[[:space:]]*#' "$file" || true)"
-    else
-        scan_input="$(cat "$file")"
-    fi
+    snapshot_is_text_file "$file" || return 0
 
     for marker in "${SNAPSHOT_SECRET_MARKERS[@]}"; do
-        if grep -qF -- "$marker" <<<"$scan_input"; then
+        if snapshot_secret_marker_comment_skip "$rel_path"; then
+            if grep -Ev '^[[:space:]]*#' "$file" | grep -qF -- "$marker"; then
+                echo "Error: secret marker '$marker' found in $rel_path" >&2
+                return 1
+            fi
+        elif grep -qF -- "$marker" "$file"; then
             echo "Error: secret marker '$marker' found in $rel_path" >&2
             return 1
         fi
@@ -308,7 +394,7 @@ snapshot_run_verification() {
     local repo_root="$1"
     local -a shell_scripts=("$repo_root/install.sh" "$repo_root"/scripts/*.sh)
 
-    git -C "$repo_root" diff --check
+    git --no-pager -C "$repo_root" diff --check
 
     if compgen -G "$repo_root/tests/*.sh" >/dev/null; then
         shell_scripts+=("$repo_root"/tests/*.sh)
@@ -387,9 +473,12 @@ snapshot_stage_managed_changes() {
 
 snapshot_commit() {
     local repo_root="$1"
+    local -a blockers=()
 
-    if snapshot_has_non_snapshot_changes "$repo_root"; then
+    mapfile -t blockers < <(snapshot_non_snapshot_changes "$repo_root")
+    if ((${#blockers[@]} > 0)); then
         echo "Error: non-snapshot changes are present. Commit or stash them before running --snapshot commit/push." >&2
+        printf '  %s\n' "${blockers[@]}" >&2
         return 1
     fi
 
@@ -461,6 +550,9 @@ run_snapshot() {
         echo "==> Dry run: skipping safety check, verification, and commit"
         return 0
     fi
+
+    echo "==> Normalizing captured text files"
+    snapshot_normalize_captured_files "$repo_root"
 
     echo "==> Running safety check"
     snapshot_safety_check "$repo_root"

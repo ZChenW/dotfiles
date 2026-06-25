@@ -73,7 +73,7 @@ if [[ "$output" != *"[dry-run] install -Dm644 $HOME/.config/mako/config -> $fake
     exit 1
 fi
 
-if [[ "$output" != *"[dry-run] rsync -a --delete $HOME/.config/mako/ -> $fake_repo/configs/config/mako/"* ]]; then
+if [[ "$output" != *"[dry-run] rsync -a --delete --delete-excluded $HOME/.config/mako/ -> $fake_repo/configs/config/mako/"* ]]; then
     echo "Expected dry-run directory copy plan" >&2
     printf '%s\n' "$output" >&2
     exit 1
@@ -188,6 +188,14 @@ if [[ "$stage_contents" != *"configs/config/mako/config"* ]]; then
     exit 1
 fi
 
+echo "==> test 6b: non-snapshot changes are listed"
+non_snapshot_output="$(snapshot_non_snapshot_changes "$fake_repo")"
+if [[ "$non_snapshot_output" != *"README.md"* ]]; then
+    echo "Expected non-snapshot change list to include README.md" >&2
+    printf '%s\n' "$non_snapshot_output" >&2
+    exit 1
+fi
+
 echo "==> test 7: snapshot rejects symlinks in source config"
 rm -rf "$fake_home/.config/mako-link"
 mkdir -p "$fake_home/.config/mako-link"
@@ -221,6 +229,73 @@ alias ll='ls -la'
 EOF
 if ! snapshot_safety_check "$fake_repo"; then
     echo "Expected comment-only secret marker in .zshrc to pass safety check" >&2
+    exit 1
+fi
+
+echo "==> test 9: binary files do not trigger null-byte scan warnings"
+mkdir -p "$fake_repo/configs/config/binary"
+printf 'abc\0def' >"$fake_repo/configs/config/binary/blob.bin"
+SNAPSHOT_MAPPINGS=(
+    "dir|$fake_repo/configs/config/binary|configs/config/binary|required"
+)
+binary_err="$tmp_dir/binary-scan.err"
+if ! snapshot_safety_check "$fake_repo" 2>"$binary_err"; then
+    echo "Expected binary safety scan to pass" >&2
+    cat "$binary_err" >&2
+    exit 1
+fi
+if [[ -s "$binary_err" ]]; then
+    echo "Expected binary safety scan to avoid warnings" >&2
+    cat "$binary_err" >&2
+    exit 1
+fi
+
+echo "==> test 10: text normalization removes diff-check whitespace"
+mkdir -p "$fake_repo/configs/config/whitespace"
+printf 'value   \n\n\n' >"$fake_repo/configs/config/whitespace/config.txt"
+snapshot_normalize_text_file "$fake_repo/configs/config/whitespace/config.txt"
+if grep -q '[[:blank:]]$' "$fake_repo/configs/config/whitespace/config.txt"; then
+    echo "Expected trailing whitespace to be removed" >&2
+    cat -vet "$fake_repo/configs/config/whitespace/config.txt" >&2
+    exit 1
+fi
+if [[ "$(tail -c 2 "$fake_repo/configs/config/whitespace/config.txt")" == $'\n\n' ]]; then
+    echo "Expected extra blank lines at EOF to be removed" >&2
+    cat -vet "$fake_repo/configs/config/whitespace/config.txt" >&2
+    exit 1
+fi
+
+echo "==> test 11: verification disables git pager"
+verify_repo="$tmp_dir/verify-repo"
+mkdir -p "$verify_repo/scripts" "$verify_repo/tests"
+cat >"$verify_repo/install.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat >"$verify_repo/scripts/verify-test.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$verify_repo/install.sh" "$verify_repo/scripts/verify-test.sh"
+
+verify_log="$tmp_dir/verify-git.log"
+(
+    mkdir -p "$tmp_dir/verify-bin"
+    cat >"$tmp_dir/verify-bin/git" <<EOF
+#!/usr/bin/bash
+printf '%s\n' "\$*" >>"$verify_log"
+exit 0
+EOF
+    cat >"$tmp_dir/verify-bin/shellcheck" <<'EOF'
+#!/usr/bin/bash
+exit 0
+EOF
+    chmod +x "$tmp_dir/verify-bin/git" "$tmp_dir/verify-bin/shellcheck"
+    PATH="$tmp_dir/verify-bin:$PATH" snapshot_run_verification "$verify_repo"
+)
+if ! grep -q -- '--no-pager -C .* diff --check' "$verify_log"; then
+    echo "Expected snapshot verification to call git with --no-pager" >&2
+    cat "$verify_log" >&2
     exit 1
 fi
 
