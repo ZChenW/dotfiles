@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/niri|configs/config/niri|required"
     "dir|$HOME/.config/waybar|configs/config/waybar|required"
@@ -148,14 +152,14 @@ snapshot_reject_source_symlinks() {
     local link
 
     if [[ -L "$src" ]]; then
-        echo "Error: snapshot source is a symlink: $src" >&2
+        ui_error "snapshot source is a symlink: $src"
         return 1
     fi
 
     if [[ "$mode" == dir && -d "$src" ]]; then
         while IFS= read -r link; do
             [[ -z "$link" ]] && continue
-            echo "Error: snapshot source contains a symlink: $link" >&2
+            ui_error "snapshot source contains a symlink: $link"
             return 1
         done < <(find "$src" -type l 2>/dev/null)
     fi
@@ -173,10 +177,10 @@ snapshot_capture_configs() {
 
         if [[ ! -e "$src" ]]; then
             if [[ "$required" == optional ]]; then
-                echo "SKIP optional source: $src"
+                ui_warn "SKIP optional source: $src"
                 continue
             fi
-            echo "Error: missing required snapshot source: $src" >&2
+            ui_error "missing required snapshot source: $src"
             return 1
         fi
 
@@ -318,11 +322,11 @@ snapshot_file_has_secret_marker() {
     for marker in "${SNAPSHOT_SECRET_MARKERS[@]}"; do
         if snapshot_secret_marker_comment_skip "$rel_path"; then
             if grep -Ev '^[[:space:]]*#' "$file" | grep -qF -- "$marker"; then
-                echo "Error: secret marker '$marker' found in $rel_path" >&2
+                ui_error "secret marker '$marker' found in $rel_path"
                 return 1
             fi
         elif grep -qF -- "$marker" "$file"; then
-            echo "Error: secret marker '$marker' found in $rel_path" >&2
+            ui_error "secret marker '$marker' found in $rel_path"
             return 1
         fi
     done
@@ -372,7 +376,7 @@ snapshot_safety_check() {
                 [[ -z "$found" ]] && continue
                 for fragment in "${SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS[@]}"; do
                     if [[ "$found" == *"$fragment"* ]]; then
-                        echo "Error: forbidden path fragment '$fragment' in $found" >&2
+                        ui_error "forbidden path fragment '$fragment' in $found"
                         return 1
                     fi
                 done
@@ -381,7 +385,7 @@ snapshot_safety_check() {
         else
             for fragment in "${SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS[@]}"; do
                 if [[ "$rel_path" == *"$fragment"* ]]; then
-                    echo "Error: forbidden path fragment '$fragment' in $rel_path" >&2
+                    ui_error "forbidden path fragment '$fragment' in $rel_path"
                     return 1
                 fi
             done
@@ -414,7 +418,7 @@ snapshot_print_summary() {
     mapfile -t status_lines < <(git -C "$repo_root" status --short -- packages configs)
 
     if ((${#status_lines[@]} == 0)); then
-        echo "Snapshot complete. No changes detected."
+        ui_success "Snapshot complete. No changes detected."
         return 1
     fi
 
@@ -477,7 +481,7 @@ snapshot_commit() {
 
     mapfile -t blockers < <(snapshot_non_snapshot_changes "$repo_root")
     if ((${#blockers[@]} > 0)); then
-        echo "Error: non-snapshot changes are present. Commit or stash them before running --snapshot commit/push." >&2
+        ui_error "non-snapshot changes are present. Commit or stash them before running --snapshot commit/push."
         printf '  %s\n' "${blockers[@]}" >&2
         return 1
     fi
@@ -485,7 +489,7 @@ snapshot_commit() {
     snapshot_stage_managed_changes "$repo_root"
 
     if git -C "$repo_root" diff --cached --quiet; then
-        echo "No staged snapshot changes to commit."
+        ui_warn "No staged snapshot changes to commit."
         return 0
     fi
 
@@ -499,7 +503,7 @@ snapshot_push() {
     local repo_root="$1"
 
     if ! git -C "$repo_root" push; then
-        echo "Error: git push failed. Commit was created locally." >&2
+        ui_error "git push failed. Commit was created locally."
         return 1
     fi
 }
@@ -516,7 +520,7 @@ snapshot_prompt_yes_no() {
     fi
 
     while true; do
-        read -r -p "$prompt [$hint] " reply
+        read -r -p "$(ui_prompt "$prompt" "$hint")" reply
         reply="${reply:-$default}"
         case "${reply,,}" in
             y | yes)
@@ -526,7 +530,7 @@ snapshot_prompt_yes_no() {
                 return 1
                 ;;
             *)
-                echo "Please answer y or n."
+                ui_warn "Please answer y or n."
                 ;;
         esac
     done
@@ -540,24 +544,24 @@ run_snapshot() {
     local commit="$5"
     local push="$6"
 
-    echo "==> Snapshotting managed configs"
+    ui_step "Snapshotting managed configs"
     snapshot_capture_configs "$repo_root" "$dry_run"
 
-    echo "==> Exporting package manifests"
+    ui_step "Exporting package manifests"
     snapshot_run_package_export "$repo_root" "$dry_run"
 
     if [[ "$dry_run" == true ]]; then
-        echo "==> Dry run: skipping safety check, verification, and commit"
+        ui_step "Dry run: skipping safety check, verification, and commit"
         return 0
     fi
 
-    echo "==> Normalizing captured text files"
+    ui_step "Normalizing captured text files"
     snapshot_normalize_captured_files "$repo_root"
 
-    echo "==> Running safety check"
+    ui_step "Running safety check"
     snapshot_safety_check "$repo_root"
 
-    echo "==> Running verification"
+    ui_step "Running verification"
     snapshot_run_verification "$repo_root"
 
     echo
@@ -567,7 +571,7 @@ run_snapshot() {
 
     if [[ "$no_commit" == true ]]; then
         echo
-        echo "Snapshot complete. Changes left uncommitted (--no-commit)."
+        ui_success "Snapshot complete. Changes left uncommitted (--no-commit)."
         return 0
     fi
 
@@ -579,7 +583,7 @@ run_snapshot() {
             do_commit=true
             do_push=true
         else
-            echo "Snapshot complete. Changes left uncommitted."
+            ui_success "Snapshot complete. Changes left uncommitted."
             return 0
         fi
     elif [[ "$commit" == true || "$assume_yes" == true ]]; then
@@ -588,7 +592,7 @@ run_snapshot() {
         do_commit=true
         do_push=true
     else
-        echo "Snapshot complete. Changes left uncommitted."
+        ui_success "Snapshot complete. Changes left uncommitted."
         return 0
     fi
 
@@ -596,13 +600,13 @@ run_snapshot() {
         return 0
     fi
 
-    echo "==> Committing snapshot changes"
+    ui_step "Committing snapshot changes"
     snapshot_commit "$repo_root"
 
     if [[ "$do_push" == true ]]; then
-        echo "==> Pushing snapshot commit"
+        ui_step "Pushing snapshot commit"
         snapshot_push "$repo_root"
     fi
 
-    echo "Snapshot complete."
+    ui_success "Snapshot complete."
 }
