@@ -52,7 +52,7 @@ function get_dynamic_width() {
 # [修改]: 增加对 wofi 的动态宽度支持
 function show_menu() {
     local content="$1"
-    
+
     if [[ "$MENU_CMD" == *"wofi"* ]]; then
         # 如果是 wofi，计算宽度并附加参数
         local width=$(get_dynamic_width "$content")
@@ -82,17 +82,17 @@ DO_SAVE=false
 while true; do
     # 菜单提示下一张 (show_menu 会自动处理宽度)
     ACTION=$(show_menu "$STR_NEXT\n$STR_FINISH\n$STR_ABORT")
-    
+
     case "$ACTION" in
         *"📸"*)
             sleep 0.2
             GEO_NEXT=$(slurp)
             if [ -z "$GEO_NEXT" ]; then continue; fi
-            
+
             # 锁定宽度和X轴，只取新高度
             IFS=', x' read -r _TX NEW_Y _TW NEW_H <<< "$GEO_NEXT"
             FINAL_GEO="${FIX_X},${NEW_Y} ${FIX_W}x${NEW_H}"
-            
+
             IMG_NAME="$(printf "%03d" $INDEX).png"
             grim -g "$FINAL_GEO" "$TMP_DIR/$IMG_NAME"
             ((INDEX++))
@@ -112,13 +112,13 @@ if [ "$COUNT" -gt 0 ] && [ "$DO_SAVE" = true ]; then
     # 拼接
     magick "$TMP_DIR"/*.png -append "$TMP_STITCHED"
     mv "$TMP_STITCHED" "$RESULT_PATH"
-    
+
     # 复制到剪贴板
     if command -v wl-copy &> /dev/null; then wl-copy < "$RESULT_PATH"; fi
-    
+
     # 读取配置执行动作
     FINAL_MODE=$(cat "$CONFIG_FILE" 2>/dev/null || echo "PREVIEW")
-    
+
     case "$FINAL_MODE" in
         "PREVIEW")
             imv "$RESULT_PATH"

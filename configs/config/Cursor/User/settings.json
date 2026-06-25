@@ -40,6 +40,7 @@
   },
   "workbench.preferredLightColorTheme": "Dark Modern",
   "explorer.confirmDelete": false,
+  "r.rterm.linux": "/home/zichenw/miniforge3/envs/py313/bin/radian",
   "terminal.integrated.inheritEnv": false,
   "git.autofetch": true,
   "vim.disableExtension": true

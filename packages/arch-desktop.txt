@@ -40,9 +40,15 @@ swappy
 swaybg
 swaylock
 thunar
+ttf-dejavu
+ttf-jetbrains-mono-nerd
 ttf-maplemono
 ttf-maplemono-nf-cn-unhinted
 ttf-maplemono-nf-unhinted
+ttf-material-symbols-variable
+ttf-roboto
+ttf-roboto-flex
+ttf-roboto-mono
 wqy-zenhei
 wtype
 xdg-desktop-portal

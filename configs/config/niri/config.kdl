@@ -664,12 +664,12 @@ binds {
     // Powers off the monitors. To turn them back on, do any input like
     // moving the mouse or pressing any other key.
     Mod+Shift+P { power-off-monitors; }
-    
+
     Mod+Shift+0 hotkey-overlay-title="Open Wallpaper Console Rust" {
         spawn "/home/chakew/.local/bin/wallpaper-console-gui-rust"
     }
 
-     
+
     Mod+Shift+9 hotkey-overlay-title="Open Wallpaper Console" {
     spawn "kitty" "--class=wallpaper-console" "-e" "/home/chakew/.local/bin/wallpaper-console"
 }
@@ -681,6 +681,21 @@ binds {
     Mod+Shift+6 hotkey-overlay-title="Toggle Waybar" { spawn "sh" "-c" "pgrep -x waybar >/dev/null && pkill -x waybar || waybar >/dev/null 2>&1 &"; }
 
     Mod+Shift+B hotkey-overlay-title="Toggle Waybar/iNiR" { spawn-sh "~/.local/bin/toggle-niri-shell"; }
+
+    // iNiR shell entry points. Mod+V and Mod+Comma are already used by existing niri window-management binds.
+    Alt+Tab hotkey-overlay-title="iNiR Window Switcher: next" { spawn "inir" "altSwitcher" "next"; }
+    Alt+Shift+Tab hotkey-overlay-title="iNiR Window Switcher: previous" { spawn "inir" "altSwitcher" "previous"; }
+    Super+G hotkey-overlay-title="iNiR Crosshair Overlay" { spawn "inir" "overlay" "toggle"; }
+    Mod+Space hotkey-overlay-title="iNiR Overview" repeat=false { spawn "inir" "overview" "toggle"; }
+    Mod+Ctrl+V hotkey-overlay-title="iNiR Clipboard" { spawn "inir" "clipboard" "toggle"; }
+    Mod+Ctrl+Comma hotkey-overlay-title="iNiR Settings" { spawn "inir" "settings"; }
+    Mod+Slash hotkey-overlay-title="iNiR Cheatsheet" { spawn "inir" "cheatsheet" "toggle"; }
+    Mod+Shift+W hotkey-overlay-title="iNiR Panel Family" { spawn "inir" "panelFamily" "cycle"; }
+    Mod+Shift+Q hotkey-overlay-title="iNiR Session" { spawn "inir" "session" "toggle"; }
+    Ctrl+Alt+T hotkey-overlay-title="iNiR Wallpaper Selector" { spawn "inir" "wallpaperSelector" "toggle"; }
+    Mod+Shift+S hotkey-overlay-title="iNiR Region Screenshot" { spawn "inir" "region" "screenshot"; }
+    Mod+Shift+X hotkey-overlay-title="iNiR Region OCR" { spawn "inir" "region" "ocr"; }
+    Mod+Shift+A hotkey-overlay-title="iNiR Region Search" { spawn "inir" "region" "search"; }
 
 }
 

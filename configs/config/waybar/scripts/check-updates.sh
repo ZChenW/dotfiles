@@ -7,7 +7,7 @@ CACHE_FILE="$HOME/.cache/waybar-updates.json"
 generate_json() {
     local updates=$1
     local count
-    
+
     if [ -z "$updates" ]; then
         count=0
     else

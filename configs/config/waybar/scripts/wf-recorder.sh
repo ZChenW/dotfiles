@@ -649,23 +649,23 @@ stop_rec() {
   stop_tick
 
   local save_path=""; [[ -r "$SAVEPATH_FILE" ]] && read -r save_path <"$SAVEPATH_FILE"
-  
+
   # --- [NEW] GIF Conversion Logic ---
   if [[ -f "$GIF_MARKER" ]]; then
     rm -f "$GIF_MARKER"
     if [[ -n "$save_path" && -f "$save_path" ]]; then
         notify "$(msg notif_processing_gif)"
-        
+
         # [FIXED] 确保 GIF 目录存在: .../wf-recorder/gif/
         local gif_dir="$(get_save_dir)/gif"
         mkdir -p "$gif_dir"
-        
+
         local filename=$(basename "$save_path")
         local gif_out="$gif_dir/${filename%.*}.gif"
-        
+
         # 使用您提供的滤镜字符串
         local filters="fps=$GIF_FPS,scale=$GIF_WIDTH:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=$GIF_STATS_MODE[p];[s1][p]paletteuse=dither=$GIF_DITHER_MODE"
-        
+
         # 运行转换，如果成功则删除原文件
         if ffmpeg -y -v error -i "$save_path" -vf "$filters" "$gif_out"; then
              rm "$save_path"

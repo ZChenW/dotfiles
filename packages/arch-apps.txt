@@ -2,6 +2,7 @@
 acpi
 alex
 cabal-install
+capitaine-cursors
 chromium
 clang
 corepack
@@ -19,6 +20,8 @@ gst-plugins-good
 happy
 jq
 jupyterlab
+kvantum
+less
 libreoffice-still
 libreoffice-still-zh-cn
 libtiff5
@@ -33,6 +36,7 @@ nvtop
 openai-codex
 opencode
 pandoc-cli
+plasma-integration
 pnpm
 python-dbus
 python-ipykernel
@@ -43,6 +47,7 @@ r
 rime-ice-pinyin-git
 scratch
 shellcheck
+songrec
 stack
 steam
 stylua
@@ -56,6 +61,7 @@ texlive-meta
 texlive-plaingeneric
 texstudio
 tokei
+translate-shell
 tree
 tree-sitter-cli
 unzip

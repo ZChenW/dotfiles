@@ -193,6 +193,21 @@
     "max": 100,
     "orientation": "horizontal",
   },
+  //系统资源
+  "cpu": {
+    "interval": 2,
+    "format": " {usage}%",
+    "tooltip": true,
+    "tooltip-format": "CPU 使用率：{usage}%",
+    "on-click": "kitty --class sysmon -e sh -lc 'command -v btop >/dev/null && exec btop; command -v htop >/dev/null && exec htop; exec top'",
+  },
+  "memory": {
+    "interval": 5,
+    "format": " {percentage}%",
+    "tooltip": true,
+    "tooltip-format": "RAM 使用率：{percentage}%\n已用：{used:0.1f}G / {total:0.1f}G",
+    "on-click": "kitty --class sysmon -e sh -lc 'command -v btop >/dev/null && exec btop; command -v htop >/dev/null && exec htop; exec top'",
+  },
   //多媒体
   "mpris": {
     "format": "{player_icon}",

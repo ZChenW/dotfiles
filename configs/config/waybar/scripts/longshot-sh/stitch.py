@@ -24,15 +24,15 @@ def stitch_video(video_path, output_path):
     # 核心参数 (手动滚动优化)
     # ==========================
     MIN_SCROLL = 2
-    MATCH_CONFIDENCE = 0.5 
-    
+    MATCH_CONFIDENCE = 0.5
+
     # 忽略上下边缘 (防止浏览器地址栏/状态栏干扰)
-    IGNORE_Y_TOP = 0.15 
+    IGNORE_Y_TOP = 0.15
     IGNORE_Y_BOTTOM = 0.15
-    IGNORE_X = 0.15 
+    IGNORE_X = 0.15
 
     h, w, _ = anchor_frame.shape
-    
+
     # 有效特征区
     x1 = int(w * IGNORE_X)
     x2 = int(w * (1 - IGNORE_X))
@@ -40,9 +40,9 @@ def stitch_video(video_path, output_path):
     template_h = int(h * 0.2)
 
     print(f"⚡ 正在分析 (梯度匹配模式)...")
-    
+
     last_shift = 0
-    SEARCH_WINDOW = 50 
+    SEARCH_WINDOW = 50
 
     while True:
         ret, curr_frame = cap.read()
@@ -61,11 +61,11 @@ def stitch_video(video_path, output_path):
 
         # 3. 匹配
         res = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
-        
+
         # 4. 惯性约束
         if last_shift > 0:
             mask = np.zeros_like(res)
-            target_y = last_shift 
+            target_y = last_shift
             y_min = max(0, target_y - SEARCH_WINDOW)
             y_max = min(res.shape[0], target_y + SEARCH_WINDOW)
             mask[y_min:y_max, :] = 1
@@ -81,7 +81,7 @@ def stitch_video(video_path, output_path):
                 new_part = curr_frame[new_content_start_y:, :, :]
                 frames.append(new_part)
                 anchor_frame = curr_frame.copy()
-                
+
                 if last_shift == 0: last_shift = shift
                 else: last_shift = int(last_shift * 0.6 + shift * 0.4)
 

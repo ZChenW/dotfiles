@@ -41,7 +41,7 @@ tooltip label {
 }
 
 /* #workspaces label {
-    font-size: 1.22em; 
+    font-size: 1.22em;
 } */
 
 #workspaces button:hover {
@@ -327,11 +327,26 @@ window#waybar.empty #window {
 }
 
 #custom-left_div.4 {
-  background-color: @surface_bright;
+  background-color: @secondary_container;
   color: @surface_container_high;
   padding: 0px;
   font-size: 1.39em; /* 25px */
 }
+
+#custom-left_div.9 {
+  background-color: @surface_bright;
+  color: @secondary_container;
+  padding: 0px;
+  font-size: 1.39em; /* 25px */
+}
+
+#cpu,
+#memory {
+  background-color: @secondary_container;
+  color: @on_secondary_container;
+  padding: 0px 0.45em;
+}
+
 /* 亮度 */
 #custom-ddcutil-day,
 #custom-ddcutil-night,

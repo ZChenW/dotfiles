@@ -1,9 +1,11 @@
 # AUR and foreign packages (non machine-local).
+adw-gtk-theme-git
 antigravity
 anydesk-bin
 appimagelauncher
 blueberry
 cursor-bin
+darkly-bin
 ddcutil-service
 freetype2-wps
 hyprmag-git
@@ -12,6 +14,10 @@ linuxqq
 microsoft-edge-beta-bin
 mpvpaper
 obsidian-bin
+otf-space-grotesk
+ttf-readex-pro
+ttf-rubik-vf
+ttf-twemoji
 ttf-wps-fonts
 visual-studio-code-bin
 waybar-cava-git

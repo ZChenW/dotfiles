@@ -60,13 +60,13 @@ wait $REC_PID 2>/dev/null
 # Step 4: 处理
 if [ -f "$TMP_VIDEO" ]; then
     notify-send -t 2000 "Longshot" "$TXT_MSG"
-    
+
     "$VENV_PYTHON" "$PY_STITCH" "$TMP_VIDEO" "$OUTPUT_IMG"
     rm -f "$TMP_VIDEO"
-    
+
     if [ -f "$OUTPUT_IMG" ]; then
         if command -v wl-copy &> /dev/null; then wl-copy < "$OUTPUT_IMG"; fi
-        
+
         # 自动执行动作
         FINAL_MODE=$(cat "$CONFIG_FILE" 2>/dev/null || echo "PREVIEW")
         case "$FINAL_MODE" in

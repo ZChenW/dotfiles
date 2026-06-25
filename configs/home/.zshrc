@@ -362,16 +362,24 @@ if [[ -o interactive && -z "${__RUN_RANDOM_FASTFETCH_DONE-}" ]]; then
   run_random_fastfetch
 fi
 
+# source /home/chakew/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
+
+###### Random fastfetch
+
 path=("$HOME/bin" $path)
 export PATH
 if [[ -x "$HOME/bin/fastfetch-random" ]]; then
   alias fastfetch="$HOME/bin/fastfetch-random"
 fi
 
-# ------------------------------------------------------------------------------
-# Local private settings (proxy, tokens, machine-specific values)
-# ------------------------------------------------------------------------------
+######
 
-if [[ -r "$HOME/.zshrc.local" ]]; then
-  source "$HOME/.zshrc.local"
-fi
+# Clash proxy
+export http_proxy="http://127.0.0.1:7890"
+export https_proxy="http://127.0.0.1:7890"
+export all_proxy="socks5://127.0.0.1:7891"
+
+export HTTP_PROXY="$http_proxy"
+export HTTPS_PROXY="$https_proxy"
+export ALL_PROXY="$all_proxy"
+export PATH="$HOME/.npm-global/bin:$PATH"
