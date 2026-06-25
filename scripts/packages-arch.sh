@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 declare -a ESSENTIAL_PACKAGES=(
     git rsync zsh
     kitty lsd yazi fastfetch
@@ -208,7 +212,7 @@ install_packages_batch() {
         if [[ "$assume_yes" == true ]]; then
             pacman_args+=(--noconfirm)
         fi
-        echo "Installing official packages: ${packages[*]}"
+        ui_substep "Installing official packages: ${packages[*]}"
         sudo "${pacman_args[@]}" "${packages[@]}"
         return 0
     fi
@@ -222,7 +226,7 @@ install_packages_batch() {
     if [[ "$assume_yes" == true ]]; then
         aur_args+=(--noconfirm)
     fi
-    echo "Installing AUR packages via $helper: ${packages[*]}"
+    ui_substep "Installing AUR packages via $helper: ${packages[*]}"
     "$helper" "${aur_args[@]}" "${packages[@]}"
 }
 
@@ -246,7 +250,7 @@ package_prompt_yes_no() {
     fi
 
     while true; do
-        read -r -p "$prompt [$hint] " reply
+        read -r -p "$(ui_prompt "$prompt" "$hint")" reply
         reply="${reply:-$default}"
         case "${reply,,}" in
             y | yes)
@@ -256,7 +260,7 @@ package_prompt_yes_no() {
                 return 1
                 ;;
             *)
-                echo "Please answer y or n."
+                ui_warn "Please answer y or n."
                 ;;
         esac
     done
@@ -276,11 +280,11 @@ bootstrap_paru() {
 
     if [[ "$assume_yes" != true ]]; then
         if [[ ! -t 0 || ! -t 1 ]]; then
-            echo "Error: AUR packages require paru or yay, and paru bootstrap needs an interactive TTY or --yes." >&2
+            ui_error "AUR packages require paru or yay, and paru bootstrap needs an interactive TTY or --yes."
             return 1
         fi
         if ! package_prompt_yes_no "No paru/yay found. Bootstrap paru from AUR now?" y; then
-            echo "Error: AUR packages require paru or yay." >&2
+            ui_error "AUR packages require paru or yay."
             return 1
         fi
     fi
@@ -304,7 +308,7 @@ bootstrap_paru() {
     )
 
     if ! command -v paru >/dev/null 2>&1; then
-        echo "Error: paru bootstrap completed but paru is still not on PATH." >&2
+        ui_error "paru bootstrap completed but paru is still not on PATH."
         return 1
     fi
 }
@@ -330,7 +334,7 @@ install_package_files() {
         local -a machine_local_packages=()
         read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
         if ((${#machine_local_packages[@]} > 0)); then
-            echo "Machine-local packages skipped. Re-run with --full-packages to include them."
+            ui_warn "Machine-local packages skipped. Re-run with --full-packages to include them."
         fi
     fi
 
@@ -344,7 +348,7 @@ install_package_files() {
 
     if [[ "$include_aur" != true ]]; then
         if ((${#aur_packages[@]} > 0)); then
-            echo "Skipping AUR packages:"
+            ui_warn "Skipping AUR packages:"
             printf '  %s\n' "${aur_packages[@]}"
         fi
         return 0
@@ -480,7 +484,7 @@ export_package_snapshot() {
     sort_packages manual_review_packages
     dedupe_packages manual_review_packages
 
-    echo "Package export complete:"
+    ui_success "Package export complete:"
     echo "  arch-essential.txt:      $(wc -l <"$packages_dir/arch-essential.txt" | tr -d ' ') lines"
     echo "  arch-desktop.txt:        $(wc -l <"$packages_dir/arch-desktop.txt" | tr -d ' ') lines"
     echo "  arch-apps.txt:           $(wc -l <"$packages_dir/arch-apps.txt" | tr -d ' ') lines"

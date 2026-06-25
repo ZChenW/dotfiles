@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 update_prompt_yes_no() {
     local prompt="$1"
     local default="${2:-n}"
@@ -15,12 +19,12 @@ update_prompt_yes_no() {
     fi
 
     while true; do
-        read -r -p "$prompt [$hint] " reply
+        read -r -p "$(ui_prompt "$prompt" "$hint")" reply
         reply="${reply:-$default}"
         case "${reply,,}" in
             y | yes) return 0 ;;
             n | no) return 1 ;;
-            *) echo "Please answer y or n." ;;
+            *) ui_warn "Please answer y or n." ;;
         esac
     done
 }
@@ -33,7 +37,7 @@ update_repo_has_changes() {
 update_require_clean_repo() {
     local repo_root="$1"
     if update_repo_has_changes "$repo_root"; then
-        echo "Error: local repo has uncommitted changes. Commit, stash, or run snapshot before update." >&2
+        ui_error "local repo has uncommitted changes. Commit, stash, or run snapshot before update."
         return 1
     fi
 }
@@ -92,7 +96,7 @@ run_update() {
     local with_packages="$4"
     local no_snapshot_prompt="$5"
 
-    echo "==> Updating dotfiles repo"
+    ui_step "Updating dotfiles repo"
 
     if [[ "$dry_run" == true ]]; then
         if [[ "$no_snapshot_prompt" != true && "$assume_yes" != true ]]; then
@@ -100,7 +104,7 @@ run_update() {
         fi
         update_pull "$repo_root" true
         update_apply "$repo_root" true "$with_packages"
-        echo "Update dry run complete. No changes were made."
+        ui_success "Update dry run complete. No changes were made."
         return 0
     fi
 
@@ -117,8 +121,8 @@ run_update() {
     update_require_clean_repo "$repo_root"
     update_pull "$repo_root" false
 
-    echo "==> Applying updated dotfiles"
+    ui_step "Applying updated dotfiles"
     update_apply "$repo_root" false "$with_packages"
 
-    echo "Update complete."
+    ui_success "Update complete."
 }

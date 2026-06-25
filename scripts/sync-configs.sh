@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 SYNC_MANIFEST_FILE=".restore-manifest"
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
@@ -19,10 +23,10 @@ sync_mapping_entry() {
 
     if [[ ! -e "$src" ]]; then
         if [[ "$required" == optional ]]; then
-            echo "SKIP optional source: $src"
+            ui_warn "SKIP optional source: $src"
             return 0
         fi
-        echo "Error: missing required repo config source: $src" >&2
+        ui_error "missing required repo config source: $src"
         return 1
     fi
 
@@ -51,10 +55,10 @@ sync_mapping_entry() {
     if [[ "$mode" == dir ]]; then
         mkdir -p "$dest"
         rsync -a --delete -- "$src/" "$dest/"
-        echo "Synced directory: $dest"
+        ui_success "Synced directory: $dest"
     else
         install -Dm"$mode" -- "$src" "$dest"
-        echo "Synced file: $dest"
+        ui_success "Synced file: $dest"
     fi
 }
 
@@ -90,14 +94,14 @@ sync_zshrc_local() {
             else
                 record_manifest_entry "$manifest" "$zshrc_local" true
                 install -Dm644 -- "$zshrc_local_template" "$zshrc_local"
-                echo "Replaced symlink with real file: $zshrc_local"
+                ui_success "Replaced symlink with real file: $zshrc_local"
             fi
         elif [[ "$dry_run" == true ]]; then
             echo "[dry-run] manifest: $zshrc_local|backed_up"
             echo "[dry-run] keep existing: $zshrc_local"
         else
             record_manifest_entry "$manifest" "$zshrc_local" true
-            echo "Keeping existing: $zshrc_local"
+            ui_warn "Keeping existing: $zshrc_local"
         fi
     elif [[ "$dry_run" == true ]]; then
         echo "[dry-run] manifest: $zshrc_local|created"
@@ -105,7 +109,7 @@ sync_zshrc_local() {
     else
         install -Dm644 -- "$zshrc_local_template" "$zshrc_local"
         record_manifest_entry "$manifest" "$zshrc_local" false
-        echo "Created: $zshrc_local"
+        ui_success "Created: $zshrc_local"
     fi
 }
 
@@ -173,7 +177,7 @@ sync_configs() {
             echo "[dry-run] chmod +x $HOME/.local/bin/inir $HOME/.local/bin/toggle-niri-shell"
         else
             chmod +x "$HOME/.local/bin/inir" "$HOME/.local/bin/toggle-niri-shell"
-            echo "Ensured executable: ~/.local/bin/inir ~/.local/bin/toggle-niri-shell"
+            ui_success "Ensured executable: ~/.local/bin/inir ~/.local/bin/toggle-niri-shell"
         fi
     fi
 

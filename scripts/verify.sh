@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 group_selected() {
     local target_group="$1"
     shift
@@ -41,23 +45,23 @@ verify_installation() {
 
     if group_selected shell "${selected_groups[@]}"; then
         if command -v zsh >/dev/null 2>&1; then
-            echo "Verifying: zsh -n \$HOME/.zshrc"
+            ui_substep "Verifying: zsh -n \$HOME/.zshrc"
             zsh -n "$HOME/.zshrc"
         else
-            echo "SKIP: zsh not installed"
+            ui_warn "SKIP: zsh not installed"
         fi
     fi
 
     if group_selected desktop "${selected_groups[@]}"; then
         if command -v niri >/dev/null 2>&1; then
             if [[ -f "$HOME/.config/niri/config.kdl" ]]; then
-                echo "Verifying: niri validate"
+                ui_substep "Verifying: niri validate"
                 niri validate -c "$HOME/.config/niri/config.kdl"
             else
-                echo "SKIP: niri config missing"
+                ui_warn "SKIP: niri config missing"
             fi
         else
-            echo "SKIP: niri not installed"
+            ui_warn "SKIP: niri not installed"
         fi
     fi
 
@@ -66,21 +70,21 @@ verify_installation() {
             local cmd="${cmd_label%%:*}"
             local check="${cmd_label#*:}"
             if command -v "$cmd" >/dev/null 2>&1; then
-                echo "Verifying: $check"
+                ui_substep "Verifying: $check"
                 # shellcheck disable=SC2086
                 $check >/dev/null
             else
-                echo "SKIP: $cmd not installed"
+                ui_warn "SKIP: $cmd not installed"
             fi
         done
     fi
 
     if group_selected desktop "${selected_groups[@]}"; then
         if command -v waybar >/dev/null 2>&1; then
-            echo "Verifying: waybar --version"
+            ui_substep "Verifying: waybar --version"
             waybar --version >/dev/null
         else
-            echo "SKIP: waybar not installed"
+            ui_warn "SKIP: waybar not installed"
         fi
     fi
 
@@ -133,13 +137,13 @@ verify_installation() {
     local path_item
     for path_item in "${paths[@]}"; do
         if [[ -L "$path_item" ]]; then
-            echo "Error: restored path is a symlink: $path_item" >&2
+            ui_error "restored path is a symlink: $path_item"
             status=1
         elif [[ ! -e "$path_item" ]]; then
-            echo "Error: restored path missing: $path_item" >&2
+            ui_error "restored path missing: $path_item"
             status=1
         else
-            echo "OK: $path_item is a real file or directory"
+            ui_success "$path_item is a real file or directory"
         fi
     done
 
@@ -148,12 +152,12 @@ verify_installation() {
             "$HOME/.config/Code/User/snippets" \
             "$HOME/.config/Cursor/User/snippets"; do
             if [[ -L "$path_item" ]]; then
-                echo "Error: restored path is a symlink: $path_item" >&2
+                ui_error "restored path is a symlink: $path_item"
                 status=1
             elif [[ -e "$path_item" ]]; then
-                echo "OK: $path_item is a real file or directory"
+                ui_success "$path_item is a real file or directory"
             else
-                echo "SKIP optional path: $path_item"
+                ui_warn "SKIP optional path: $path_item"
             fi
         done
     fi

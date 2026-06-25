@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/ui.sh
+source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+
 DOTFILES_BACKUP_BASE="${DOTFILES_BACKUP_BASE:-$HOME/.dotfiles-backups}"
 SYNC_MANIFEST_FILE=".restore-manifest"
 
@@ -66,7 +70,7 @@ backup_path() {
                 echo "resolved_target="
             fi
         } >"${backup_dest}.symlink-info"
-        echo "Backed up symlink: $target_path"
+        ui_success "Backed up symlink: $target_path"
         return 0
     fi
 
@@ -75,7 +79,7 @@ backup_path() {
     else
         cp -a -- "$target_path" "$backup_dest"
     fi
-    echo "Backed up: $target_path"
+    ui_success "Backed up: $target_path"
 }
 
 remove_symlink_dest() {
@@ -90,7 +94,7 @@ remove_symlink_dest() {
         echo "[dry-run] rm -f $dest  # replace symlink with real path"
     else
         rm -f -- "$dest"
-        echo "Removed symlink before copy: $dest"
+        ui_warn "Removed symlink before copy: $dest"
     fi
 }
 
@@ -189,5 +193,5 @@ ROLLBACK_HEADER
     fi
 
     chmod +x "$rollback_script"
-    echo "Wrote rollback script: $rollback_script"
+    ui_success "Wrote rollback script: $rollback_script"
 }

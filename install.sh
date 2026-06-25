@@ -6,6 +6,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
 
+# shellcheck source=scripts/ui.sh
+source "$REPO_ROOT/scripts/ui.sh"
+
 DRY_RUN=false
 ASSUME_YES=false
 SKIP_PACKAGES=false
@@ -106,7 +109,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "Unknown option: $1" >&2
+            ui_error "Unknown option: $1"
             usage >&2
             exit 1
             ;;
@@ -116,14 +119,14 @@ done
 
 require_arch_linux() {
     if [[ ! -f /etc/os-release ]]; then
-        echo "Error: /etc/os-release not found. This installer supports Arch Linux only." >&2
+        ui_error "/etc/os-release not found. This installer supports Arch Linux only."
         exit 1
     fi
 
     # shellcheck source=/dev/null
     source /etc/os-release
     if [[ "${ID:-}" != "arch" ]]; then
-        echo "Error: unsupported OS '${ID:-unknown}'. This installer supports Arch Linux only." >&2
+        ui_error "unsupported OS '${ID:-unknown}'. This installer supports Arch Linux only."
         exit 1
     fi
 }
@@ -182,7 +185,7 @@ prompt_yes_no() {
     fi
 
     while true; do
-        read -r -p "$prompt [$hint] " reply
+        read -r -p "$(ui_prompt "$prompt" "$hint")" reply
         reply="${reply:-$default}"
         case "${reply,,}" in
             y | yes)
@@ -192,7 +195,7 @@ prompt_yes_no() {
                 return 1
                 ;;
             *)
-                echo "Please answer y or n."
+                ui_warn "Please answer y or n."
                 ;;
         esac
     done
@@ -233,14 +236,14 @@ resolve_config_groups() {
                 resolved+=(local-bin)
                 ;;
             *)
-                echo "Unknown config group: $token" >&2
+                ui_error "Unknown config group: $token"
                 return 1
                 ;;
         esac
     done
 
     if ((${#resolved[@]} == 0)); then
-        echo "No config groups selected." >&2
+        ui_error "No config groups selected."
         return 1
     fi
 
@@ -248,8 +251,7 @@ resolve_config_groups() {
 }
 
 print_plan_summary() {
-    echo
-    echo "=== Installation plan ==="
+    ui_section "Installation plan"
     echo "Repository: $REPO_ROOT"
     echo "Dry run: $DRY_RUN"
 
@@ -288,13 +290,12 @@ run_interactive_setup() {
     local mode_choice group_input
 
     if [[ "$PACKAGES_ONLY" != true && "$SKIP_PACKAGES" != true ]]; then
-        echo
-        echo "=== Step 1: Install mode ==="
+        ui_section "Step 1: Install mode"
         echo "  1) Full install (packages + configs)"
         echo "  2) Packages only"
         echo "  3) Configs only"
         echo "  4) Dry-run preview (full install)"
-        read -r -p "Choice [1]: " mode_choice
+        read -r -p "$(ui_prompt "Choice" "1")" mode_choice
         case "${mode_choice:-1}" in
             1) ;;
             2)
@@ -307,15 +308,14 @@ run_interactive_setup() {
                 DRY_RUN=true
                 ;;
             *)
-                echo "Invalid choice: $mode_choice" >&2
+                ui_error "Invalid choice: $mode_choice"
                 exit 1
                 ;;
         esac
     fi
 
     if [[ "$SKIP_PACKAGES" != true ]]; then
-        echo
-        echo "=== Step 2: Software scope ==="
+        ui_section "Step 2: Software scope"
         if ! prompt_yes_no "Install packages?" y; then
             SKIP_PACKAGES=true
         else
@@ -338,8 +338,7 @@ run_interactive_setup() {
     fi
 
     if [[ "$PACKAGES_ONLY" != true ]]; then
-        echo
-        echo "=== Step 3: Config groups ==="
+        ui_section "Step 3: Config groups"
         echo "Available groups:"
         echo "  1) shell      - .zshrc, .zshrc.local"
         echo "  2) desktop    - niri, waybar, fcitx5, mako, environment.d, qt5ct, qt6ct"
@@ -347,21 +346,19 @@ run_interactive_setup() {
         echo "  4) apps       - waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore"
         echo "  5) editors    - Code/Cursor settings, keybindings, optional snippets"
         echo "  6) local-bin  - inir, toggle-niri-shell"
-        read -r -p "Select groups (comma-separated names or numbers, default all): " group_input
+        read -r -p "$(ui_prompt "Select groups (comma-separated names or numbers, default all)" "all")" group_input
         resolve_config_groups "${group_input:-all}"
     fi
 
-    echo
-    echo "=== Step 4: Local private config ==="
+    ui_section "Step 4: Local private config"
     echo "\$HOME/.zshrc.local is only handled when the shell group is selected."
     echo "Existing regular files are kept. Missing files are created from the template."
     echo "Existing symlinks are backed up and replaced with a real file."
 
     print_plan_summary
-    echo
-    echo "=== Step 5: Confirm ==="
+    ui_section "Step 5: Confirm"
     if ! prompt_yes_no "Proceed?" n; then
-        echo "Aborted."
+        ui_warn "Aborted."
         exit 0
     fi
 }
@@ -379,7 +376,7 @@ apply_non_interactive_defaults() {
 }
 
 main() {
-    echo "Dotfiles installer"
+    ui_banner
     echo "Repository: $REPO_ROOT"
 
     require_arch_linux
@@ -405,7 +402,7 @@ main() {
     fi
 
     if [[ "$EXPORT_PACKAGES" == true ]]; then
-        echo "==> Exporting package snapshot"
+        ui_step "Exporting package snapshot"
         export_package_snapshot "$REPO_ROOT"
         exit 0
     fi
@@ -415,24 +412,24 @@ main() {
     elif is_tty; then
         run_interactive_setup
     else
-        echo "Error: non-interactive stdin/stdout requires --yes." >&2
+        ui_error "non-interactive stdin/stdout requires --yes."
         echo "Run in a terminal for interactive mode, or pass --yes for scripted installs." >&2
         exit 1
     fi
 
     if [[ "$SKIP_PACKAGES" != true ]]; then
-        echo "==> Installing packages"
+        ui_step "Installing packages"
         install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"
     else
-        echo "==> Skipping package installation"
+        ui_step "Skipping package installation"
     fi
 
     if [[ "$PACKAGES_ONLY" == true ]]; then
         echo
         if [[ "$DRY_RUN" == true ]]; then
-            echo "Packages-only dry run complete. No config changes were made."
+            ui_success "Packages-only dry run complete. No config changes were made."
         else
-            echo "Packages-only install complete."
+            ui_success "Packages-only install complete."
         fi
         exit 0
     fi
@@ -447,28 +444,28 @@ main() {
     local backup_root
     if [[ "$DRY_RUN" == true ]]; then
         backup_root="$(create_backup_dir)"
-        echo "==> Dry run: would create backup directory $backup_root"
+        ui_step "Dry run: would create backup directory $backup_root"
     else
         backup_root="$(create_backup_dir)"
         mkdir -p "$backup_root"
-        echo "==> Created backup directory: $backup_root"
+        ui_step "Created backup directory: $backup_root"
     fi
 
-    echo "==> Syncing configs"
+    ui_step "Syncing configs"
     sync_configs "$REPO_ROOT" "$backup_root" "$DRY_RUN" "${SELECTED_GROUPS[@]}"
 
     if [[ "$RESTORE_ONLY" == true ]]; then
-        echo "==> Restore-only mode: skipping optional service actions"
+        ui_step "Restore-only mode: skipping optional service actions"
     fi
 
-    echo "==> Verifying installation"
+    ui_step "Verifying installation"
     verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"
 
     echo
     if [[ "$DRY_RUN" == true ]]; then
-        echo "Dry run complete. No changes were made."
+        ui_success "Dry run complete. No changes were made."
     else
-        echo "Install complete."
+        ui_success "Install complete."
         echo "Backup directory: $backup_root"
         echo "To roll back: $backup_root/rollback.sh"
     fi
