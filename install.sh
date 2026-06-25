@@ -25,6 +25,15 @@ SNAPSHOT_PUSH=false
 UPDATE=false
 UPDATE_WITH_PACKAGES=false
 UPDATE_NO_SNAPSHOT_PROMPT=false
+VERBOSE=0
+DEBUG=0
+NO_COLOR_FLAG=false
+ASCII_FLAG=false
+MODE_LABEL=""
+BACKUP_ROOT=""
+LOG_FILE=""
+LOG_INITIALIZED=false
+INTRO_PRINTED=false
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
 SELECTED_GROUPS=()
@@ -52,6 +61,10 @@ Options:
   --update           Pull repo updates, then apply configs
   --with-packages    With --update: install package manifests after pulling
   --no-snapshot-prompt  With --update: do not ask to snapshot before pulling
+  --verbose          Show readable per-operation details
+  --debug            Show raw commands and internal details; implies --verbose
+  --no-color         Disable color output
+  --ascii            Disable Unicode symbols and box drawing
   --help             Show this help message
 EOF
 }
@@ -104,6 +117,21 @@ while [[ $# -gt 0 ]]; do
         --no-snapshot-prompt)
             UPDATE_NO_SNAPSHOT_PROMPT=true
             ;;
+        --verbose)
+            VERBOSE=1
+            ;;
+        --debug)
+            DEBUG=1
+            VERBOSE=1
+            ;;
+        --no-color)
+            NO_COLOR_FLAG=true
+            NO_COLOR=1
+            ;;
+        --ascii)
+            ASCII_FLAG=true
+            DOTFILES_ASCII=1
+            ;;
         --help|-h)
             usage
             exit 0
@@ -116,6 +144,17 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+UI_VERBOSE="$VERBOSE"
+UI_DEBUG="$DEBUG"
+export UI_VERBOSE UI_DEBUG
+if [[ "$NO_COLOR_FLAG" == true ]]; then
+    export NO_COLOR
+fi
+if [[ "$ASCII_FLAG" == true ]]; then
+    export DOTFILES_ASCII
+fi
+ui_init
 
 require_arch_linux() {
     if [[ ! -f /etc/os-release ]]; then
@@ -286,6 +325,33 @@ print_plan_summary() {
     fi
 }
 
+mode_label() {
+    if [[ -n "$MODE_LABEL" ]]; then
+        printf '%s\n' "$MODE_LABEL"
+        return 0
+    fi
+
+    if [[ "$SNAPSHOT" == true && "$DRY_RUN" == true ]]; then
+        printf 'snapshot + dry-run\n'
+    elif [[ "$SNAPSHOT" == true ]]; then
+        printf 'snapshot\n'
+    elif [[ "$UPDATE" == true && "$DRY_RUN" == true ]]; then
+        printf 'update + dry-run\n'
+    elif [[ "$UPDATE" == true ]]; then
+        printf 'update\n'
+    elif [[ "$EXPORT_PACKAGES" == true ]]; then
+        printf 'export packages\n'
+    elif [[ "$DRY_RUN" == true ]]; then
+        printf 'dry-run\n'
+    elif [[ "$PACKAGES_ONLY" == true ]]; then
+        printf 'packages-only install\n'
+    elif [[ "$RESTORE_ONLY" == true ]]; then
+        printf 'restore-only install\n'
+    else
+        printf 'install\n'
+    fi
+}
+
 run_interactive_setup() {
     local mode_choice group_input
 
@@ -375,36 +441,162 @@ apply_non_interactive_defaults() {
     fi
 }
 
-main() {
-    ui_banner
-    echo "Repository: $REPO_ROOT"
+init_log_once() {
+    [[ "$LOG_INITIALIZED" == true ]] && return 0
 
-    require_arch_linux
+    if [[ "$DRY_RUN" == true || "$SNAPSHOT" == true || "$UPDATE" == true || "$EXPORT_PACKAGES" == true ]]; then
+        LOG_FILE="/tmp/dotfiles-install-$(date +%Y%m%d-%H%M%S).log"
+    else
+        # shellcheck source=scripts/backup.sh
+        source "$REPO_ROOT/scripts/backup.sh"
+        BACKUP_ROOT="$(create_backup_dir)"
+        LOG_FILE="$BACKUP_ROOT/install.log"
+        mkdir -p "$BACKUP_ROOT"
+    fi
+    : >"$LOG_FILE"
+    DOTFILES_LOG_FILE="$LOG_FILE"
+    export DOTFILES_LOG_FILE
+    LOG_INITIALIZED=true
+}
+
+print_intro_once() {
+    [[ "$INTRO_PRINTED" == true ]] && return 0
+
+    ui_banner "Dotfiles Installer" "Make this machine feel like home."
+    echo
+    ui_kv "Repository" "$REPO_ROOT"
+    ui_kv "Mode" "$(mode_label)"
+    if [[ -n "$BACKUP_ROOT" ]]; then
+        ui_kv "Backup" "$BACKUP_ROOT"
+    fi
+    ui_kv "Log" "$LOG_FILE"
+    INTRO_PRINTED=true
+}
+
+snapshot_managed_configs() {
+    snapshot_capture_configs "$REPO_ROOT" false
+}
+
+export_package_manifests() {
+    export_package_snapshot "$REPO_ROOT"
+}
+
+normalize_captured_text_files() {
+    snapshot_normalize_captured_files "$REPO_ROOT"
+}
+
+run_safety_check() {
+    snapshot_safety_check "$REPO_ROOT"
+}
+
+plan_packages() {
+    install_package_files true "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"
+}
+
+print_package_plan_summary() {
+    :
+}
+
+plan_config_sync() {
+    # shellcheck source=scripts/backup.sh
+    source "$REPO_ROOT/scripts/backup.sh"
+    # shellcheck source=scripts/sync-configs.sh
+    source "$REPO_ROOT/scripts/sync-configs.sh"
+
+    BACKUP_ROOT="$(create_backup_dir)"
+    debug_log "[dry-run] would create backup directory $BACKUP_ROOT"
+    sync_configs "$REPO_ROOT" "$BACKUP_ROOT" true "${SELECTED_GROUPS[@]}"
+}
+
+print_config_plan_summary() {
+    :
+}
+
+run_verification() {
+    # shellcheck source=scripts/verify.sh
+    source "$REPO_ROOT/scripts/verify.sh"
+    verify_installation true "${SELECTED_GROUPS[@]}"
+}
+
+snapshot_result_detail() {
+    if [[ -z "$(git -C "$REPO_ROOT" status --short -- packages configs)" ]]; then
+        printf 'No changes detected\n'
+    else
+        printf 'Changes left uncommitted\n'
+    fi
+}
+
+run_snapshot_workflow() {
+    DRY_RUN=true
+    MODE_LABEL="snapshot + dry-run"
+    SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+
+    init_log_once
+    print_intro_once
 
     # shellcheck source=scripts/packages-arch.sh
     source "$REPO_ROOT/scripts/packages-arch.sh"
+    # shellcheck source=scripts/snapshot.sh
+    source "$REPO_ROOT/scripts/snapshot.sh"
 
-    validate_snapshot_flags
-    validate_update_flags
+    ui_section "1/5 Snapshot"
+    snapshot_managed_configs
+    normalize_captured_text_files
+    ui_ok "Text files normalized"
+    run_safety_check
+    ui_ok "Safety check passed"
+
+    ui_section "2/5 Package manifests"
+    export_package_manifests
+
+    ui_section "3/5 Package plan"
+    plan_packages
+    print_package_plan_summary
+
+    ui_section "4/5 Config plan"
+    plan_config_sync
+    print_config_plan_summary
+
+    ui_section "5/5 Verification"
+    run_verification
+
+    ui_result_box "Result" \
+        "ok:Dry run complete" \
+        "ok:No changes were made" \
+        "ok:Snapshot complete" \
+        "ok:$(snapshot_result_detail)"
+
+    if [[ "$SNAPSHOT_NO_COMMIT" == true ]]; then
+        return 0
+    fi
+
+    if [[ "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
+        snapshot_commit "$REPO_ROOT"
+        if [[ "$SNAPSHOT_PUSH" == true ]]; then
+            snapshot_push "$REPO_ROOT"
+        fi
+    fi
+}
+
+run_install_workflow() {
+    init_log_once
+    print_intro_once
+
+    # shellcheck source=scripts/packages-arch.sh
+    source "$REPO_ROOT/scripts/packages-arch.sh"
 
     if [[ "$UPDATE" == true ]]; then
         # shellcheck source=scripts/update.sh
         source "$REPO_ROOT/scripts/update.sh"
         run_update "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$UPDATE_WITH_PACKAGES" "$UPDATE_NO_SNAPSHOT_PROMPT"
-        exit 0
-    fi
-
-    if [[ "$SNAPSHOT" == true ]]; then
-        # shellcheck source=scripts/snapshot.sh
-        source "$REPO_ROOT/scripts/snapshot.sh"
-        run_snapshot "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$SNAPSHOT_NO_COMMIT" "$SNAPSHOT_COMMIT" "$SNAPSHOT_PUSH"
-        exit 0
+        return 0
     fi
 
     if [[ "$EXPORT_PACKAGES" == true ]]; then
-        ui_step "Exporting package snapshot"
+        ui_section "Package manifests"
         export_package_snapshot "$REPO_ROOT"
-        exit 0
+        ui_result_box "Result" "ok:Package export complete"
+        return 0
     fi
 
     if [[ "$ASSUME_YES" == true ]]; then
@@ -414,24 +606,33 @@ main() {
     else
         ui_error "non-interactive stdin/stdout requires --yes."
         echo "Run in a terminal for interactive mode, or pass --yes for scripted installs." >&2
-        exit 1
+        return 1
     fi
 
     if [[ "$SKIP_PACKAGES" != true ]]; then
-        ui_step "Installing packages"
-        install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"
+        if [[ "$DRY_RUN" == true ]]; then
+            ui_section "3/5 Package plan"
+        else
+            ui_section "3/5 Installing packages"
+        fi
+        if ! install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"; then
+            ui_result_box "Result" "fail:Install failed"
+            ui_note "See log: $LOG_FILE"
+            return 1
+        fi
     else
-        ui_step "Skipping package installation"
+        ui_section "3/5 Package plan"
+        ui_warn "Package installation skipped"
     fi
 
     if [[ "$PACKAGES_ONLY" == true ]]; then
         echo
         if [[ "$DRY_RUN" == true ]]; then
-            ui_success "Packages-only dry run complete. No config changes were made."
+            ui_result_box "Result" "ok:Dry run complete" "ok:No config changes were made"
         else
-            ui_success "Packages-only install complete."
+            ui_result_box "Result" "ok:Packages-only install complete"
         fi
-        exit 0
+        return 0
     fi
 
     # shellcheck source=scripts/backup.sh
@@ -441,33 +642,60 @@ main() {
     # shellcheck source=scripts/verify.sh
     source "$REPO_ROOT/scripts/verify.sh"
 
-    local backup_root
     if [[ "$DRY_RUN" == true ]]; then
-        backup_root="$(create_backup_dir)"
-        ui_step "Dry run: would create backup directory $backup_root"
+        BACKUP_ROOT="$(create_backup_dir)"
+        debug_log "[dry-run] would create backup directory $BACKUP_ROOT"
     else
-        backup_root="$(create_backup_dir)"
-        mkdir -p "$backup_root"
-        ui_step "Created backup directory: $backup_root"
+        mkdir -p "$BACKUP_ROOT"
+        debug_log "created backup directory: $BACKUP_ROOT"
     fi
 
-    ui_step "Syncing configs"
-    sync_configs "$REPO_ROOT" "$backup_root" "$DRY_RUN" "${SELECTED_GROUPS[@]}"
+    if [[ "$DRY_RUN" == true ]]; then
+        ui_section "4/5 Config plan"
+    else
+        ui_section "4/5 Syncing configs"
+    fi
+    if ! sync_configs "$REPO_ROOT" "$BACKUP_ROOT" "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
+        ui_result_box "Result" "fail:Config sync failed"
+        ui_note "See log: $LOG_FILE"
+        return 1
+    fi
 
     if [[ "$RESTORE_ONLY" == true ]]; then
-        ui_step "Restore-only mode: skipping optional service actions"
+        verbose_log "restore-only mode: skipping optional service actions"
     fi
 
-    ui_step "Verifying installation"
-    verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"
+    ui_section "5/5 Verification"
+    if ! verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
+        ui_result_box "Result" "fail:Verification failed" "ok:Backup preserved"
+        ui_note "See log: $LOG_FILE"
+        return 1
+    fi
 
-    echo
     if [[ "$DRY_RUN" == true ]]; then
-        ui_success "Dry run complete. No changes were made."
+        ui_result_box "Result" "ok:Dry run complete" "ok:No changes were made" "ok:Rollback script planned"
     else
-        ui_success "Install complete."
-        echo "Backup directory: $backup_root"
-        echo "To roll back: $backup_root/rollback.sh"
+        ui_result_box "Result" "ok:Install complete" "ok:Backup created" "ok:Rollback script ready" "ok:Verification passed"
+        ui_note "Rollback: $BACKUP_ROOT/rollback.sh"
+    fi
+}
+
+run_dry_run_workflow() {
+    DRY_RUN=true
+    run_install_workflow
+}
+
+main() {
+    validate_snapshot_flags
+    validate_update_flags
+    require_arch_linux
+
+    if [[ "$SNAPSHOT" == true ]]; then
+        run_snapshot_workflow
+    elif [[ "$DRY_RUN" == true ]]; then
+        run_dry_run_workflow
+    else
+        run_install_workflow
     fi
 }
 

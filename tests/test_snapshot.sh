@@ -67,22 +67,35 @@ if [[ "$before_hash" != "$after_hash" ]]; then
     exit 1
 fi
 
-if [[ "$output" != *"[dry-run] install -Dm644 $HOME/.config/mako/config -> $fake_repo/configs/config/mako/config"* ]]; then
-    echo "Expected dry-run file copy plan" >&2
+if [[ "$output" == *"[dry-run] install -Dm644"* || "$output" == *"[dry-run] rsync"* ]]; then
+    echo "Expected default snapshot dry-run output to hide raw copy commands" >&2
     printf '%s\n' "$output" >&2
     exit 1
 fi
 
-if [[ "$output" != *"[dry-run] rsync -a --delete --delete-excluded $HOME/.config/mako/ -> $fake_repo/configs/config/mako/"* ]]; then
-    echo "Expected dry-run directory copy plan" >&2
+if [[ "$output" != *"Managed configs captured"* ]]; then
+    echo "Expected default snapshot dry-run summary" >&2
     printf '%s\n' "$output" >&2
     exit 1
 fi
 
 export_dry="$(snapshot_run_package_export "$fake_repo" true)"
-if [[ "$export_dry" != *"[dry-run] export package snapshot into packages/*.txt"* ]]; then
-    echo "Expected dry-run package export plan" >&2
+if [[ "$export_dry" == *"[dry-run] export package snapshot into packages/*.txt"* || "$export_dry" != *"Export planned"* ]]; then
+    echo "Expected default package export dry-run summary" >&2
     printf '%s\n' "$export_dry" >&2
+    exit 1
+fi
+
+debug_output="$(UI_DEBUG=1 UI_VERBOSE=1 snapshot_capture_configs "$fake_repo" true)"
+if [[ "$debug_output" != *"[dry-run] install -Dm644 $HOME/.config/mako/config -> $fake_repo/configs/config/mako/config"* ]]; then
+    echo "Expected debug snapshot dry-run file copy command" >&2
+    printf '%s\n' "$debug_output" >&2
+    exit 1
+fi
+
+if [[ "$debug_output" != *"[dry-run] rsync -a --delete --delete-excluded $HOME/.config/mako/ -> $fake_repo/configs/config/mako/"* ]]; then
+    echo "Expected debug snapshot dry-run directory copy command" >&2
+    printf '%s\n' "$debug_output" >&2
     exit 1
 fi
 

@@ -101,13 +101,15 @@ snapshot_path_is_managed() {
     local repo_root="$1"
     local path="$2"
     local managed
+    local -a managed_paths=()
 
-    while IFS= read -r managed; do
+    mapfile -t managed_paths < <(snapshot_managed_paths "$repo_root")
+    for managed in "${managed_paths[@]}"; do
         [[ -z "$managed" ]] && continue
         if [[ "$path" == "$managed" || "$path" == "$managed"/* ]]; then
             return 0
         fi
-    done < <(snapshot_managed_paths "$repo_root")
+    done
 
     return 1
 }
@@ -171,6 +173,7 @@ snapshot_capture_configs() {
     local repo_root="$1"
     local dry_run="$2"
     local mapping mode src dest required exclude
+    local captured_count=0
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
         IFS='|' read -r mode src dest required <<<"$mapping"
@@ -188,10 +191,13 @@ snapshot_capture_configs() {
 
         if [[ "$dry_run" == true ]]; then
             if [[ "$mode" == dir ]]; then
-                echo "[dry-run] rsync -a --delete --delete-excluded $src/ -> $repo_root/$dest/"
+                verbose_log "rsync    $dest/"
+                debug_log "[dry-run] rsync -a --delete --delete-excluded $src/ -> $repo_root/$dest/"
             else
-                echo "[dry-run] install -Dm644 $src -> $repo_root/$dest"
+                verbose_log "install  $dest"
+                debug_log "[dry-run] install -Dm644 $src -> $repo_root/$dest"
             fi
+            ((++captured_count))
             continue
         fi
 
@@ -211,7 +217,10 @@ snapshot_capture_configs() {
                 chmod +x "$repo_root/$dest"
                 ;;
         esac
+        ((++captured_count))
     done
+
+    ui_ok "Managed configs captured" "$captured_count paths"
 }
 
 snapshot_run_package_export() {
@@ -219,7 +228,8 @@ snapshot_run_package_export() {
     local dry_run="$2"
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] export package snapshot into packages/*.txt"
+        ui_ok "Export planned"
+        debug_log "[dry-run] export package snapshot into packages/*.txt"
         return 0
     fi
 
@@ -544,25 +554,29 @@ run_snapshot() {
     local commit="$5"
     local push="$6"
 
-    ui_step "Snapshotting managed configs"
+    ui_section "Snapshot"
     snapshot_capture_configs "$repo_root" "$dry_run"
 
-    ui_step "Exporting package manifests"
+    ui_section "Package manifests"
     snapshot_run_package_export "$repo_root" "$dry_run"
 
     if [[ "$dry_run" == true ]]; then
-        ui_step "Dry run: skipping safety check, verification, and commit"
+        ui_ok "Safety check planned"
+        ui_ok "Verification planned"
         return 0
     fi
 
-    ui_step "Normalizing captured text files"
+    ui_section "Normalize"
     snapshot_normalize_captured_files "$repo_root"
+    ui_ok "Text files normalized"
 
-    ui_step "Running safety check"
+    ui_section "Safety"
     snapshot_safety_check "$repo_root"
+    ui_ok "Safety check passed"
 
-    ui_step "Running verification"
+    ui_section "Verification"
     snapshot_run_verification "$repo_root"
+    ui_ok "Verification passed"
 
     echo
     if ! snapshot_print_summary "$repo_root"; then

@@ -11,6 +11,31 @@ SYNC_MANIFEST_FILE=".restore-manifest"
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin)
 
+SYNC_BACKUP_COUNT=0
+SYNC_DIR_COUNT=0
+SYNC_FILE_COUNT=0
+SYNC_TEMPLATE_COUNT=0
+
+sync_display_path() {
+    local path="$1"
+    if [[ "$path" == "$HOME"* ]]; then
+        printf '~%s\n' "${path#"$HOME"}"
+    else
+        printf '%s\n' "$path"
+    fi
+}
+
+sync_count_label() {
+    local count="$1"
+    local singular="$2"
+    local plural="$3"
+    if [[ "$count" == 1 ]]; then
+        printf '1 %s\n' "$singular"
+    else
+        printf '%s %s\n' "$count" "$plural"
+    fi
+}
+
 sync_mapping_entry() {
     local backup_root="$1"
     local dry_run="$2"
@@ -36,29 +61,42 @@ sync_mapping_entry() {
         existed_before=false
     fi
 
+    if path_existed "$dest"; then
+        ((++SYNC_BACKUP_COUNT))
+        verbose_log "backup   $(sync_display_path "$dest")"
+    fi
+
     backup_path "$dest" "$backup_root" "$dry_run"
     remove_symlink_dest "$dest" "$dry_run"
 
     if [[ "$dry_run" == true ]]; then
         local action="created"
         [[ "$existed_before" == true ]] && action="backed_up"
-        echo "[dry-run] manifest: $dest|$action"
+        debug_log "[dry-run] manifest: $dest|$action"
         if [[ "$mode" == dir ]]; then
-            echo "[dry-run] rsync -a $src/ -> $dest/"
+            ((++SYNC_DIR_COUNT))
+            verbose_log "rsync    $(sync_display_path "$dest")/"
+            debug_log "[dry-run] rsync -a $src/ -> $dest/"
         else
-            echo "[dry-run] install -Dm$mode $src -> $dest"
+            ((++SYNC_FILE_COUNT))
+            verbose_log "install  $(sync_display_path "$dest")"
+            debug_log "[dry-run] install -Dm$mode $src -> $dest"
         fi
         return 0
     fi
 
     record_manifest_entry "$manifest" "$dest" "$existed_before"
     if [[ "$mode" == dir ]]; then
+        ((++SYNC_DIR_COUNT))
         mkdir -p "$dest"
         rsync -a --delete -- "$src/" "$dest/"
-        ui_success "Synced directory: $dest"
+        verbose_log "rsync    $(sync_display_path "$dest")/"
+        debug_log "rsync -a --delete $src/ -> $dest/"
     else
+        ((++SYNC_FILE_COUNT))
         install -Dm"$mode" -- "$src" "$dest"
-        ui_success "Synced file: $dest"
+        verbose_log "install  $(sync_display_path "$dest")"
+        debug_log "install -Dm$mode $src -> $dest"
     fi
 }
 
@@ -87,29 +125,42 @@ sync_zshrc_local() {
         backup_path "$zshrc_local" "$backup_root" "$dry_run"
 
         if [[ "$was_symlink" == true ]]; then
+            ((++SYNC_BACKUP_COUNT))
+            ((++SYNC_TEMPLATE_COUNT))
+            verbose_log "backup   $(sync_display_path "$zshrc_local")"
             remove_symlink_dest "$zshrc_local" "$dry_run"
             if [[ "$dry_run" == true ]]; then
-                echo "[dry-run] manifest: $zshrc_local|backed_up"
-                echo "[dry-run] install -Dm644 $zshrc_local_template -> $zshrc_local (replace symlink)"
+                debug_log "[dry-run] manifest: $zshrc_local|backed_up"
+                verbose_log "create   $(sync_display_path "$zshrc_local")"
+                debug_log "[dry-run] install -Dm644 $zshrc_local_template -> $zshrc_local (replace symlink)"
             else
                 record_manifest_entry "$manifest" "$zshrc_local" true
                 install -Dm644 -- "$zshrc_local_template" "$zshrc_local"
-                ui_success "Replaced symlink with real file: $zshrc_local"
+                verbose_log "create   $(sync_display_path "$zshrc_local")"
+                debug_log "install -Dm644 $zshrc_local_template -> $zshrc_local (replace symlink)"
             fi
         elif [[ "$dry_run" == true ]]; then
-            echo "[dry-run] manifest: $zshrc_local|backed_up"
-            echo "[dry-run] keep existing: $zshrc_local"
+            ((++SYNC_BACKUP_COUNT))
+            verbose_log "backup   $(sync_display_path "$zshrc_local")"
+            debug_log "[dry-run] manifest: $zshrc_local|backed_up"
+            debug_log "[dry-run] keep existing: $zshrc_local"
         else
+            ((++SYNC_BACKUP_COUNT))
+            verbose_log "backup   $(sync_display_path "$zshrc_local")"
             record_manifest_entry "$manifest" "$zshrc_local" true
-            ui_warn "Keeping existing: $zshrc_local"
+            ui_warn "Keeping existing" "$(sync_display_path "$zshrc_local")"
         fi
     elif [[ "$dry_run" == true ]]; then
-        echo "[dry-run] manifest: $zshrc_local|created"
-        echo "[dry-run] install -Dm644 $zshrc_local_template -> $zshrc_local (new file)"
+        ((++SYNC_TEMPLATE_COUNT))
+        debug_log "[dry-run] manifest: $zshrc_local|created"
+        verbose_log "create   $(sync_display_path "$zshrc_local")"
+        debug_log "[dry-run] install -Dm644 $zshrc_local_template -> $zshrc_local (new file)"
     else
+        ((++SYNC_TEMPLATE_COUNT))
         install -Dm644 -- "$zshrc_local_template" "$zshrc_local"
         record_manifest_entry "$manifest" "$zshrc_local" false
-        ui_success "Created: $zshrc_local"
+        verbose_log "create   $(sync_display_path "$zshrc_local")"
+        debug_log "install -Dm644 $zshrc_local_template -> $zshrc_local (new file)"
     fi
 }
 
@@ -123,6 +174,11 @@ sync_configs() {
     if ((${#selected_groups[@]} == 0)); then
         selected_groups=("${ALL_CONFIG_GROUPS[@]}")
     fi
+
+    SYNC_BACKUP_COUNT=0
+    SYNC_DIR_COUNT=0
+    SYNC_FILE_COUNT=0
+    SYNC_TEMPLATE_COUNT=0
 
     # shellcheck source=scripts/backup.sh
     source "$repo_root/scripts/backup.sh"
@@ -174,12 +230,18 @@ sync_configs() {
 
     if group_selected local-bin "${selected_groups[@]}"; then
         if [[ "$dry_run" == true ]]; then
-            echo "[dry-run] chmod +x $HOME/.local/bin/inir $HOME/.local/bin/toggle-niri-shell"
+            debug_log "[dry-run] chmod +x $HOME/.local/bin/inir $HOME/.local/bin/toggle-niri-shell"
         else
             chmod +x "$HOME/.local/bin/inir" "$HOME/.local/bin/toggle-niri-shell"
-            ui_success "Ensured executable: ~/.local/bin/inir ~/.local/bin/toggle-niri-shell"
+            verbose_log "chmod    ~/.local/bin/inir ~/.local/bin/toggle-niri-shell"
         fi
     fi
 
     write_rollback_script "$backup_root" "$dry_run"
+
+    ui_ok "Existing paths to back up" "$(sync_count_label "$SYNC_BACKUP_COUNT" path paths)"
+    ui_ok "Directories to sync" "$(sync_count_label "$SYNC_DIR_COUNT" dir dirs)"
+    ui_ok "Files to install" "$(sync_count_label "$SYNC_FILE_COUNT" file files)"
+    ui_ok "Templates to create" "$(sync_count_label "$SYNC_TEMPLATE_COUNT" file files)"
+    ui_ok "Rollback script planned"
 }

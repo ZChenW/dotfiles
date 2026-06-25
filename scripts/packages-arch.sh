@@ -204,7 +204,8 @@ install_packages_batch() {
 
     if [[ "$helper" == pacman ]]; then
         if [[ "$dry_run" == true ]]; then
-            echo "[dry-run] sudo pacman -S --needed ${packages[*]}"
+            verbose_log "pacman   ${#packages[@]} packages planned"
+            debug_log "[dry-run] sudo pacman -S --needed ${packages[*]}"
             return 0
         fi
 
@@ -212,13 +213,20 @@ install_packages_batch() {
         if [[ "$assume_yes" == true ]]; then
             pacman_args+=(--noconfirm)
         fi
-        ui_substep "Installing official packages: ${packages[*]}"
-        sudo "${pacman_args[@]}" "${packages[@]}"
+        verbose_log "pacman   install started (${#packages[@]} packages)"
+        debug_log "sudo ${pacman_args[*]} ${packages[*]}"
+        if sudo "${pacman_args[@]}" "${packages[@]}"; then
+            ui_ok "Pacman install complete"
+        else
+            ui_fail "Pacman install failed"
+            return 1
+        fi
         return 0
     fi
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] $helper -S --needed ${packages[*]}"
+        verbose_log "$helper     ${#packages[@]} packages planned"
+        debug_log "[dry-run] $helper -S --needed ${packages[*]}"
         return 0
     fi
 
@@ -226,8 +234,14 @@ install_packages_batch() {
     if [[ "$assume_yes" == true ]]; then
         aur_args+=(--noconfirm)
     fi
-    ui_substep "Installing AUR packages via $helper: ${packages[*]}"
-    "$helper" "${aur_args[@]}" "${packages[@]}"
+    verbose_log "$helper     install started (${#packages[@]} packages)"
+    debug_log "$helper ${aur_args[*]} ${packages[*]}"
+    if "$helper" "${aur_args[@]}" "${packages[@]}"; then
+        ui_ok "AUR install complete"
+    else
+        ui_fail "AUR install failed"
+        return 1
+    fi
 }
 
 find_aur_helper() {
@@ -271,10 +285,12 @@ bootstrap_paru() {
     local assume_yes="$2"
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] bootstrap AUR helper: paru"
-        echo "[dry-run] sudo pacman -S --needed git base-devel"
-        echo "[dry-run] git clone https://aur.archlinux.org/paru.git /tmp/dotfiles-paru-bootstrap/paru"
-        echo "[dry-run] cd /tmp/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
+        ui_warn "AUR helper bootstrap" "paru planned"
+        verbose_log "bootstrap paru from AUR"
+        debug_log "[dry-run] bootstrap AUR helper: paru"
+        debug_log "[dry-run] sudo pacman -S --needed git base-devel"
+        debug_log "[dry-run] git clone https://aur.archlinux.org/paru.git /tmp/dotfiles-paru-bootstrap/paru"
+        debug_log "[dry-run] cd /tmp/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
         return 0
     fi
 
@@ -328,13 +344,14 @@ install_package_files() {
         "$packages_dir/arch-aur.txt"
     )
 
+    local -a machine_local_packages=()
+    read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
+
     if [[ "$include_machine_local" == true ]]; then
         package_files+=("$packages_dir/arch-machine-local.txt")
     else
-        local -a machine_local_packages=()
-        read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
         if ((${#machine_local_packages[@]} > 0)); then
-            ui_warn "Machine-local packages skipped. Re-run with --full-packages to include them."
+            debug_log "Machine-local packages skipped: ${machine_local_packages[*]}"
         fi
     fi
 
@@ -344,12 +361,23 @@ install_package_files() {
     filter_excluded_packages all_packages exclude_packages
     split_official_and_aur official_packages aur_packages "${all_packages[@]}"
 
+    if [[ "$dry_run" == true ]]; then
+        ui_ok "Pacman packages" "${#official_packages[@]} packages"
+        ui_ok "AUR packages" "${#aur_packages[@]} packages"
+        if [[ "$include_machine_local" != true && ${#machine_local_packages[@]} -gt 0 ]]; then
+            ui_warn "Machine-local skipped" "use --full-packages"
+        fi
+    else
+        ui_ok "Pacman packages" "${#official_packages[@]} packages"
+        ui_ok "AUR packages" "${#aur_packages[@]} packages"
+    fi
+
     install_packages_batch "$dry_run" "$assume_yes" pacman "${official_packages[@]}"
 
     if [[ "$include_aur" != true ]]; then
         if ((${#aur_packages[@]} > 0)); then
-            ui_warn "Skipping AUR packages:"
-            printf '  %s\n' "${aur_packages[@]}"
+            ui_warn "AUR packages skipped" "${#aur_packages[@]} packages"
+            debug_log "AUR packages skipped: ${aur_packages[*]}"
         fi
         return 0
     fi
@@ -367,6 +395,15 @@ install_package_files() {
     fi
 
     install_packages_batch "$dry_run" "$assume_yes" "$aur_helper" "${aur_packages[@]}"
+}
+
+package_manifest_line_count() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        wc -l <"$file" | tr -d ' '
+    else
+        printf '0\n'
+    fi
 }
 
 export_package_snapshot() {
@@ -484,18 +521,18 @@ export_package_snapshot() {
     sort_packages manual_review_packages
     dedupe_packages manual_review_packages
 
-    ui_success "Package export complete:"
-    echo "  arch-essential.txt:      $(wc -l <"$packages_dir/arch-essential.txt" | tr -d ' ') lines"
-    echo "  arch-desktop.txt:        $(wc -l <"$packages_dir/arch-desktop.txt" | tr -d ' ') lines"
-    echo "  arch-apps.txt:           $(wc -l <"$packages_dir/arch-apps.txt" | tr -d ' ') lines"
-    echo "  arch-aur.txt:            $(wc -l <"$packages_dir/arch-aur.txt" | tr -d ' ') lines"
-    echo "  arch-machine-local.txt:  $(wc -l <"$packages_dir/arch-machine-local.txt" | tr -d ' ') lines"
-    echo "  arch-exclude.txt:        $(wc -l <"$packages_dir/arch-exclude.txt" | tr -d ' ') lines"
-    echo "  machine-local packages:  ${#machine_local_packages[@]}"
-    echo "  manual review suggested: ${#manual_review_packages[@]}"
+    ui_ok "Export complete"
+    ui_table_header "manifest" "lines"
+    ui_table_row "arch-essential.txt" "$(package_manifest_line_count "$packages_dir/arch-essential.txt")"
+    ui_table_row "arch-desktop.txt" "$(package_manifest_line_count "$packages_dir/arch-desktop.txt")"
+    ui_table_row "arch-apps.txt" "$(package_manifest_line_count "$packages_dir/arch-apps.txt")"
+    ui_table_row "arch-aur.txt" "$(package_manifest_line_count "$packages_dir/arch-aur.txt")"
+    ui_table_row "arch-machine-local.txt" "$(package_manifest_line_count "$packages_dir/arch-machine-local.txt")"
+    ui_table_row "arch-exclude.txt" "$(package_manifest_line_count "$packages_dir/arch-exclude.txt")"
+    ui_warn "Machine-local packages" "${#machine_local_packages[@]} packages"
+    ui_warn "Manual review suggested" "${#manual_review_packages[@]} packages"
     if ((${#manual_review_packages[@]} > 0)); then
-        echo "  review candidates:"
-        printf '    %s\n' "${manual_review_packages[@]}"
+        ui_review_candidates "${manual_review_packages[@]}"
     fi
 }
 

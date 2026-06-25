@@ -49,10 +49,10 @@ backup_path() {
 
     if [[ "$dry_run" == true ]]; then
         if [[ -L "$target_path" ]]; then
-            echo "[dry-run] backup symlink: $target_path -> $backup_dest"
-            echo "[dry-run] write symlink info: ${backup_dest}.symlink-info"
+            debug_log "[dry-run] backup symlink: $target_path -> $backup_dest"
+            debug_log "[dry-run] write symlink info: ${backup_dest}.symlink-info"
         else
-            echo "[dry-run] backup: $target_path -> $backup_dest"
+            debug_log "[dry-run] backup: $target_path -> $backup_dest"
         fi
         return 0
     fi
@@ -70,7 +70,7 @@ backup_path() {
                 echo "resolved_target="
             fi
         } >"${backup_dest}.symlink-info"
-        ui_success "Backed up symlink: $target_path"
+        debug_log "backup symlink: $target_path -> $backup_dest"
         return 0
     fi
 
@@ -79,22 +79,28 @@ backup_path() {
     else
         cp -a -- "$target_path" "$backup_dest"
     fi
-    ui_success "Backed up: $target_path"
+    debug_log "backup: $target_path -> $backup_dest"
 }
 
 remove_symlink_dest() {
     local dest="$1"
     local dry_run="${2:-false}"
+    local display_dest="$dest"
+
+    if [[ "$display_dest" == "$HOME"* ]]; then
+        display_dest="~${display_dest#"$HOME"}"
+    fi
 
     if [[ ! -L "$dest" ]]; then
         return 0
     fi
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] rm -f $dest  # replace symlink with real path"
+        debug_log "[dry-run] rm -f $dest  # replace symlink with real path"
     else
         rm -f -- "$dest"
-        ui_warn "Removed symlink before copy: $dest"
+        verbose_log "remove   $display_dest symlink"
+        debug_log "rm -f $dest  # replace symlink with real path"
     fi
 }
 
@@ -105,7 +111,7 @@ write_rollback_script() {
     local manifest="$backup_root/$SYNC_MANIFEST_FILE"
 
     if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] write rollback script: $rollback_script"
+        debug_log "[dry-run] write rollback script: $rollback_script"
         return 0
     fi
 
@@ -193,5 +199,6 @@ ROLLBACK_HEADER
     fi
 
     chmod +x "$rollback_script"
-    ui_success "Wrote rollback script: $rollback_script"
+    verbose_log "rollback $rollback_script"
+    debug_log "write rollback script: $rollback_script"
 }

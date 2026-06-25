@@ -48,14 +48,30 @@ output="$(
     PATH="$fakebin" install_package_files true true false true "$tmp_dir/repo"
 )"
 
-if [[ "$output" != *"[dry-run] bootstrap AUR helper: paru"* ]]; then
-    echo "Expected dry-run paru bootstrap plan when no AUR helper exists" >&2
+if [[ "$output" == *"[dry-run] bootstrap AUR helper: paru"* || "$output" == *"[dry-run] paru -S --needed aur-only"* ]]; then
+    echo "Expected default package dry-run output to hide raw commands" >&2
     printf '%s\n' "$output" >&2
     exit 1
 fi
 
-if [[ "$output" != *"[dry-run] paru -S --needed aur-only"* ]]; then
-    echo "Expected AUR package install plan through bootstrapped paru" >&2
+if [[ "$output" != *"Pacman packages"* || "$output" != *"AUR packages"* || "$output" != *"AUR helper bootstrap"* ]]; then
+    echo "Expected default package dry-run summary" >&2
     printf '%s\n' "$output" >&2
+    exit 1
+fi
+
+debug_output="$(
+    PATH="$fakebin" UI_DEBUG=1 UI_VERBOSE=1 install_package_files true true false true "$tmp_dir/repo"
+)"
+
+if [[ "$debug_output" != *"[dry-run] bootstrap AUR helper: paru"* ]]; then
+    echo "Expected debug output to include dry-run paru bootstrap plan" >&2
+    printf '%s\n' "$debug_output" >&2
+    exit 1
+fi
+
+if [[ "$debug_output" != *"[dry-run] paru -S --needed aur-only"* ]]; then
+    echo "Expected debug output to include AUR package raw command" >&2
+    printf '%s\n' "$debug_output" >&2
     exit 1
 fi
