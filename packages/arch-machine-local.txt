@@ -18,7 +18,9 @@ nvidia-open
 nvidia-prime
 os-prober
 pipewire-alsa
+pipewire-pulse
 snap-pac
 snapper
 sof-firmware
 vulkan-radeon
+wireplumber
