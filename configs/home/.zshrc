@@ -77,6 +77,7 @@ unset history_search_up_widget history_search_down_widget
 # ------------------------------------------------------------------------------
 
 ZSH_PLUGIN_HOME="${ZSH_PLUGIN_HOME:-$HOME/.oh-my-zsh/custom/plugins}"
+ZSH_ARCH_PLUGIN_HOME="/usr/share/zsh/plugins"
 ZSH_LEGACY_PLUGIN_HOME="$HOME/.zsh/plugins"
 
 if [[ -r "$ZSH_LEGACY_PLUGIN_HOME/git/git.plugin.zsh" ]]; then
@@ -94,14 +95,19 @@ fi
 if [[ -r "$ZSH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
   source "$ZSH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh"
   bindkey '^\' autosuggest-accept
+elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  source "$ZSH_ARCH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  bindkey '^\' autosuggest-accept
 fi
 
 # Load syntax highlighting last.
 if [[ -r "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
   source "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+  source "$ZSH_ARCH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
 
-unset ZSH_PLUGIN_HOME ZSH_LEGACY_PLUGIN_HOME
+unset ZSH_PLUGIN_HOME ZSH_ARCH_PLUGIN_HOME ZSH_LEGACY_PLUGIN_HOME
 
 # ------------------------------------------------------------------------------
 # Personal aliases
@@ -383,3 +389,9 @@ export HTTP_PROXY="$http_proxy"
 export HTTPS_PROXY="$https_proxy"
 export ALL_PROXY="$all_proxy"
 export PATH="$HOME/.npm-global/bin:$PATH"
+
+# Machine-local/private overrides. Keep this last so install.sh can manage
+# ~/.zshrc while preserving local values in ~/.zshrc.local.
+if [[ -r "$HOME/.zshrc.local" ]]; then
+  source "$HOME/.zshrc.local"
+fi
