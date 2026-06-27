@@ -136,6 +136,7 @@ alias cs485='conda activate cs485'
 alias transformers='conda activate transformers'
 alias y='yazi'
 alias uva='source .venv/bin/activate'
+alias open="xdg-open"
 
 # Keep a few core git shortcuts available even without Oh My Zsh plugin loading.
 alias gst='git status'
