@@ -226,7 +226,7 @@ echo "==> test 8: .zshrc secret markers are scanned outside comments"
 mkdir -p "$fake_repo/configs/home"
 cat >"$fake_repo/configs/home/.zshrc" <<'EOF'
 # Example: export OPENAI_API_KEY=sk-example
-export OPENAI_API_KEY=sk-live
+export OPENAI_API_KEY=sk-live-abcdefghijklmnopqrstuvwxyz
 EOF
 SNAPSHOT_MAPPINGS=(
     "file|$fake_repo/configs/home/.zshrc|configs/home/.zshrc|required"
@@ -242,6 +242,33 @@ alias ll='ls -la'
 EOF
 if ! snapshot_safety_check "$fake_repo"; then
     echo "Expected comment-only secret marker in .zshrc to pass safety check" >&2
+    exit 1
+fi
+
+echo "==> test 8b: CURSOR_API_KEY and ANTHROPIC_AUTH_TOKEN are rejected"
+cat >"$fake_repo/configs/home/.zshrc" <<'EOF'
+export CURSOR_API_KEY='crsr_ba850e8ecf85a3d920c79f8136c6b1793284225b'
+EOF
+if snapshot_safety_check "$fake_repo" 2>/dev/null; then
+    echo "Expected CURSOR_API_KEY export to fail safety check" >&2
+    exit 1
+fi
+
+cat >"$fake_repo/configs/home/.zshrc" <<'EOF'
+export ANTHROPIC_AUTH_TOKEN=sk-7c7536e23fb641dbacd96ffae8d43e39
+EOF
+if snapshot_safety_check "$fake_repo" 2>/dev/null; then
+    echo "Expected ANTHROPIC_AUTH_TOKEN export to fail safety check" >&2
+    exit 1
+fi
+
+cat >"$fake_repo/configs/home/.zshrc" <<'EOF'
+# export CURSOR_API_KEY='crsr_example_placeholder_not_real_000'
+# export ANTHROPIC_AUTH_TOKEN=sk-example_placeholder_not_real
+alias ll='ls -la'
+EOF
+if ! snapshot_safety_check "$fake_repo"; then
+    echo "Expected commented cursor/deepseek examples to pass safety check" >&2
     exit 1
 fi
 

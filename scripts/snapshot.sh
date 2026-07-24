@@ -55,17 +55,29 @@ SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS=(
     .cache/
 )
 
+# Case-insensitive substring markers (matched with grep -iF).
 SNAPSHOT_SECRET_MARKERS=(
     github_pat
     ghp_
     OPENAI_API_KEY
     ANTHROPIC_API_KEY
-    api_key
-    access_token
-    refresh_token
-    cookie
+    ANTHROPIC_AUTH_TOKEN
+    CURSOR_API_KEY
+    API_KEY
+    AUTH_TOKEN
+    ACCESS_TOKEN
+    REFRESH_TOKEN
+    SECRET_KEY
     password=
     passwd=
+)
+
+# High-confidence token shapes (ERE). Keep thresholds high to limit false positives.
+SNAPSHOT_SECRET_TOKEN_REGEXES=(
+    'crsr_[A-Za-z0-9]{20,}'
+    'sk-[A-Za-z0-9]{20,}'
+    'ghp_[A-Za-z0-9]{20,}'
+    'github_pat_[A-Za-z0-9_]{20,}'
 )
 
 SNAPSHOT_SECRET_MARKER_ALLOWLIST=(
@@ -323,21 +335,36 @@ snapshot_secret_marker_comment_skip() {
     return 1
 }
 
+snapshot_file_scan_payload() {
+    local file="$1"
+    local rel_path="$2"
+
+    if snapshot_secret_marker_comment_skip "$rel_path"; then
+        grep -Ev '^[[:space:]]*#' "$file" || true
+    else
+        cat -- "$file"
+    fi
+}
+
 snapshot_file_has_secret_marker() {
     local file="$1"
     local rel_path="$2"
-    local marker
+    local marker regex payload
 
     snapshot_is_text_file "$file" || return 0
 
+    payload="$(snapshot_file_scan_payload "$file" "$rel_path")"
+
     for marker in "${SNAPSHOT_SECRET_MARKERS[@]}"; do
-        if snapshot_secret_marker_comment_skip "$rel_path"; then
-            if grep -Ev '^[[:space:]]*#' "$file" | grep -qF -- "$marker"; then
-                ui_error "secret marker '$marker' found in $rel_path"
-                return 1
-            fi
-        elif grep -qF -- "$marker" "$file"; then
-            ui_error "secret marker '$marker' found in $rel_path"
+        if grep -qiF -- "$marker" <<<"$payload"; then
+            ui_error "secret marker '$marker' found in $rel_path (move secrets to ~/.zshrc.local)"
+            return 1
+        fi
+    done
+
+    for regex in "${SNAPSHOT_SECRET_TOKEN_REGEXES[@]}"; do
+        if grep -Eq -- "$regex" <<<"$payload"; then
+            ui_error "secret token pattern '$regex' found in $rel_path (move secrets to ~/.zshrc.local)"
             return 1
         fi
     done

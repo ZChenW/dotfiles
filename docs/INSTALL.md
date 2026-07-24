@@ -118,7 +118,7 @@ Use this after changing configs or installing/removing packages:
 ./install.sh --snapshot
 ```
 
-The snapshot command refreshes `packages/*.txt` and managed config files from this machine into the repo, runs safety checks, prints a dry-run plan for what install would do on `$HOME` (home is not modified), then asks whether to commit and push when run in a TTY. It stages only snapshot-managed files and never uses `git add .`.
+The snapshot command refreshes `packages/*.txt` and managed config files from this machine into the repo, runs safety checks (including secret markers / token shapes in managed files), prints a dry-run plan for what install would do on `$HOME` (home is not modified), then asks whether to commit and push when run in a TTY. It stages only snapshot-managed files and never uses `git add .`. Secrets belong in `~/.zshrc.local`, which is never snapshotted; if a secret is found in tracked configs, snapshot fails.
 
 Use `--no-commit` to update files only, `--commit` to commit without pushing, and `--push` to request commit+push explicitly.
 
