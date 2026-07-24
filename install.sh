@@ -501,7 +501,7 @@ run_interactive_setup() {
         echo "  3) terminal   - kitty, fastfetch, cava"
         echo "  4) apps       - waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore"
         echo "  5) editors    - Code/Cursor settings, keybindings, optional snippets"
-        echo "  6) local-bin  - inir, toggle-niri-shell"
+        echo "  6) local-bin  - inir, toggle-niri-shell, toggle-wlsunset, wcr-post-apply-waybar.sh"
         echo "  7) media      - Pictures/wallpapers"
         read -r -p "$(ui_prompt "Select groups (comma-separated names or numbers, default all)" "all")" group_input
         resolve_config_groups "${group_input:-all}"

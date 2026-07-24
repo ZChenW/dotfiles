@@ -22,6 +22,70 @@ package_available_in_pacman() {
     pacman -Si "$pkg" >/dev/null 2>&1
 }
 
+# Populates INSTALLED_NAMES and PROVIDES_INDEX from the local pacman DB.
+# INSTALLED_NAMES = exact package names only.
+# PROVIDES_INDEX = exact names + Provides targets.
+build_installed_package_index() {
+    declare -gA INSTALLED_NAMES=()
+    declare -gA PROVIDES_INDEX=()
+    local kind value
+
+    while IFS=' ' read -r kind value; do
+        [[ -n "$value" ]] || continue
+        case "$kind" in
+            N)
+                INSTALLED_NAMES["$value"]=1
+                PROVIDES_INDEX["$value"]=1
+                ;;
+            P)
+                PROVIDES_INDEX["${value%%=*}"]=1
+                ;;
+        esac
+    done < <(
+        awk '
+            FNR == 1 { section = "" }
+            /^%/ { section = $0; next }
+            /^$/ { section = ""; next }
+            section == "%NAME%" { print "N", $0 }
+            section == "%PROVIDES%" { print "P", $0 }
+        ' /var/lib/pacman/local/*/desc 2>/dev/null || true
+    )
+}
+
+package_already_satisfied() {
+    local pkg="$1"
+    if [[ -z "${PROVIDES_INDEX+x}" || ${#PROVIDES_INDEX[@]} -eq 0 ]]; then
+        build_installed_package_index
+    fi
+    [[ -n "${PROVIDES_INDEX[$pkg]+x}" ]]
+}
+
+package_installed_exactly() {
+    local pkg="$1"
+    if [[ -z "${INSTALLED_NAMES+x}" || ${#INSTALLED_NAMES[@]} -eq 0 ]]; then
+        build_installed_package_index
+    fi
+    [[ -n "${INSTALLED_NAMES[$pkg]+x}" ]]
+}
+
+filter_satisfied_packages() {
+    local -n _packages_ref="$1"
+    local -a filtered=()
+    local pkg
+
+    build_installed_package_index
+
+    for pkg in "${_packages_ref[@]}"; do
+        if package_already_satisfied "$pkg"; then
+            debug_log "skip already satisfied: $pkg"
+            continue
+        fi
+        filtered+=("$pkg")
+    done
+
+    _packages_ref=("${filtered[@]}")
+}
+
 read_package_file() {
     local file="$1"
     local -n _packages_ref="$2"
@@ -137,10 +201,11 @@ is_desktop_pkg() {
     [[ "$pkg" =~ ^(ttf-|noto-fonts|wqy-|adobe-source-) ]] && return 0
     [[ "$pkg" =~ ^fcitx5- ]] && return 0
     [[ "$pkg" =~ ^(blueman|bluez-utils|bluetui)$ ]] && return 0
-    [[ "$pkg" =~ ^(cava|chafa|swappy|hyprpicker|awww|swaybg|swaylock)$ ]] && return 0
-    [[ "$pkg" =~ ^(thunar|dolphin|gwenview|ark|mission-center)$ ]] && return 0
+    [[ "$pkg" =~ ^(cava|chafa|swappy|hyprpicker|awww|swaybg|swaylock|wlsunset)$ ]] && return 0
+    [[ "$pkg" =~ ^(thunar|dolphin|gwenview|ark|mission-center|pavucontrol|btop)$ ]] && return 0
+    [[ "$pkg" =~ ^(gnome-clocks|gnome-calendar|ddcutil)$ ]] && return 0
     [[ "$pkg" =~ ^power-profiles ]] && return 0
-    [[ "$pkg" =~ ^(polkit-gnome|packagekit) ]] && return 0
+    [[ "$pkg" =~ ^(polkit-gnome|packagekit|network-manager-applet) ]] && return 0
     [[ "$pkg" =~ ^xdg-desktop-portal ]] && return 0
     [[ "$pkg" =~ ^(qt5-wayland|qt6-wayland|xwayland) ]] && return 0
     [[ "$pkg" =~ ^zsh-(autosuggestions|syntax-highlighting|completions) ]] && return 0
@@ -197,6 +262,8 @@ install_packages_batch() {
     local helper="$3"
     shift 3
     local -a packages=("$@")
+
+    filter_satisfied_packages packages
 
     if ((${#packages[@]} == 0)); then
         return 0
@@ -411,6 +478,8 @@ export_package_snapshot() {
     local packages_dir="$repo_root/packages"
     mkdir -p "$packages_dir"
 
+    build_installed_package_index
+
     local -a native_packages=() foreign_packages=()
     mapfile -t native_packages < <(pacman -Qqen 2>/dev/null || true)
     mapfile -t foreign_packages < <(pacman -Qqem 2>/dev/null || true)
@@ -486,6 +555,12 @@ export_package_snapshot() {
     done
 
     for pkg in "${ESSENTIAL_PACKAGES[@]}" "${existing_essential[@]}"; do
+        # Keep virtual essential names only when nothing installed already provides them.
+        # Example: waybar-cava-git Provides waybar — do not also pin official waybar.
+        if package_already_satisfied "$pkg" && ! package_installed_exactly "$pkg"; then
+            debug_log "essential provided by installed package: $pkg"
+            continue
+        fi
         assign_package "$pkg" essential_packages
     done
 

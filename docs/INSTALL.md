@@ -78,7 +78,7 @@ With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install 
 | `terminal` | `~/.config/kitty`, fastfetch, cava |
 | `apps` | waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
-| `local-bin` | `~/.local/bin/inir`, `toggle-niri-shell` |
+| `local-bin` | `~/.local/bin/inir`, `toggle-niri-shell`, `toggle-wlsunset`, `wcr-post-apply-waybar.sh` |
 | `media` | `~/Pictures/wallpapers` |
 
 `~/.zshrc.local` is handled only when the `shell` group is selected:

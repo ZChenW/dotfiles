@@ -92,6 +92,33 @@ doctor_check_desktop_tools() {
     done
 }
 
+doctor_check_runtime_deps() {
+    local cmd path
+    for cmd in brightnessctl swayidle clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            doctor_ok "Runtime dep" "$cmd"
+        else
+            doctor_warn "Runtime dep" "$cmd missing (referenced by niri/desktop)"
+        fi
+    done
+
+    for path in \
+        "$HOME/.config/niri/scripts/swayidle.sh" \
+        "$HOME/.config/niri/scripts/bar-shell-switch/start-current-bar-shell.sh" \
+        "$HOME/.config/waybar/scripts/matugen-select-type.sh" \
+        "$HOME/.local/bin/toggle-wlsunset" \
+        "$HOME/.local/bin/wcr-post-apply-waybar.sh"
+    do
+        if [[ -x "$path" ]]; then
+            doctor_ok "Runtime script" "${path/#$HOME/~}"
+        elif [[ -e "$path" ]]; then
+            doctor_warn "Runtime script" "${path/#$HOME/~} exists but is not executable"
+        else
+            doctor_warn "Runtime script" "${path/#$HOME/~} missing"
+        fi
+    done
+}
+
 doctor_check_backups() {
     local backup_base="${DOTFILES_BACKUP_BASE:-$HOME/.dotfiles-backups}"
     local -a rollbacks=()
@@ -149,6 +176,7 @@ run_doctor() {
 
     ui_section "Doctor: desktop tools"
     doctor_check_desktop_tools
+    doctor_check_runtime_deps
 
     ui_section "Doctor: managed configs"
     doctor_check_managed_paths "$repo_root"

@@ -13,6 +13,7 @@ SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/kitty|configs/config/kitty|required"
     "dir|$HOME/.config/fastfetch|configs/config/fastfetch|required"
     "dir|$HOME/.config/waypaper|configs/config/waypaper|required"
+    "dir|$HOME/.config/matugen|configs/config/matugen|required"
     "dir|$HOME/.config/fcitx5|configs/config/fcitx5|required"
     "dir|$HOME/.config/mako|configs/config/mako|required"
     "dir|$HOME/.config/environment.d|configs/config/environment.d|required"
@@ -32,6 +33,8 @@ SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
     "file|$HOME/.local/bin/inir|configs/local-bin/inir|required"
     "file|$HOME/.local/bin/toggle-niri-shell|configs/local-bin/toggle-niri-shell|required"
+    "file|$HOME/.local/bin/toggle-wlsunset|configs/local-bin/toggle-wlsunset|required"
+    "file|$HOME/.local/bin/wcr-post-apply-waybar.sh|configs/local-bin/wcr-post-apply-waybar.sh|required"
     "dir|$HOME/Pictures/wallpapers|configs/Pictures/wallpapers|optional"
 )
 
@@ -92,6 +95,10 @@ SNAPSHOT_SECRET_MARKER_COMMENT_SKIP_FILES=(
 SNAPSHOT_RSYNC_EXCLUDES=(
     .codex
     "*.bak"
+    "*.bak.*"
+    "*.bak-*"
+    "*.backup"
+    "*backup*"
 )
 
 snapshot_managed_paths() {
@@ -226,7 +233,7 @@ snapshot_capture_configs() {
         fi
 
         case "$dest" in
-            configs/local-bin/inir | configs/local-bin/toggle-niri-shell)
+            configs/local-bin/inir | configs/local-bin/toggle-niri-shell | configs/local-bin/toggle-wlsunset | configs/local-bin/wcr-post-apply-waybar.sh)
                 chmod +x "$repo_root/$dest"
                 ;;
         esac

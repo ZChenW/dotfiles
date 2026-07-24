@@ -35,14 +35,26 @@ EOF
 
 cat >"$fakebin/pacman" <<'EOF'
 #!/usr/bin/bash
-if [[ "${1:-}" == -Si && "${2:-}" == git ]]; then
-    exit 0
-fi
-exit 1
+case "${1:-}" in
+    -Si)
+        if [[ "${2:-}" == git ]]; then
+            exit 0
+        fi
+        exit 1
+        ;;
+    -Qi|-Qq|-Q)
+        exit 0
+        ;;
+    *)
+        exit 1
+        ;;
+esac
 EOF
 chmod +x "$fakebin/pacman"
 ln -s /usr/bin/awk "$fakebin/awk"
 ln -s /usr/bin/sort "$fakebin/sort"
+ln -s /usr/bin/wc "$fakebin/wc"
+ln -s /usr/bin/tr "$fakebin/tr"
 
 output="$(
     PATH="$fakebin" install_package_files true true false true "$tmp_dir/repo"

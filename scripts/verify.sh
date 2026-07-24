@@ -155,6 +155,7 @@ verify_installation() {
     if group_selected apps "${selected_groups[@]}"; then
         paths+=(
             "$HOME/.config/waypaper"
+            "$HOME/.config/matugen"
             "$HOME/.config/Thunar"
             "$HOME/.config/mimeapps.list"
             "$HOME/.config/user-dirs.dirs"
@@ -173,6 +174,8 @@ verify_installation() {
         paths+=(
             "$HOME/.local/bin/inir"
             "$HOME/.local/bin/toggle-niri-shell"
+            "$HOME/.local/bin/toggle-wlsunset"
+            "$HOME/.local/bin/wcr-post-apply-waybar.sh"
         )
     fi
 

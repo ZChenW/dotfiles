@@ -17,7 +17,6 @@ playerctl
 rsync
 slurp
 swayidle
-waybar
 wf-recorder
 wl-clipboard
 yazi

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Toggle wlsunset (night light). Used by waybar brightness module.
+set -euo pipefail
+
+if ! command -v wlsunset >/dev/null 2>&1; then
+    notify-send "wlsunset" "wlsunset is not installed" 2>/dev/null || true
+    echo "wlsunset not found" >&2
+    exit 1
+fi
+
+if pgrep -x wlsunset >/dev/null 2>&1; then
+    pkill -x wlsunset
+    notify-send "wlsunset" "Night light off" 2>/dev/null || true
+else
+    # Default temperature curve; override with WLSUNSET_ARGS if needed.
+    # shellcheck disable=SC2086
+    nohup wlsunset ${WLSUNSET_ARGS:--t 4000 -T 6500} >/dev/null 2>&1 &
+    disown || true
+    notify-send "wlsunset" "Night light on" 2>/dev/null || true
+fi

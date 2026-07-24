@@ -20,3 +20,6 @@
 # export ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
 # export CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
 # export CLAUDE_CODE_EFFORT_LEVEL=max
+
+# --- machine PATH overlays ---
+# export PATH="$HOME/.kimi-code/bin:$PATH"

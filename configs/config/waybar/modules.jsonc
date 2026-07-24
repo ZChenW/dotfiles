@@ -223,11 +223,10 @@
   },
   //logo+程序启动器
   "custom/applauncher": {
-    "tooltip-format": "左键：软件启动菜单\n右键：切换壁纸\n中键：启用/禁用niri背景自动模糊",
+    "tooltip-format": "左键：软件启动菜单\n右键：切换壁纸",
     "format": "󰣇",
     "on-click": "fuzzel",
-    "on-click-right": "waypaper",
-    "on-click-middle": "~/.config/scripts/niri_auto_blur_bg.sh || pkill -f niri_auto_blur_bg.sh"
+    "on-click-right": "waypaper"
   },
   //电源菜单
   "group/powermenu": {
@@ -382,7 +381,7 @@
     },
     "tooltip-format-activated": "自动熄屏已禁止",
     "tooltip-format-deactivated": "自动熄屏已开启",
-    "on-click-right": "~/.config/scripts/matugen-select-type.sh"
+    "on-click-right": "~/.config/waybar/scripts/matugen-select-type.sh"
   },
   //分隔符󰇝 󱋱
   "custom/separator#1": {

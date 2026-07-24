@@ -183,6 +183,7 @@ build_sync_mappings() {
         "terminal|$config_root/fastfetch|$HOME/.config/fastfetch|dir|required"
         "terminal|$config_root/cava|$HOME/.config/cava|dir|required"
         "apps|$config_root/waypaper|$HOME/.config/waypaper|dir|required"
+        "apps|$config_root/matugen|$HOME/.config/matugen|dir|required"
         "apps|$config_root/Thunar|$HOME/.config/Thunar|dir|required"
         "apps|$config_root/mimeapps.list|$HOME/.config/mimeapps.list|644|required"
         "apps|$config_root/user-dirs.dirs|$HOME/.config/user-dirs.dirs|644|required"
@@ -195,6 +196,8 @@ build_sync_mappings() {
         "editors|$config_root/Cursor/User/snippets|$HOME/.config/Cursor/User/snippets|dir|optional"
         "local-bin|$repo_root/configs/local-bin/inir|$HOME/.local/bin/inir|755|required"
         "local-bin|$repo_root/configs/local-bin/toggle-niri-shell|$HOME/.local/bin/toggle-niri-shell|755|required"
+        "local-bin|$repo_root/configs/local-bin/toggle-wlsunset|$HOME/.local/bin/toggle-wlsunset|755|required"
+        "local-bin|$repo_root/configs/local-bin/wcr-post-apply-waybar.sh|$HOME/.local/bin/wcr-post-apply-waybar.sh|755|required"
         "media|$repo_root/configs/Pictures/wallpapers|$HOME/Pictures/wallpapers|dir|required"
     )
 }
@@ -261,10 +264,14 @@ sync_configs() {
 
     if group_selected local-bin "${selected_groups[@]}"; then
         if [[ "$dry_run" == true ]]; then
-            debug_log "[dry-run] chmod +x $HOME/.local/bin/inir $HOME/.local/bin/toggle-niri-shell"
+            debug_log "[dry-run] chmod +x $HOME/.local/bin/inir $HOME/.local/bin/toggle-niri-shell $HOME/.local/bin/toggle-wlsunset $HOME/.local/bin/wcr-post-apply-waybar.sh"
         else
-            chmod +x "$HOME/.local/bin/inir" "$HOME/.local/bin/toggle-niri-shell"
-            verbose_log "chmod    ~/.local/bin/inir ~/.local/bin/toggle-niri-shell"
+            chmod +x \
+                "$HOME/.local/bin/inir" \
+                "$HOME/.local/bin/toggle-niri-shell" \
+                "$HOME/.local/bin/toggle-wlsunset" \
+                "$HOME/.local/bin/wcr-post-apply-waybar.sh"
+            verbose_log "chmod    ~/.local/bin/{inir,toggle-niri-shell,toggle-wlsunset,wcr-post-apply-waybar.sh}"
         fi
     fi
 
