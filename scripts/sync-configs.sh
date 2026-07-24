@@ -10,6 +10,7 @@ source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 SYNC_MANIFEST_FILE=".restore-manifest"
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin media)
+SYNC_MAPPINGS=()
 
 SYNC_BACKUP_COUNT=0
 SYNC_DIR_COUNT=0
@@ -164,27 +165,12 @@ sync_zshrc_local() {
     fi
 }
 
-sync_configs() {
+# Populate SYNC_MAPPINGS for the given repo root.
+# Format: group|src|dest|mode|required
+build_sync_mappings() {
     local repo_root="$1"
-    local backup_root="$2"
-    local dry_run="${3:-false}"
-    shift 3 || true
-    local -a selected_groups=("$@")
-
-    if ((${#selected_groups[@]} == 0)); then
-        selected_groups=("${ALL_CONFIG_GROUPS[@]}")
-    fi
-
-    SYNC_BACKUP_COUNT=0
-    SYNC_DIR_COUNT=0
-    SYNC_FILE_COUNT=0
-    SYNC_TEMPLATE_COUNT=0
-
-    # shellcheck source=scripts/backup.sh
-    source "$repo_root/scripts/backup.sh"
-
     local config_root="$repo_root/configs/config"
-    local -a mappings=(
+    SYNC_MAPPINGS=(
         "shell|$repo_root/configs/home/.zshrc|$HOME/.zshrc|644|required"
         "desktop|$config_root/niri|$HOME/.config/niri|dir|required"
         "desktop|$config_root/waybar|$HOME/.config/waybar|dir|required"
@@ -211,6 +197,50 @@ sync_configs() {
         "local-bin|$repo_root/configs/local-bin/toggle-niri-shell|$HOME/.local/bin/toggle-niri-shell|755|required"
         "media|$repo_root/configs/Pictures/wallpapers|$HOME/Pictures/wallpapers|dir|required"
     )
+}
+
+# Print managed destination paths (one per line), optionally filtered by groups.
+# Does not include ~/.zshrc.local (private overlay — never uninstall-managed).
+list_managed_dest_paths() {
+    local repo_root="$1"
+    shift || true
+    local -a selected_groups=("$@")
+    local mapping group dest
+
+    if ((${#selected_groups[@]} == 0)); then
+        selected_groups=("${ALL_CONFIG_GROUPS[@]}")
+    fi
+
+    build_sync_mappings "$repo_root"
+    for mapping in "${SYNC_MAPPINGS[@]}"; do
+        IFS='|' read -r group _ dest _ _ <<<"$mapping"
+        if group_selected "$group" "${selected_groups[@]}"; then
+            printf '%s\n' "$dest"
+        fi
+    done
+}
+
+sync_configs() {
+    local repo_root="$1"
+    local backup_root="$2"
+    local dry_run="${3:-false}"
+    shift 3 || true
+    local -a selected_groups=("$@")
+
+    if ((${#selected_groups[@]} == 0)); then
+        selected_groups=("${ALL_CONFIG_GROUPS[@]}")
+    fi
+
+    SYNC_BACKUP_COUNT=0
+    SYNC_DIR_COUNT=0
+    SYNC_FILE_COUNT=0
+    SYNC_TEMPLATE_COUNT=0
+
+    # shellcheck source=scripts/backup.sh
+    source "$repo_root/scripts/backup.sh"
+
+    build_sync_mappings "$repo_root"
+    local -a mappings=("${SYNC_MAPPINGS[@]}")
 
     local manifest="$backup_root/$SYNC_MANIFEST_FILE"
     if [[ "$dry_run" != true ]]; then

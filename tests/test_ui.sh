@@ -79,9 +79,33 @@ if [[ "$(grep -c "Dotfiles Installer" <<<"$box_output")" -ne 1 ]]; then
     printf '%s\n' "$box_output" >&2
     exit 1
 fi
+if [[ "$box_output" != *"██████"* ]]; then
+    echo "Expected giant Unicode DOTFILES logo in default banner" >&2
+    printf '%s\n' "$box_output" >&2
+    exit 1
+fi
 if [[ "$box_output" != *"manifest"* || "$box_output" != *"arch-essential.txt"* || "$box_output" != *"Dry run complete"* || "$box_output" != *"Manual review suggested"* ]]; then
     echo "Expected table and result box content" >&2
     printf '%s\n' "$box_output" >&2
+    exit 1
+fi
+
+echo "==> test 6: ASCII mode uses plain logo"
+ascii_logo_output="$(
+    TERM=dumb DOTFILES_COLOR=auto DOTFILES_ASCII=1 bash -c '
+        source "$1"
+        ui_init
+        ui_logo
+    ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+if [[ "$ascii_logo_output" != *"____"* || "$ascii_logo_output" != *"|  _ \\"* ]]; then
+    echo "Expected ASCII DOTFILES logo fallback" >&2
+    printf '%s\n' "$ascii_logo_output" >&2
+    exit 1
+fi
+if [[ "$ascii_logo_output" == *"█"* ]]; then
+    echo "Expected ASCII logo to avoid block characters" >&2
+    printf '%s\n' "$ascii_logo_output" >&2
     exit 1
 fi
 

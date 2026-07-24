@@ -54,12 +54,18 @@ Non-TTY stdin/stdout without `--yes` fails with a message to use `--yes` or run 
 | `./install.sh --full-packages` | Include `packages/arch-machine-local.txt` |
 | `./install.sh --no-aur` | Skip AUR packages |
 | `./install.sh --export-packages` | Regenerate `packages/*.txt` from this machine |
+| `./install.sh --doctor` | Diagnostics only (tools, configs, backups, validation) |
+| `./install.sh --uninstall` | Safe uninstall: archive then remove managed configs |
+| `./install.sh --uninstall restore` | Run the latest install `rollback.sh` |
+| `./install.sh --uninstall purge` / `--purge` | Remove managed configs and all install backups |
 
 Other flags:
 
 - `--yes` — non-interactive mode with recommended defaults
 - `--restore-only` — same as `--skip-packages`, and skip optional service actions
-- `--dry-run` — preview actions without modifying `$HOME`
+- `--dry-run` — preview actions without modifying `$HOME` (also works with `--uninstall`)
+
+Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, and `tar` for uninstall). Missing tools fail early with an install hint.
 
 With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install official packages only. In interactive mode, AUR is off by default unless you choose to include it. If AUR is enabled and neither `paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode or asks before doing so in interactive mode.
 
@@ -73,6 +79,7 @@ With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install 
 | `apps` | waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
 | `local-bin` | `~/.local/bin/inir`, `toggle-niri-shell` |
+| `media` | `~/Pictures/wallpapers` |
 
 `~/.zshrc.local` is handled only when the `shell` group is selected:
 
@@ -111,7 +118,7 @@ Use this after changing configs or installing/removing packages:
 ./install.sh --snapshot
 ```
 
-The snapshot command refreshes `packages/*.txt` and managed config files from this machine, runs checks, prints changed dotfiles/packages, then asks whether to commit and push. It stages only snapshot-managed files and never uses `git add .`.
+The snapshot command refreshes `packages/*.txt` and managed config files from this machine into the repo, runs safety checks, prints a dry-run plan for what install would do on `$HOME` (home is not modified), then asks whether to commit and push when run in a TTY. It stages only snapshot-managed files and never uses `git add .`.
 
 Use `--no-commit` to update files only, `--commit` to commit without pushing, and `--push` to request commit+push explicitly.
 
@@ -186,6 +193,37 @@ Run that script to restore the pre-install state:
 - Paths created by the installer (for example a new `~/.zshrc.local`) are removed.
 
 The installer prints the exact backup path when it finishes.
+
+Unexpected install failures print the log path and, when available, the backup/rollback path. The installer does **not** auto-rollback on failure; run `rollback.sh` yourself if needed.
+
+## Doctor
+
+Run diagnostics without changing configs:
+
+```bash
+./install.sh --doctor
+```
+
+Doctor checks Arch OS, required tools, AUR helper presence, login shell, desktop tools, managed path presence/symlink safety, backup/rollback availability, and reuses the post-install verification checks.
+
+## Uninstall
+
+Remove managed configs without touching OS packages or `~/.zshrc.local`:
+
+```bash
+# Archive managed configs under ~/.dotfiles-backups, then remove them
+./install.sh --uninstall
+
+# Restore the latest install backup
+./install.sh --uninstall restore
+
+# Remove managed configs and all ~/.dotfiles-backups (final archive under ~/)
+./install.sh --uninstall purge
+# or
+./install.sh --purge --yes
+```
+
+`--dry-run` works with uninstall modes and only prints planned removals.
 
 ## Verification
 

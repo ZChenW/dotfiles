@@ -102,7 +102,7 @@ assert_contains() {
 assert_count "Dotfiles Installer" 1
 assert_count "  Log" 1
 assert_count "Result" 1
-assert_contains "snapshot + dry-run"
+assert_contains "snapshot"
 assert_contains "1/5 Snapshot"
 assert_contains "2/5 Package manifests"
 assert_contains "3/5 Package plan"
@@ -113,4 +113,6 @@ assert_contains "Safety check passed"
 assert_contains "Pacman packages"
 assert_contains "Existing paths to back up"
 assert_contains "zsh syntax"
-assert_contains "No changes were made"
+assert_contains "Home directory unchanged"
+assert_contains "Repo files may have been updated"
+assert_contains "Preflight"

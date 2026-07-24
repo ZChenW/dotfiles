@@ -25,6 +25,9 @@ SNAPSHOT_PUSH=false
 UPDATE=false
 UPDATE_WITH_PACKAGES=false
 UPDATE_NO_SNAPSHOT_PROMPT=false
+DOCTOR=false
+UNINSTALL=false
+UNINSTALL_MODE="safe"
 VERBOSE=0
 DEBUG=0
 NO_COLOR_FLAG=false
@@ -37,6 +40,25 @@ INTRO_PRINTED=false
 
 ALL_CONFIG_GROUPS=(shell desktop terminal apps editors local-bin media)
 SELECTED_GROUPS=()
+
+cleanup_on_exit() {
+    local exit_code=$?
+    if ((exit_code == 0 || exit_code == 130)); then
+        return 0
+    fi
+    echo >&2
+    echo "Installer exited unexpectedly (code $exit_code)." >&2
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        echo "Log: $LOG_FILE" >&2
+    fi
+    if [[ -n "${BACKUP_ROOT:-}" && -d "${BACKUP_ROOT:-}" ]]; then
+        echo "Backup (may be partial): $BACKUP_ROOT" >&2
+        if [[ -x "$BACKUP_ROOT/rollback.sh" ]]; then
+            echo "Rollback: $BACKUP_ROOT/rollback.sh" >&2
+        fi
+    fi
+}
+trap cleanup_on_exit EXIT
 
 usage() {
     cat <<'EOF'
@@ -61,11 +83,21 @@ Options:
   --update           Pull repo updates, then apply configs
   --with-packages    With --update: install package manifests after pulling
   --no-snapshot-prompt  With --update: do not ask to snapshot before pulling
+  --doctor           Run diagnostics without changing configs
+  --uninstall [MODE] Remove managed configs (safe|restore|purge); default: safe
+  --purge            Shortcut for --uninstall purge
   --verbose          Show readable per-operation details
   --debug            Show raw commands and internal details; implies --verbose
   --no-color         Disable color output
   --ascii            Disable Unicode symbols and box drawing
   --help             Show this help message
+
+Uninstall modes:
+  safe               Archive managed configs, then remove them (keeps packages/backups)
+  restore            Run the latest ~/.dotfiles-backups/*/rollback.sh
+  purge              Remove managed configs and all install backups (keeps packages)
+
+Never removes OS packages. Never removes ~/.zshrc.local.
 EOF
 }
 
@@ -116,6 +148,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-snapshot-prompt)
             UPDATE_NO_SNAPSHOT_PROMPT=true
+            ;;
+        --doctor)
+            DOCTOR=true
+            ;;
+        --uninstall)
+            UNINSTALL=true
+            if [[ $# -ge 2 && "$2" != -* ]]; then
+                UNINSTALL_MODE="$2"
+                shift
+            else
+                UNINSTALL_MODE="safe"
+            fi
+            ;;
+        --purge)
+            UNINSTALL=true
+            UNINSTALL_MODE="purge"
             ;;
         --verbose)
             VERBOSE=1
@@ -191,8 +239,8 @@ validate_snapshot_flags() {
         echo "Error: --no-commit cannot be combined with --push." >&2
         exit 1
     fi
-    if [[ "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true ]]; then
-        echo "Error: --snapshot cannot be combined with install/export mode flags." >&2
+    if [[ "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true || "$DOCTOR" == true || "$UNINSTALL" == true ]]; then
+        echo "Error: --snapshot cannot be combined with install/export/doctor/uninstall mode flags." >&2
         exit 1
     fi
 }
@@ -206,9 +254,44 @@ validate_update_flags() {
         return 0
     fi
 
-    if [[ "$SNAPSHOT" == true || "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true || "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
-        echo "Error: --update cannot be combined with snapshot/install/export mode flags." >&2
+    if [[ "$SNAPSHOT" == true || "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$EXPORT_PACKAGES" == true || "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true || "$DOCTOR" == true || "$UNINSTALL" == true ]]; then
+        echo "Error: --update cannot be combined with snapshot/install/export/doctor/uninstall mode flags." >&2
         exit 1
+    fi
+}
+
+validate_lifecycle_flags() {
+    local mode_count=0
+    [[ "$SNAPSHOT" == true ]] && ((++mode_count))
+    [[ "$UPDATE" == true ]] && ((++mode_count))
+    [[ "$EXPORT_PACKAGES" == true ]] && ((++mode_count))
+    [[ "$DOCTOR" == true ]] && ((++mode_count))
+    [[ "$UNINSTALL" == true ]] && ((++mode_count))
+
+    if ((mode_count > 1)); then
+        echo "Error: --snapshot, --update, --export-packages, --doctor, and --uninstall are mutually exclusive." >&2
+        exit 1
+    fi
+
+    if [[ "$DOCTOR" == true ]]; then
+        if [[ "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
+            echo "Error: --doctor cannot be combined with install/snapshot mode flags." >&2
+            exit 1
+        fi
+    fi
+
+    if [[ "$UNINSTALL" == true ]]; then
+        case "$UNINSTALL_MODE" in
+            safe | restore | purge | uninstall) ;;
+            *)
+                echo "Error: unknown uninstall mode '$UNINSTALL_MODE' (use safe, restore, or purge)." >&2
+                exit 1
+                ;;
+        esac
+        if [[ "$PACKAGES_ONLY" == true || "$SKIP_PACKAGES" == true || "$RESTORE_ONLY" == true || "$SNAPSHOT_NO_COMMIT" == true || "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true || "$FULL_PACKAGES" == true ]]; then
+            echo "Error: --uninstall cannot be combined with install/snapshot package flags." >&2
+            exit 1
+        fi
     fi
 }
 
@@ -334,7 +417,11 @@ mode_label() {
         return 0
     fi
 
-    if [[ "$SNAPSHOT" == true && "$DRY_RUN" == true ]]; then
+    if [[ "$DOCTOR" == true ]]; then
+        printf 'doctor\n'
+    elif [[ "$UNINSTALL" == true ]]; then
+        printf 'uninstall (%s)\n' "$UNINSTALL_MODE"
+    elif [[ "$SNAPSHOT" == true && "$DRY_RUN" == true ]]; then
         printf 'snapshot + dry-run\n'
     elif [[ "$SNAPSHOT" == true ]]; then
         printf 'snapshot\n'
@@ -448,7 +535,7 @@ apply_non_interactive_defaults() {
 init_log_once() {
     [[ "$LOG_INITIALIZED" == true ]] && return 0
 
-    if [[ "$DRY_RUN" == true || "$SNAPSHOT" == true || "$UPDATE" == true || "$EXPORT_PACKAGES" == true ]]; then
+    if [[ "$DRY_RUN" == true || "$SNAPSHOT" == true || "$UPDATE" == true || "$EXPORT_PACKAGES" == true || "$DOCTOR" == true || "$UNINSTALL" == true ]]; then
         LOG_FILE="/tmp/dotfiles-install-$(date +%Y%m%d-%H%M%S).log"
     else
         # shellcheck source=scripts/backup.sh
@@ -531,12 +618,16 @@ snapshot_result_detail() {
 }
 
 run_snapshot_workflow() {
-    DRY_RUN=true
-    MODE_LABEL="snapshot + dry-run"
+    # Capture mutates the repo; home stays untouched. Plan steps still run dry.
+    MODE_LABEL="snapshot"
     SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
 
     init_log_once
     print_intro_once
+
+    # shellcheck source=scripts/preflight.sh
+    source "$REPO_ROOT/scripts/preflight.sh"
+    run_preflight snapshot
 
     # shellcheck source=scripts/packages-arch.sh
     source "$REPO_ROOT/scripts/packages-arch.sh"
@@ -565,9 +656,9 @@ run_snapshot_workflow() {
     run_verification
 
     ui_result_box "Result" \
-        "ok:Dry run complete" \
-        "ok:No changes were made" \
-        "ok:Snapshot complete" \
+        "ok:Snapshot capture complete" \
+        "ok:Home directory unchanged" \
+        "ok:Repo files may have been updated" \
         "ok:$(snapshot_result_detail)"
 
     if [[ "$SNAPSHOT_NO_COMMIT" == true ]]; then
@@ -575,16 +666,73 @@ run_snapshot_workflow() {
     fi
 
     if [[ "$SNAPSHOT_COMMIT" == true || "$SNAPSHOT_PUSH" == true ]]; then
+        if [[ "$SNAPSHOT_PUSH" == true ]] && is_tty && [[ "$ASSUME_YES" != true ]]; then
+            if ! prompt_yes_no "Commit and push these snapshot changes?" n; then
+                ui_success "Snapshot complete. Changes left uncommitted."
+                return 0
+            fi
+        fi
         snapshot_commit "$REPO_ROOT"
         if [[ "$SNAPSHOT_PUSH" == true ]]; then
             snapshot_push "$REPO_ROOT"
         fi
+        return 0
     fi
+
+    # Plain --snapshot: ask to commit+push when interactive (matches docs).
+    if is_tty && [[ "$ASSUME_YES" != true ]]; then
+        if prompt_yes_no "Commit and push these snapshot changes?" n; then
+            snapshot_commit "$REPO_ROOT"
+            snapshot_push "$REPO_ROOT"
+        else
+            ui_success "Snapshot complete. Changes left uncommitted."
+        fi
+    fi
+}
+
+run_doctor_workflow() {
+    MODE_LABEL="doctor"
+    init_log_once
+    print_intro_once
+
+    # shellcheck source=scripts/preflight.sh
+    source "$REPO_ROOT/scripts/preflight.sh"
+    run_preflight doctor
+
+    # shellcheck source=scripts/doctor.sh
+    source "$REPO_ROOT/scripts/doctor.sh"
+    run_doctor "$REPO_ROOT"
+}
+
+run_uninstall_workflow() {
+    MODE_LABEL="uninstall ($UNINSTALL_MODE)"
+    init_log_once
+    print_intro_once
+
+    # shellcheck source=scripts/preflight.sh
+    source "$REPO_ROOT/scripts/preflight.sh"
+    run_preflight uninstall
+
+    # shellcheck source=scripts/uninstall.sh
+    source "$REPO_ROOT/scripts/uninstall.sh"
+    run_uninstall "$REPO_ROOT" "$UNINSTALL_MODE" "$DRY_RUN" "$ASSUME_YES"
 }
 
 run_install_workflow() {
     init_log_once
     print_intro_once
+
+    # shellcheck source=scripts/preflight.sh
+    source "$REPO_ROOT/scripts/preflight.sh"
+    if [[ "$UPDATE" == true ]]; then
+        run_preflight update
+    elif [[ "$EXPORT_PACKAGES" == true ]]; then
+        run_preflight export
+    elif [[ "$DRY_RUN" == true ]]; then
+        run_preflight dry-run
+    else
+        run_preflight install
+    fi
 
     # shellcheck source=scripts/packages-arch.sh
     source "$REPO_ROOT/scripts/packages-arch.sh"
@@ -692,9 +840,14 @@ run_dry_run_workflow() {
 main() {
     validate_snapshot_flags
     validate_update_flags
+    validate_lifecycle_flags
     require_arch_linux
 
-    if [[ "$SNAPSHOT" == true ]]; then
+    if [[ "$DOCTOR" == true ]]; then
+        run_doctor_workflow
+    elif [[ "$UNINSTALL" == true ]]; then
+        run_uninstall_workflow
+    elif [[ "$SNAPSHOT" == true ]]; then
         run_snapshot_workflow
     elif [[ "$DRY_RUN" == true ]]; then
         run_dry_run_workflow

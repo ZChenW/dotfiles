@@ -109,12 +109,35 @@ ui_pad_right() {
     printf '%-*s' "$width" "$text"
 }
 
+ui_logo() {
+    # Giant wordmark shown above the installer banner.
+    if [[ -n "${DOTFILES_ASCII:-}" ]]; then
+        printf '%s\n' "$(ui_color "$UI_BOLD$UI_BLUE" '
+ ____   ___ _____ _____ ___ _     _____ ____
+|  _ \ / _ \_   _|  ___|_ _| |   | ____/ ___|
+| | | | | | || | | |_   | || |   |  _| \___ \
+| |_| | |_| || | |  _|  | || |___| |___ ___) |
+|____/ \___/ |_| |_|   |___|_____|_____|____/
+')"
+    else
+        printf '%s\n' "$(ui_color "$UI_BOLD$UI_BLUE" '
+██████╗  ██████╗ ████████╗███████╗██╗██╗     ███████╗███████╗
+██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██║██║     ██╔════╝██╔════╝
+██║  ██║██║   ██║   ██║   █████╗  ██║██║     █████╗  ███████╗
+██║  ██║██║   ██║   ██║   ██╔══╝  ██║██║     ██╔══╝  ╚════██║
+██████╔╝╚██████╔╝   ██║   ██║     ██║███████╗███████╗███████║
+╚═════╝  ╚═════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
+')"
+    fi
+}
+
 ui_banner() {
     local title="${1:-Dotfiles Installer}"
     local subtitle="${2:-Make this machine feel like home.}"
     local width=44
     local inner=$((width - 2))
 
+    ui_logo
     printf '%s%s%s\n' "$(ui_color "$UI_BLUE" "$BOX_TOP_LEFT")" "$(ui_color "$UI_BLUE" "$(ui_repeat "$BOX_HORIZONTAL" "$inner")")" "$(ui_color "$UI_BLUE" "$BOX_TOP_RIGHT")"
     printf '%s %s %s\n' "$(ui_color "$UI_BLUE" "$BOX_VERTICAL")" "$(ui_color "$UI_BOLD" "$(ui_pad_right "$title" $((inner - 2)))")" "$(ui_color "$UI_BLUE" "$BOX_VERTICAL")"
     printf '%s %s %s\n' "$(ui_color "$UI_BLUE" "$BOX_VERTICAL")" "$(ui_color "$UI_DIM" "$(ui_pad_right "$subtitle" $((inner - 2)))")" "$(ui_color "$UI_BLUE" "$BOX_VERTICAL")"
