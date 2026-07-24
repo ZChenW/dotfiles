@@ -7,3 +7,16 @@
 # export HTTP_PROXY="$http_proxy"
 # export HTTPS_PROXY="$https_proxy"
 # export ALL_PROXY="$all_proxy"
+
+# --- cursor ---
+# export CURSOR_API_KEY='crsr_...'
+
+# --- deepseek (Anthropic-compatible) ---
+# export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+# export ANTHROPIC_AUTH_TOKEN=sk-...
+# export ANTHROPIC_MODEL=deepseek-v4-pro[1m]
+# export ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro[1m]
+# export ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro[1m]
+# export ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
+# export CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
+# export CLAUDE_CODE_EFFORT_LEVEL=max

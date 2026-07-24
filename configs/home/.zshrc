@@ -454,8 +454,8 @@ codex1() {
 codex2() {
     CODEX_HOME="$HOME/.codex-plus2" command codex "$@"
 }
-# --- cursor ---
-export CURSOR_API_KEY='crsr_ba850e8ecf85a3d920c79f8136c6b1793284225b298d12bb1bdeaae14814f769'
+# --- cursor / deepseek ---
+# API keys and provider auth belong in ~/.zshrc.local (never commit secrets).
 
 # --- bun ---
 [ -s "/home/chakew/.bun/_bun" ] && source "/home/chakew/.bun/_bun"
@@ -467,15 +467,8 @@ fpath=(~/.grok/completions/zsh $fpath)
 autoload -Uz compinit && compinit -C
 # <<< grok installer <<<
 
-# --- deepseek ---
-export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
-export ANTHROPIC_AUTH_TOKEN=sk-7c7536e23fb641dbacd96ffae8d43e39
-export ANTHROPIC_MODEL=deepseek-v4-pro[1m]
-export ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro[1m]
-export ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro[1m]
-export ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
-export CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
-export CLAUDE_CODE_EFFORT_LEVEL=max
+# kimi-code
+export PATH="/home/chakew/.kimi-code/bin:$PATH"
 
 # ------------------------------------------------------------------------------
 # 12. Local Overrides
@@ -486,6 +479,3 @@ export CLAUDE_CODE_EFFORT_LEVEL=max
 if [[ -r "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
-
-# kimi-code
-export PATH="/home/chakew/.kimi-code/bin:$PATH"
