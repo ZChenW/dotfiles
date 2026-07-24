@@ -1,21 +1,40 @@
+# ==============================================================================
 # Native zsh setup without Oh My Zsh.
+#
 # Backups:
 #   ~/.zshrc.backup
+#   ~/.zshrc.backup.<YYYYMMDD-HHMMSS>
 #   ~/.oh-my-zsh.backup
+# ==============================================================================
 
+# ------------------------------------------------------------------------------
+# 1. Shell Environment
+# ------------------------------------------------------------------------------
+
+# Terminal
 export TERM="xterm-256color"
 
 # Keep PATH tidy and deduplicated.
 typeset -U path PATH
 
+# Core autoloads
 autoload -Uz add-zsh-hook colors compinit
 colors
 setopt prompt_subst
 
-# Completion
+# Allow comments in interactive shells.
+setopt interactivecomments
+
+# ------------------------------------------------------------------------------
+# 2. Completion System
+# ------------------------------------------------------------------------------
+
+# z plugin fpath
 if [[ -d "$HOME/.zsh/plugins/z" ]]; then
   fpath=("$HOME/.zsh/plugins/z" $fpath)
 fi
+
+# Initialize completion.
 compinit -d "$HOME/.zcompdump"
 
 # Keep native zsh completion, but allow case-insensitive directory prefix matching.
@@ -28,7 +47,7 @@ setopt auto_menu
 setopt complete_in_word
 
 # ------------------------------------------------------------------------------
-# History
+# 3. History
 # ------------------------------------------------------------------------------
 
 HISTFILE="$HOME/.zsh_history"
@@ -37,14 +56,14 @@ SAVEHIST=100000
 
 # Keep a large shared history without polluting it with low-value duplicates.
 setopt APPEND_HISTORY
-setopt SHARE_HISTORY
-setopt HIST_IGNORE_DUPS
-setopt HIST_IGNORE_ALL_DUPS
-setopt HIST_SAVE_NO_DUPS
+setopt EXTENDED_HISTORY
 setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_DUPS
 setopt HIST_IGNORE_SPACE
 setopt HIST_REDUCE_BLANKS
-setopt EXTENDED_HISTORY
+setopt HIST_SAVE_NO_DUPS
+setopt SHARE_HISTORY
 
 # SHARE_HISTORY already appends/imports incrementally across sessions, so keep the
 # history-write behavior unambiguous by disabling overlapping modes.
@@ -73,25 +92,29 @@ bindkey '^[OB' "$history_search_down_widget"
 unset history_search_up_widget history_search_down_widget
 
 # ------------------------------------------------------------------------------
-# Independent plugins
+# 4. Plugins
 # ------------------------------------------------------------------------------
 
 ZSH_PLUGIN_HOME="${ZSH_PLUGIN_HOME:-$HOME/.oh-my-zsh/custom/plugins}"
 ZSH_ARCH_PLUGIN_HOME="/usr/share/zsh/plugins"
 ZSH_LEGACY_PLUGIN_HOME="$HOME/.zsh/plugins"
 
+# git
 if [[ -r "$ZSH_LEGACY_PLUGIN_HOME/git/git.plugin.zsh" ]]; then
   source "$ZSH_LEGACY_PLUGIN_HOME/git/git.plugin.zsh"
 fi
 
+# sudo
 if [[ -r "$ZSH_LEGACY_PLUGIN_HOME/sudo/sudo.plugin.zsh" ]]; then
   source "$ZSH_LEGACY_PLUGIN_HOME/sudo/sudo.plugin.zsh"
 fi
 
+# z (directory jumper)
 if [[ -r "$ZSH_LEGACY_PLUGIN_HOME/z/z.plugin.zsh" ]]; then
   source "$ZSH_LEGACY_PLUGIN_HOME/z/z.plugin.zsh"
 fi
 
+# autosuggestions
 if [[ -r "$ZSH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
   source "$ZSH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh"
   bindkey '^\' autosuggest-accept
@@ -100,7 +123,7 @@ elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]
   bindkey '^\' autosuggest-accept
 fi
 
-# Load syntax highlighting last.
+# syntax highlighting (load last)
 if [[ -r "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
   source "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
@@ -110,41 +133,85 @@ fi
 unset ZSH_PLUGIN_HOME ZSH_ARCH_PLUGIN_HOME ZSH_LEGACY_PLUGIN_HOME
 
 # ------------------------------------------------------------------------------
-# Personal aliases
+# 5. PATH
 # ------------------------------------------------------------------------------
 
-alias n='nvim'
-alias l="ls -a"
-alias ls='lsd'
-alias ll='lsd -l'
-alias lla='lsd -la'
-alias upd='sudo pacman -Syu'
-alias zshrc='nvim ~/.zshrc'
-alias ckitty='nvim ~/.config/kitty'
+# Remove stray node_modules home entries.
+path=(${path:#/usr/lib/node_modules/bin/home/*})
+
+# Prepend core user directories.
+path=(
+  /usr/lib/node_modules/bin
+  "$HOME/.npm-global/bin"
+  "$HOME/.local/bin"
+  $path
+)
+export PATH
+
+# Prepend ~/bin for user scripts.
+path=("$HOME/bin" $path)
+export PATH
+
+# Prepend npm global (re-prioritize).
+export PATH="$HOME/.npm-global/bin:$PATH"
+
+# Prepend ~/.local/bin (cursor / general user tools).
+export PATH="$HOME/.local/bin:$PATH"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# ------------------------------------------------------------------------------
+# 6. Aliases
+# ------------------------------------------------------------------------------
+
+# General
 alias cfast='nvim ~/.config/fastfetch/'
+alias ckitty='nvim ~/.config/kitty'
 alias cl='clear'
 alias down='sudo pacman -S'
-alias condac='conda create -n'
-alias condaa='conda activate'
-alias condad='conda deactivate'
+alias l="ls -a"
+alias ll='lsd -l'
+alias lla='lsd -la'
+alias ls='lsd'
+alias n='nvim'
+alias open="xdg-open"
+alias upd='sudo pacman -Syu'
+alias y='yazi'
+alias zshrc='nvim ~/.zshrc'
+
+# Directory navigation
+alias cd..='cd ..'
+
+# Git
 alias gita='git add .'
 alias gitc='git commit -m '
 alias gitp='git push'
-alias cd..='cd ..'
-alias torch-cu128='conda activate torch-cu128'
-alias cs485='conda activate cs485'
-alias transformers='conda activate transformers'
-alias y='yazi'
-alias uva='source .venv/bin/activate'
-alias open="xdg-open"
 
 # Keep a few core git shortcuts available even without Oh My Zsh plugin loading.
-alias gst='git status'
 alias gl='git pull'
 alias gp='git push'
+alias gst='git status'
+
+# Conda environments
+alias condaa='conda activate'
+alias condac='conda create -n'
+alias condad='conda deactivate'
+alias cs485='conda activate cs485'
+alias torch-cu128='conda activate torch-cu128'
+alias transformers='conda activate transformers'
+
+# Python venv
+alias uva='source .venv/bin/activate'
+
+# Fastfetch random
+if [[ -x "$HOME/bin/fastfetch-random" ]]; then
+  alias fastfetch="$HOME/bin/fastfetch-random"
+fi
 
 # ------------------------------------------------------------------------------
-# Conda
+# 7. Conda (Lazy Loading)
 # ------------------------------------------------------------------------------
 
 __load_conda() {
@@ -172,21 +239,7 @@ conda() {
 }
 
 # ------------------------------------------------------------------------------
-# PATH additions
-# ------------------------------------------------------------------------------
-
-path=(${path:#/usr/lib/node_modules/bin/home/*})
-
-path=(
-  /usr/lib/node_modules/bin
-  "$HOME/.npm-global/bin"
-  "$HOME/.local/bin"
-  $path
-)
-export PATH
-
-# ------------------------------------------------------------------------------
-# Agnoster-like prompt without Oh My Zsh
+# 8. Prompt (Agnoster-like, without Oh My Zsh)
 # ------------------------------------------------------------------------------
 
 AGNOSTER_SEGMENT_SEPARATOR=''
@@ -342,7 +395,7 @@ agnoster_build_prompt() {
 PROMPT='$(agnoster_build_prompt)'
 
 # ------------------------------------------------------------------------------
-# Startup behavior
+# 9. Startup
 # ------------------------------------------------------------------------------
 
 # Run random fastfetch once for each new interactive zsh.
@@ -369,19 +422,13 @@ if [[ -o interactive && -z "${__RUN_RANDOM_FASTFETCH_DONE-}" ]]; then
   run_random_fastfetch
 fi
 
+# (disabled) Fastfetch resize hook.
 # source /home/chakew/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
 
-###### Random fastfetch
+# ------------------------------------------------------------------------------
+# 10. Proxy (Clash)
+# ------------------------------------------------------------------------------
 
-path=("$HOME/bin" $path)
-export PATH
-if [[ -x "$HOME/bin/fastfetch-random" ]]; then
-  alias fastfetch="$HOME/bin/fastfetch-random"
-fi
-
-######
-
-# Clash proxy
 export http_proxy="http://127.0.0.1:7890"
 export https_proxy="http://127.0.0.1:7890"
 export all_proxy="socks5://127.0.0.1:7891"
@@ -389,10 +436,56 @@ export all_proxy="socks5://127.0.0.1:7891"
 export HTTP_PROXY="$http_proxy"
 export HTTPS_PROXY="$https_proxy"
 export ALL_PROXY="$all_proxy"
-export PATH="$HOME/.npm-global/bin:$PATH"
+
+# ------------------------------------------------------------------------------
+# 11. Tools & CLI Integrations
+# ------------------------------------------------------------------------------
+
+# --- jj (Jujutsu) ---
+autoload -U compinit
+compinit
+source <(COMPLETE=zsh jj)
+
+# --- codex ---
+codex1() {
+    CODEX_HOME="$HOME/.codex-plus1" command codex "$@"
+}
+
+codex2() {
+    CODEX_HOME="$HOME/.codex-plus2" command codex "$@"
+}
+# --- cursor ---
+export CURSOR_API_KEY='crsr_ba850e8ecf85a3d920c79f8136c6b1793284225b298d12bb1bdeaae14814f769'
+
+# --- bun ---
+[ -s "/home/chakew/.bun/_bun" ] && source "/home/chakew/.bun/_bun"
+
+# --- grok ---
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<
+
+# --- deepseek ---
+export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+export ANTHROPIC_AUTH_TOKEN=sk-7c7536e23fb641dbacd96ffae8d43e39
+export ANTHROPIC_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
+export CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
+export CLAUDE_CODE_EFFORT_LEVEL=max
+
+# ------------------------------------------------------------------------------
+# 12. Local Overrides
+# ------------------------------------------------------------------------------
 
 # Machine-local/private overrides. Keep this last so install.sh can manage
 # ~/.zshrc while preserving local values in ~/.zshrc.local.
 if [[ -r "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
+
+# kimi-code
+export PATH="/home/chakew/.kimi-code/bin:$PATH"

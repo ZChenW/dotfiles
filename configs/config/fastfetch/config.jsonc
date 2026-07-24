@@ -34,7 +34,7 @@
             "type": "packages",
             "key": "  󰏗 Packages",
             "keyColor": "green",
-            "format": "{1}"
+            "format": "{all}"
         },
         {
             "type": "de",

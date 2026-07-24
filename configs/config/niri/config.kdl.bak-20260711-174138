@@ -670,15 +670,15 @@ binds {
     }
 
 
-//    Mod+Shift+9 hotkey-overlay-title="Open Wallpaper Console" {
-//    spawn "kitty" "--class=wallpaper-console" "-e" "/home/chakew/.local/bin/wallpaper-console"
-//}
+    Mod+Shift+9 hotkey-overlay-title="Open Wallpaper Console" {
+    spawn "kitty" "--class=wallpaper-console" "-e" "/home/chakew/.local/bin/wallpaper-console"
+}
 
-    Mod+Shift+9 { spawn-sh "pkill fcitx5 || fcitx5"; }
+    Mod+Shift+8 { spawn-sh "pkill fcitx5 || fcitx5"; }
 
-    Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
+    Mod+Shift+7 { spawn "~/.config/niri/scripts/edit-screenshot.sh"; }
 
-    Mod+Shift+7 hotkey-overlay-title="Toggle Waybar" { spawn "sh" "-c" "pgrep -x waybar >/dev/null && pkill -x waybar || waybar >/dev/null 2>&1 &"; }
+    Mod+Shift+6 hotkey-overlay-title="Toggle Waybar" { spawn "sh" "-c" "pgrep -x waybar >/dev/null && pkill -x waybar || waybar >/dev/null 2>&1 &"; }
 
     Mod+Shift+B hotkey-overlay-title="Toggle Waybar/iNiR" { spawn-sh "~/.local/bin/toggle-niri-shell"; }
 

@@ -19,6 +19,7 @@ gst-plugins-base
 gst-plugins-good
 happy
 jq
+jujutsu
 jupyterlab
 kvantum
 less
@@ -45,6 +46,7 @@ python-scikit-learn
 quickshell
 r
 rime-ice-pinyin-git
+satty
 scratch
 shellcheck
 songrec
