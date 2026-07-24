@@ -272,6 +272,34 @@ if ! snapshot_safety_check "$fake_repo"; then
     exit 1
 fi
 
+echo "==> test 8c: fcitx5 ForPassword keys are not false positives"
+mkdir -p "$fake_repo/configs/config/fcitx5"
+cat >"$fake_repo/configs/config/fcitx5/config" <<'EOF'
+# Allow input method in the password field
+AllowInputMethodForPassword=False
+# Show preedit text when typing password
+ShowPreeditForPassword=False
+EOF
+SNAPSHOT_MAPPINGS=(
+    "dir|$fake_repo/configs/config/fcitx5|configs/config/fcitx5|required"
+)
+if ! snapshot_safety_check "$fake_repo"; then
+    echo "Expected fcitx5 ForPassword settings to pass safety check" >&2
+    exit 1
+fi
+
+cat >"$fake_repo/configs/home/.zshrc" <<'EOF'
+export DB_PASSWORD=super-secret-value
+password=literal-secret
+EOF
+SNAPSHOT_MAPPINGS=(
+    "file|$fake_repo/configs/home/.zshrc|configs/home/.zshrc|required"
+)
+if snapshot_safety_check "$fake_repo" 2>/dev/null; then
+    echo "Expected standalone password= assignment to fail safety check" >&2
+    exit 1
+fi
+
 echo "==> test 9: binary files do not trigger null-byte scan warnings"
 mkdir -p "$fake_repo/configs/config/binary"
 printf 'abc\0def' >"$fake_repo/configs/config/binary/blob.bin"

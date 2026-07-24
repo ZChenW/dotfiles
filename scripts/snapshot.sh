@@ -71,8 +71,12 @@ SNAPSHOT_SECRET_MARKERS=(
     ACCESS_TOKEN
     REFRESH_TOKEN
     SECRET_KEY
-    password=
-    passwd=
+)
+
+# Assignment keys that must stand alone (avoid ForPassword= / ShowPreeditForPassword=).
+SNAPSHOT_SECRET_KEY_REGEXES=(
+    '(^|[[:space:]_])password[[:space:]]*='
+    '(^|[[:space:]_])passwd[[:space:]]*='
 )
 
 # High-confidence token shapes (ERE). Keep thresholds high to limit false positives.
@@ -365,6 +369,13 @@ snapshot_file_has_secret_marker() {
     for marker in "${SNAPSHOT_SECRET_MARKERS[@]}"; do
         if grep -qiF -- "$marker" <<<"$payload"; then
             ui_error "secret marker '$marker' found in $rel_path (move secrets to ~/.zshrc.local)"
+            return 1
+        fi
+    done
+
+    for regex in "${SNAPSHOT_SECRET_KEY_REGEXES[@]}"; do
+        if grep -Eqi -- "$regex" <<<"$payload"; then
+            ui_error "secret key pattern '$regex' found in $rel_path (move secrets to ~/.zshrc.local)"
             return 1
         fi
     done
