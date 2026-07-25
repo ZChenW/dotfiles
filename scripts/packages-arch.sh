@@ -256,6 +256,124 @@ write_package_file() {
     } >"$file"
 }
 
+# ── AUR package resolution ──────────────────────────────────────────────
+# Queries the AUR RPC to resolve provider ambiguity and inner conflicts
+# before handing the list to paru/yay.  This avoids the interactive prompts
+# that break --noconfirm mode.
+
+# Query the AUR RPC search endpoint.  Writes raw JSON to stdout.
+# Returns 0 on success, 1 when curl is missing or the request fails.
+_aur_rpc_search() {
+    local query="$1"
+    local response
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+    response=$(curl -sS --connect-timeout 5 --max-time 10 \
+        "https://aur.archlinux.org/rpc/v5/search/${query}" 2>/dev/null) || return 1
+    if [[ -z "$response" ]]; then
+        return 1
+    fi
+    printf '%s\n' "$response"
+    return 0
+}
+
+# Query the AUR RPC info endpoint for a single package.  Writes raw JSON to stdout.
+_aur_rpc_info() {
+    local pkg="$1"
+    local response
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+    response=$(curl -sS --connect-timeout 5 --max-time 10 \
+        "https://aur.archlinux.org/rpc/v5/info/${pkg}" 2>/dev/null) || return 1
+    if [[ -z "$response" ]]; then
+        return 1
+    fi
+    printf '%s\n' "$response"
+    return 0
+}
+
+# Extract "Name" values from AUR RPC JSON on stdin (one per line).
+_aur_parse_names() {
+    grep -oP '"Name":"\K[^"]+'
+}
+
+# Extract "Provides" entries from AUR RPC info JSON on stdin.
+# Produces one package name per line, stripping version constraints.
+_aur_parse_provides() {
+    grep -oP '"Provides":\[\K[^\]]*' | grep -oP '(?<=")[^",]+(?=")' || true
+}
+
+# Resolve a single AUR package name to its canonical form.
+# When multiple providers exist (e.g. wechat → wechat / wechat-appimage),
+# the first exact-name match from the AUR is selected so the AUR helper
+# never sees an ambiguous name.
+resolve_aur_package_name() {
+    local pkg="$1"
+    local response names first_match
+
+    response=$(_aur_rpc_search "$pkg") || {
+        printf '%s\n' "$pkg"
+        return 0
+    }
+
+    names=$(printf '%s\n' "$response" | _aur_parse_names)
+
+    if [[ -z "$names" ]]; then
+        printf '%s\n' "$pkg"
+        return 0
+    fi
+
+    # Prefer the exact name match (handles wechat vs wechat-appimage, etc.)
+    first_match=$(printf '%s\n' "$names" | grep -Fx "$pkg" | head -1)
+    if [[ -n "$first_match" ]]; then
+        printf '%s\n' "$first_match"
+        return 0
+    fi
+
+    # Fall back to the first search result.
+    printf '%s\n' "$names" | head -1
+}
+
+# Get the Provides list for an AUR package (may be empty).
+_aur_get_provides() {
+    local pkg="$1"
+    local response
+
+    response=$(_aur_rpc_info "$pkg") || return 1
+    printf '%s\n' "$response" | _aur_parse_provides
+}
+
+# Separate packages that declare Provides into a pre-install batch.
+# Installing them first satisfies dependency resolution for the main
+# batch and avoids inner conflicts when --noconfirm is in use.
+# Example: wps-office-cn provides wps-office; if a dependency later
+# pulls in wps-office, the resolver sees it as already satisfied and
+# does not flag a conflict.
+resolve_aur_conflicts() {
+    local -n _pkg_list_ref="$1"
+    local -n _pre_install_ref="$2"
+    local -a remaining=()
+    local pkg
+
+    _pre_install_ref=()
+    for pkg in "${_pkg_list_ref[@]}"; do
+        local provides
+        provides=$(_aur_get_provides "$pkg") || { remaining+=("$pkg"); continue; }
+        if [[ -n "$provides" ]]; then
+            debug_log "aur provider: $pkg — pre-installing"
+            _pre_install_ref+=("$pkg")
+        else
+            remaining+=("$pkg")
+        fi
+    done
+
+    _pkg_list_ref=("${remaining[@]}")
+}
+
+# ── Batch install ───────────────────────────────────────────────────────
+
 install_packages_batch() {
     local dry_run="$1"
     local assume_yes="$2"
@@ -297,10 +415,52 @@ install_packages_batch() {
         return 0
     fi
 
+    # ── Pre-resolve AUR package names ────────────────────────────────
+    # Resolve each name through the AUR RPC so that packages with
+    # multiple providers (e.g. wechat, ttf-wps-fonts) are unambiguous
+    # before we hand them to the AUR helper.
+    local -a resolved_packages=()
+    local pkg
+    for pkg in "${packages[@]}"; do
+        local resolved
+        resolved=$(resolve_aur_package_name "$pkg")
+        if [[ "$resolved" != "$pkg" ]]; then
+            debug_log "aur resolved: $pkg → $resolved"
+        fi
+        resolved_packages+=("$resolved")
+    done
+    packages=("${resolved_packages[@]}")
+    dedupe_packages packages
+
+    # ── Detect and separate conflicting packages ─────────────────────
+    # Some packages Provide the name of another package in the list
+    # (e.g. wps-office-cn provides wps-office).  Installing the provider
+    # first satisfies the dependency so the main batch does not pull in
+    # the conflicting package.
+    local -a pre_install_packages=()
+    resolve_aur_conflicts packages pre_install_packages
+
     local -a aur_args=(-S --needed)
     if [[ "$assume_yes" == true ]]; then
         aur_args+=(--noconfirm)
     fi
+
+    # Phase 1 — pre-install packages that provide dependency names.
+    if ((${#pre_install_packages[@]} > 0)); then
+        verbose_log "$helper     pre-install providers (${#pre_install_packages[@]} packages)"
+        debug_log "$helper ${aur_args[*]} ${pre_install_packages[*]}"
+        if ! "$helper" "${aur_args[@]}" "${pre_install_packages[@]}"; then
+            ui_fail "AUR pre-install failed"
+            return 1
+        fi
+        ui_ok "AUR pre-install complete"
+    fi
+
+    # Phase 2 — main batch (dependencies satisfied by pre-installed packages).
+    if ((${#packages[@]} == 0)); then
+        return 0
+    fi
+
     verbose_log "$helper     install started (${#packages[@]} packages)"
     debug_log "$helper ${aur_args[*]} ${packages[*]}"
     if "$helper" "${aur_args[@]}" "${packages[@]}"; then
