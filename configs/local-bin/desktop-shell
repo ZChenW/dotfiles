@@ -34,7 +34,11 @@ case "$desktop_shell_profile" in
 esac
 
 user_qml_dir="$HOME/.local/lib/qt6/qml"
-export QML_IMPORT_PATH="$user_qml_dir${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+case ":${QML_IMPORT_PATH:-}:" in
+    *":$user_qml_dir:"*) ;;
+    *) QML_IMPORT_PATH="$user_qml_dir${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}" ;;
+esac
+export QML_IMPORT_PATH
 
 usage() {
     cat >&2 <<'EOF'

@@ -121,6 +121,7 @@ run_shell() {
     HOME="$fake_home" \
         XDG_STATE_HOME="$fake_state" \
         PATH="$fake_bin:/usr/bin" \
+        QML_IMPORT_PATH="$fake_home/.local/lib/qt6/qml" \
         DESKTOP_SHELL_NOTIFY=0 \
         DESKTOP_SHELL_TEST_RUNTIME="$runtime_state" \
         DESKTOP_SHELL_TEST_WCR_FAIL="${DESKTOP_SHELL_TEST_WCR_FAIL:-}" \
@@ -164,7 +165,7 @@ DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
 [[ ! -e "$runtime_state/swayidle" ]]
 [[ "$(cat "$fake_state/dotfiles/desktop-shell")" == quickshell ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
-[[ "$(cat "$runtime_state/qml-import-path")" == "$fake_home/.local/lib/qt6/qml"* ]]
+[[ "$(cat "$runtime_state/qml-import-path")" == "$fake_home/.local/lib/qt6/qml" ]]
 mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "qs-start wcr-stop" ]]
 
