@@ -1,0 +1,538 @@
+#!/usr/bin/env bash
+# Switch between the current Waybar desktop and the local QuickShell config.
+
+set -euo pipefail
+
+PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH"
+
+worker_mode=false
+action="${1:-status}"
+if [[ "$action" == --worker ]]; then
+    worker_mode=true
+    shift
+    action="${1:-}"
+fi
+status_format=auto
+
+quickshell_config="${QUICKSHELL_CONFIG_PATH:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+state_dir="$state_home/dotfiles"
+state_file="$state_dir/desktop-shell"
+profile_file="$state_dir/desktop-shell-profile"
+lock_file="$state_dir/desktop-shell.lock"
+log_file="$state_dir/desktop-shell.log"
+swayidle_script="${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/swayidle.sh"
+notify_enabled="${DESKTOP_SHELL_NOTIFY:-1}"
+script_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
+desktop_shell_profile=dual
+if [[ -f "$profile_file" ]]; then
+    read -r desktop_shell_profile <"$profile_file" || desktop_shell_profile=dual
+fi
+case "$desktop_shell_profile" in
+    waybar | quickshell | dual) ;;
+    *) desktop_shell_profile=dual ;;
+esac
+
+user_qml_dir="$HOME/.local/lib/qt6/qml"
+export QML_IMPORT_PATH="$user_qml_dir${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: desktop-shell {start|toggle|waybar|quickshell|status|launcher|lock|hub|tools|control-center}
+       desktop-shell status --plain
+EOF
+}
+
+case "$action" in
+    start | toggle | waybar | quickshell | status | launcher | lock | hub | tools | control-center)
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac
+
+if (($# > 1)); then
+    if [[ "$action" == status && "$#" == 2 && "${2:-}" == --plain ]]; then
+        status_format=plain
+    else
+        usage
+        exit 2
+    fi
+fi
+
+if [[ "$worker_mode" == true ]]; then
+    case "$action" in
+        start | toggle | waybar | quickshell) ;;
+        *)
+            echo "desktop-shell: invalid worker action: $action" >&2
+            exit 2
+            ;;
+    esac
+fi
+
+mkdir -p "$state_dir"
+touch "$log_file"
+
+log() {
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$log_file"
+}
+
+notify() {
+    [[ "$notify_enabled" == 1 ]] || return 0
+    command -v notify-send >/dev/null 2>&1 || return 0
+    notify-send "Desktop shell" "$1" >/dev/null 2>&1 || true
+}
+
+validate_profile_action() {
+    case "$desktop_shell_profile:$action" in
+        waybar:toggle | waybar:quickshell)
+            echo "desktop-shell: profile is waybar; reinstall with --desktop-shell dual or quickshell" >&2
+            return 1
+            ;;
+        quickshell:toggle | quickshell:waybar)
+            echo "desktop-shell: profile is quickshell; reinstall with --desktop-shell dual or waybar" >&2
+            return 1
+            ;;
+    esac
+}
+
+start_detached() {
+    if command -v setsid >/dev/null 2>&1; then
+        setsid -f "$@" >>"$log_file" 2>&1 9>&-
+    else
+        nohup "$@" >>"$log_file" 2>&1 9>&- &
+        disown || true
+    fi
+}
+
+switch_lock_available() {
+    command -v flock >/dev/null 2>&1 || return 0
+    flock -n "$lock_file" true >/dev/null 2>&1
+}
+
+acquire_switch_lock() {
+    command -v flock >/dev/null 2>&1 || return 0
+    exec 9>"$lock_file"
+    if ! flock -n 9; then
+        log "ignored $action request because another switch is in progress"
+        return 1
+    fi
+}
+
+dispatch_switch() {
+    if ! switch_lock_available; then
+        echo "desktop-shell: another switch is already running" >&2
+        return 1
+    fi
+
+    if [[ "${DESKTOP_SHELL_FOREGROUND:-0}" == 1 ]]; then
+        exec "$script_path" --worker "$action"
+    fi
+
+    if command -v setsid >/dev/null 2>&1; then
+        setsid -f "$script_path" --worker "$action" \
+            </dev/null >>"$log_file" 2>&1
+    else
+        nohup "$script_path" --worker "$action" \
+            </dev/null >>"$log_file" 2>&1 &
+        disown || true
+    fi
+    printf 'desktop-shell: switch requested: %s\n' "$action"
+}
+
+wait_for_process() {
+    local process_name="$1"
+    local expected="$2"
+    local attempt=0
+    while ((attempt < 50)); do
+        if pgrep -x "$process_name" >/dev/null 2>&1; then
+            [[ "$expected" == running ]] && return 0
+        else
+            [[ "$expected" == stopped ]] && return 0
+        fi
+        sleep 0.1
+        ((attempt += 1))
+    done
+    return 1
+}
+
+quickshell_running() {
+    command -v qs >/dev/null 2>&1 || return 1
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 1s qs ipc --path "$quickshell_config" show >/dev/null 2>&1
+    else
+        qs ipc --path "$quickshell_config" show >/dev/null 2>&1
+    fi
+}
+
+wait_for_quickshell() {
+    local expected="$1"
+    local attempt=0
+    while ((attempt < 60)); do
+        if quickshell_running; then
+            [[ "$expected" == running ]] && return 0
+        else
+            [[ "$expected" == stopped ]] && return 0
+        fi
+        sleep 0.1
+        ((attempt += 1))
+    done
+    return 1
+}
+
+ensure_process() {
+    local process_name="$1"
+    shift
+    pgrep -x "$process_name" >/dev/null 2>&1 && return 0
+    start_detached "$@"
+    wait_for_process "$process_name" running
+}
+
+stop_process() {
+    local process_name="$1"
+    pgrep -x "$process_name" >/dev/null 2>&1 || return 0
+    pkill -x "$process_name" >/dev/null 2>&1 || true
+    wait_for_process "$process_name" stopped
+}
+
+write_state() {
+    local mode="$1"
+    printf '%s\n' "$mode" >"$state_file.tmp"
+    mv -f "$state_file.tmp" "$state_file"
+}
+
+ensure_mako() {
+    local mako_bin
+    mako_bin="$(command -v mako 2>/dev/null || true)"
+    [[ -n "$mako_bin" ]] || {
+        log "mako is unavailable"
+        return 1
+    }
+    ensure_process mako "$mako_bin"
+}
+
+ensure_swayidle() {
+    [[ -x "$swayidle_script" ]] || {
+        log "swayidle script is unavailable: $swayidle_script"
+        return 1
+    }
+    ensure_process swayidle "$swayidle_script"
+}
+
+stop_swayidle() {
+    stop_process swayidle || true
+    pkill -f -- "$swayidle_script" >/dev/null 2>&1 || true
+}
+
+run_wallpaper_console() {
+    local action="$1"
+    command -v wallpaper-console-rust >/dev/null 2>&1 || return 0
+    wallpaper-console-rust "$action" >>"$log_file" 2>&1 9>&-
+}
+
+activate_waybar() {
+    local waybar_bin
+    local waybar_was_running=false
+    waybar_bin="$(command -v waybar 2>/dev/null || true)"
+    if [[ -z "$waybar_bin" ]]; then
+        log "cannot activate waybar: binary not found"
+        notify "Waybar is not installed"
+        return 1
+    fi
+
+    if pgrep -x waybar >/dev/null 2>&1; then
+        waybar_was_running=true
+    fi
+
+    # Keep the current shell visible until Waybar has successfully appeared.
+    if ! ensure_process waybar "$waybar_bin"; then
+        log "cannot activate waybar: process did not start"
+        notify "Waybar failed to start; QuickShell was kept"
+        return 1
+    fi
+
+    if ! run_wallpaper_console restore; then
+        log "cannot activate Waybar: Wallpaper Console did not restore"
+        if quickshell_running || [[ "$waybar_was_running" == false ]]; then
+            stop_process waybar || true
+        fi
+        notify "Wallpaper could not be restored; QuickShell was kept"
+        return 1
+    fi
+
+    if quickshell_running; then
+        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+        if ! wait_for_quickshell stopped; then
+            log "cannot activate Waybar: QuickShell did not stop"
+            run_wallpaper_console stop \
+                || log "warning: Wallpaper Console did not stop during rollback"
+            stop_process waybar || log "warning: Waybar did not stop during rollback"
+            notify "QuickShell did not stop; Waybar switch was rolled back"
+            return 1
+        fi
+    fi
+
+    ensure_mako || log "warning: Mako did not start"
+    ensure_swayidle || log "warning: swayidle did not start"
+    write_state waybar
+    log "activated waybar"
+    notify "Waybar mode"
+}
+
+activate_quickshell() {
+    local qs_bin
+    qs_bin="$(command -v qs 2>/dev/null || true)"
+    if [[ -z "$qs_bin" || ! -f "$quickshell_config/shell.qml" ]]; then
+        log "cannot activate QuickShell: config unavailable at $quickshell_config"
+        notify "QuickShell config is unavailable"
+        return 1
+    fi
+
+    if quickshell_running; then
+        if ! run_wallpaper_console stop; then
+            log "cannot reconcile QuickShell: Wallpaper Console backends did not stop"
+            notify "Wallpaper renderer could not be stopped"
+            return 1
+        fi
+        if ! stop_process waybar; then
+            log "cannot reconcile QuickShell: Waybar did not stop"
+            notify "Waybar could not be stopped"
+            return 1
+        fi
+        stop_process mako || true
+        stop_swayidle
+        write_state quickshell
+        log "QuickShell was already running; reconciled companion services"
+        notify "QuickShell mode"
+        return 0
+    fi
+
+    # QuickShell owns org.freedesktop.Notifications. Stop Mako before launch so
+    # the notification server is registered during initial configuration load.
+    stop_process mako || true
+    start_detached "$qs_bin" --no-duplicate --path "$quickshell_config"
+
+    if ! wait_for_quickshell running; then
+        log "QuickShell failed to become ready; restoring Waybar companions"
+        ensure_mako || true
+        notify "QuickShell failed to start; Waybar was kept"
+        return 1
+    fi
+
+    if ! run_wallpaper_console stop; then
+        log "cannot activate QuickShell: Wallpaper Console backends did not stop"
+        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+        if ! wait_for_quickshell stopped; then
+            log "warning: QuickShell did not stop cleanly during rollback"
+        fi
+        ensure_mako || log "warning: Mako did not restart during rollback"
+        notify "Wallpaper renderer could not be stopped; Waybar was kept"
+        return 1
+    fi
+
+    if ! stop_process waybar; then
+        log "cannot activate QuickShell: Waybar did not stop"
+        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+        if wait_for_quickshell stopped; then
+            run_wallpaper_console restore \
+                || log "warning: Wallpaper Console did not restore during rollback"
+        else
+            log "warning: QuickShell did not stop cleanly during rollback"
+        fi
+        ensure_mako || log "warning: Mako did not restart during rollback"
+        notify "Waybar did not stop; QuickShell switch was rolled back"
+        return 1
+    fi
+    stop_swayidle
+    write_state quickshell
+    log "activated QuickShell from $quickshell_config"
+    notify "QuickShell mode"
+}
+
+start_saved_mode() {
+    local saved_mode=waybar
+
+    case "$desktop_shell_profile" in
+        waybar)
+            activate_waybar
+            return
+            ;;
+        quickshell)
+            activate_quickshell
+            return
+            ;;
+    esac
+
+    if [[ -f "$state_file" ]]; then
+        read -r saved_mode <"$state_file" || saved_mode=waybar
+    fi
+
+    if [[ "$saved_mode" == quickshell ]]; then
+        if ! activate_quickshell; then
+            log "falling back to Waybar after QuickShell startup failure"
+            activate_waybar
+        fi
+    else
+        activate_waybar
+    fi
+}
+
+call_quickshell() {
+    local target="$1"
+    local function_name="$2"
+    quickshell_running || return 1
+    qs ipc --path "$quickshell_config" call "$target" "$function_name"
+}
+
+mode_label() {
+    case "$1" in
+        waybar) printf 'Waybar' ;;
+        quickshell) printf 'QuickShell' ;;
+        none) printf 'Not running' ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+print_plain_status() {
+    local configured="$1"
+    local active="$2"
+    printf 'profile=%s\nconfigured=%s\nactive=%s\nquickshell_config=%s\n' \
+        "$desktop_shell_profile" "$configured" "$active" "$quickshell_config"
+}
+
+print_pretty_status() {
+    local configured="$1"
+    local active="$2"
+    local config_display="${quickshell_config/#"$HOME"/\~}"
+    local configured_label active_label
+    local reset="" bold="" dim="" blue="" green="" yellow="" red=""
+    local active_color active_icon
+
+    configured_label="$(mode_label "$configured")"
+    active_label="$(mode_label "$active")"
+
+    if [[ -z "${NO_COLOR:-}" && "${TERM:-}" != dumb ]]; then
+        reset=$'\033[0m'
+        bold=$'\033[1m'
+        dim=$'\033[2m'
+        blue=$'\033[34m'
+        green=$'\033[32m'
+        yellow=$'\033[33m'
+        red=$'\033[31m'
+    fi
+
+    if [[ "$active" == none ]]; then
+        active_color="$red"
+        active_icon="○"
+    elif [[ "$active" == "$configured" ]]; then
+        active_color="$green"
+        active_icon="●"
+    else
+        active_color="$yellow"
+        active_icon="●"
+    fi
+
+    printf '%s╭─%s %sDesktop Shell%s\n' "$blue" "$reset" "$bold" "$reset"
+    printf '%s│%s  %s◇%s  %-9s %s\n' \
+        "$blue" "$reset" "$blue" "$reset" "Profile" "$desktop_shell_profile"
+    printf '%s│%s  %s%s%s  %-9s %s%s%s\n' \
+        "$blue" "$reset" "$active_color" "$active_icon" "$reset" \
+        "Active" "$bold" "$active_label" "$reset"
+    printf '%s│%s  %s◆%s  %-9s %s\n' \
+        "$blue" "$reset" "$blue" "$reset" "Saved" "$configured_label"
+    printf '%s│%s  %s◇%s  %-9s %s%s%s\n' \
+        "$blue" "$reset" "$blue" "$reset" "Config" "$dim" "$config_display" "$reset"
+    printf '%s╰─%s %sMod+Shift+7 · desktop-shell toggle%s\n' \
+        "$blue" "$reset" "$dim" "$reset"
+}
+
+show_status() {
+    local configured=waybar
+    local active
+
+    [[ -f "$state_file" ]] && read -r configured <"$state_file" || true
+    if quickshell_running; then
+        active=quickshell
+    elif pgrep -x waybar >/dev/null 2>&1; then
+        active=waybar
+    else
+        active=none
+    fi
+
+    if [[ "$status_format" == plain ]]; then
+        print_plain_status "$configured" "$active"
+        return
+    fi
+
+    case "${DESKTOP_SHELL_STATUS_STYLE:-auto}" in
+        pretty)
+            print_pretty_status "$configured" "$active"
+            ;;
+        plain)
+            print_plain_status "$configured" "$active"
+            ;;
+        auto | *)
+            if [[ -t 1 ]]; then
+                print_pretty_status "$configured" "$active"
+            else
+                print_plain_status "$configured" "$active"
+            fi
+            ;;
+    esac
+}
+
+if [[ "$worker_mode" == false ]]; then
+    case "$action" in
+        start | toggle | waybar | quickshell)
+            validate_profile_action || exit 1
+            dispatch_switch
+            exit $?
+            ;;
+    esac
+else
+    validate_profile_action || exit 1
+    acquire_switch_lock || exit 1
+fi
+
+case "$action" in
+    start)
+        notify_enabled=0
+        start_saved_mode
+        ;;
+    toggle)
+        if quickshell_running; then
+            activate_waybar
+        else
+            activate_quickshell
+        fi
+        ;;
+    waybar)
+        activate_waybar
+        ;;
+    quickshell)
+        activate_quickshell
+        ;;
+    status)
+        show_status
+        ;;
+    launcher)
+        call_quickshell launcher toggle || exec fuzzel
+        ;;
+    lock)
+        call_quickshell lock open || exec swaylock -f
+        ;;
+    hub)
+        call_quickshell keystone hub || notify "Switch to QuickShell to use Keystone"
+        ;;
+    tools)
+        call_quickshell keystone tools || notify "Switch to QuickShell to use Keystone tools"
+        ;;
+    control-center)
+        if quickshell_running; then
+            start_detached qs --no-duplicate --path "$quickshell_config/controlcenter.qml"
+        else
+            notify "Switch to QuickShell to use its control center"
+        fi
+        ;;
+esac

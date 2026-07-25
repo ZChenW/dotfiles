@@ -70,12 +70,16 @@ update_apply() {
     local repo_root="$1"
     local dry_run="$2"
     local with_packages="$3"
+    local desktop_shell_profile="${4:-}"
     local -a args=()
 
     if [[ "$with_packages" == true ]]; then
         args+=(--yes)
     else
         args+=(--skip-packages --yes)
+    fi
+    if [[ -n "$desktop_shell_profile" ]]; then
+        args+=(--desktop-shell "$desktop_shell_profile")
     fi
 
     if [[ "$dry_run" == true ]]; then
@@ -95,6 +99,7 @@ run_update() {
     local assume_yes="$3"
     local with_packages="$4"
     local no_snapshot_prompt="$5"
+    local desktop_shell_profile="${6:-}"
 
     ui_step "Updating dotfiles repo"
 
@@ -103,7 +108,7 @@ run_update() {
             echo "[dry-run] optional prompt: Snapshot and push this machine before pulling?"
         fi
         update_pull "$repo_root" true
-        update_apply "$repo_root" true "$with_packages"
+        update_apply "$repo_root" true "$with_packages" "$desktop_shell_profile"
         ui_success "Update dry run complete. No changes were made."
         return 0
     fi
@@ -122,7 +127,7 @@ run_update() {
     update_pull "$repo_root" false
 
     ui_step "Applying updated dotfiles"
-    update_apply "$repo_root" false "$with_packages"
+    update_apply "$repo_root" false "$with_packages" "$desktop_shell_profile"
 
     ui_success "Update complete."
 }

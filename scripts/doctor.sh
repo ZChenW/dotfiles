@@ -72,18 +72,27 @@ doctor_check_shell() {
 
     if [[ -f "$HOME/.zshrc.local" ]]; then
         if [[ -L "$HOME/.zshrc.local" ]]; then
-            doctor_warn "Private config" "~/.zshrc.local is a symlink (install replaces with a real file)"
+            doctor_warn "Private config" "\$HOME/.zshrc.local is a symlink (install replaces with a real file)"
         else
-            doctor_ok "Private config" "~/.zshrc.local present"
+            doctor_ok "Private config" "\$HOME/.zshrc.local present"
         fi
     else
-        doctor_warn "Private config" "~/.zshrc.local missing (created from template on shell install)"
+        doctor_warn "Private config" "\$HOME/.zshrc.local missing (created from template on shell install)"
     fi
 }
 
 doctor_check_desktop_tools() {
     local cmd
-    for cmd in zsh niri waybar kitty fastfetch; do
+    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-waybar}"
+    local -a commands=(zsh niri kitty fastfetch)
+    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+        commands+=(waybar)
+    fi
+    if [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
+        commands+=(quickshell)
+    fi
+
+    for cmd in "${commands[@]}"; do
         if command -v "$cmd" >/dev/null 2>&1; then
             doctor_ok "Desktop tool" "$cmd"
         else
@@ -94,6 +103,12 @@ doctor_check_desktop_tools() {
 
 doctor_check_runtime_deps() {
     local cmd path
+    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-waybar}"
+    local -a runtime_paths=(
+        "$HOME/.config/niri/scripts/swayidle.sh"
+        "$HOME/.local/bin/toggle-wlsunset"
+        "$HOME/.local/bin/desktop-shell"
+    )
     for cmd in brightnessctl swayidle clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
         if command -v "$cmd" >/dev/null 2>&1; then
             doctor_ok "Runtime dep" "$cmd"
@@ -102,12 +117,14 @@ doctor_check_runtime_deps() {
         fi
     done
 
-    for path in \
-        "$HOME/.config/niri/scripts/swayidle.sh" \
-        "$HOME/.config/niri/scripts/bar-shell-switch/start-current-bar-shell.sh" \
-        "$HOME/.config/waybar/scripts/matugen-select-type.sh" \
-        "$HOME/.local/bin/toggle-wlsunset" \
-        "$HOME/.local/bin/wcr-post-apply-waybar.sh"
+    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+        runtime_paths+=(
+            "$HOME/.config/waybar/scripts/matugen-select-type.sh"
+            "$HOME/.local/bin/wcr-post-apply-waybar.sh"
+        )
+    fi
+
+    for path in "${runtime_paths[@]}"
     do
         if [[ -x "$path" ]]; then
             doctor_ok "Runtime script" "${path/#$HOME/~}"

@@ -117,6 +117,20 @@ if [[ ! -f "$fake_repo/configs/config/mako/config" ]]; then
     exit 1
 fi
 
+echo "==> test 2b: snapshot preserves committed Waybar color seed"
+mkdir -p "$fake_home/.config/waybar" "$fake_repo/configs/config/waybar"
+printf 'live-generated\n' >"$fake_home/.config/waybar/colors.css"
+printf 'stable-seed\n' >"$fake_repo/configs/config/waybar/colors.css"
+printf 'style\n' >"$fake_home/.config/waybar/style.css"
+SNAPSHOT_MAPPINGS=(
+    "dir|$HOME/.config/waybar|configs/config/waybar|required"
+)
+snapshot_capture_configs "$fake_repo" false >/dev/null
+if [[ "$(cat "$fake_repo/configs/config/waybar/colors.css")" != stable-seed ]]; then
+    echo "Snapshot replaced the committed Waybar seed with runtime-generated colors" >&2
+    exit 1
+fi
+
 echo "==> test 3: optional missing source is skipped"
 SNAPSHOT_MAPPINGS=(
     "file|$HOME/.config/missing-optional.json|configs/config/missing-optional.json|optional"
@@ -364,6 +378,21 @@ EOF
 if ! grep -q -- '--no-pager -C .* diff --check' "$verify_log"; then
     echo "Expected snapshot verification to call git with --no-pager" >&2
     cat "$verify_log" >&2
+    exit 1
+fi
+
+echo "==> test 12: snapshot mappings follow the desktop shell profile"
+DESKTOP_SHELL_PROFILE=quickshell
+build_snapshot_mappings
+if printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}" \
+    | grep -F -e '/waybar|' -e 'wcr-post-apply-waybar' >/dev/null; then
+    echo "QuickShell-only snapshot still requires Waybar files" >&2
+    exit 1
+fi
+DESKTOP_SHELL_PROFILE=dual
+build_snapshot_mappings
+if ! printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}" | grep -Fq '/waybar|'; then
+    echo "Dual snapshot lost Waybar config capture" >&2
     exit 1
 fi
 

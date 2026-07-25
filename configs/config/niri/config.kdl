@@ -285,18 +285,12 @@ layout {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// This block starts the selected bar/shell, defaulting to Waybar.
-// # BEGIN waybar/caelestia switch
-spawn-at-startup "waybar"
-spawn-at-startup "/home/chakew/.local/bin/wallpaper-console-rust" "restore"
-spawn-at-startup "~/.config/niri/scripts/bar-shell-switch/start-current-bar-shell.sh"
+// Restore the last selected Waybar/QuickShell desktop mode.
+spawn-sh-at-startup "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell start"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
-spawn-at-startup "mako"
 spawn-at-startup "fcitx5"
 spawn-at-startup "/usr/bin/kanshi"
-spawn-at-startup "~/.config/niri/scripts/swayidle.sh"
 spawn-sh-at-startup "clipse --listen"
-// # END waybar/caelestia switch
 
 
 
@@ -407,8 +401,8 @@ binds {
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
     Mod+T hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
-    Mod+D hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }
+    Mod+D hotkey-overlay-title="Application Launcher" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell launcher"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
@@ -678,24 +672,10 @@ binds {
 
     Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
 
-    Mod+Shift+7 hotkey-overlay-title="Toggle Waybar" { spawn "sh" "-c" "pgrep -x waybar >/dev/null && pkill -x waybar || waybar >/dev/null 2>&1 &"; }
-
-    Mod+Shift+B hotkey-overlay-title="Toggle Waybar/iNiR" { spawn-sh "~/.local/bin/toggle-niri-shell"; }
-
-    // iNiR shell entry points. Mod+V and Mod+Comma are already used by existing niri window-management binds.
-    Alt+Tab hotkey-overlay-title="iNiR Window Switcher: next" { spawn "inir" "altSwitcher" "next"; }
-    Alt+Shift+Tab hotkey-overlay-title="iNiR Window Switcher: previous" { spawn "inir" "altSwitcher" "previous"; }
-    Super+G hotkey-overlay-title="iNiR Crosshair Overlay" { spawn "inir" "overlay" "toggle"; }
-    Mod+Space hotkey-overlay-title="iNiR Overview" repeat=false { spawn "inir" "overview" "toggle"; }
-    Mod+Ctrl+V hotkey-overlay-title="iNiR Clipboard" { spawn "inir" "clipboard" "toggle"; }
-    Mod+Ctrl+Comma hotkey-overlay-title="iNiR Settings" { spawn "inir" "settings"; }
-    Mod+Slash hotkey-overlay-title="iNiR Cheatsheet" { spawn "inir" "cheatsheet" "toggle"; }
-    Mod+Shift+W hotkey-overlay-title="iNiR Panel Family" { spawn "inir" "panelFamily" "cycle"; }
-    Mod+Shift+Q hotkey-overlay-title="iNiR Session" { spawn "inir" "session" "toggle"; }
-    Ctrl+Alt+T hotkey-overlay-title="iNiR Wallpaper Selector" { spawn "inir" "wallpaperSelector" "toggle"; }
-    Mod+Shift+S hotkey-overlay-title="iNiR Region Screenshot" { spawn "inir" "region" "screenshot"; }
-    Mod+Shift+X hotkey-overlay-title="iNiR Region OCR" { spawn "inir" "region" "ocr"; }
-    Mod+Shift+A hotkey-overlay-title="iNiR Region Search" { spawn "inir" "region" "search"; }
+    Mod+Shift+7 hotkey-overlay-title="Switch Waybar/QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell toggle"; }
+    Mod+Shift+Space hotkey-overlay-title="QuickShell Keystone Hub" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell hub"; }
+    Mod+Ctrl+Space hotkey-overlay-title="QuickShell Keystone Tools" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell tools"; }
+    Mod+Shift+C hotkey-overlay-title="QuickShell Control Center" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell control-center"; }
 
 }
 

@@ -3,5 +3,5 @@
 version_check = false
 
 [templates.waybar]
-input_path = '~/.config/matugen/templates/waybar-colors.css'
-output_path = '~/.config/waybar/colors.css'
+input_path = 'templates/waybar-colors.css'
+output_path = '../waybar/colors.css'

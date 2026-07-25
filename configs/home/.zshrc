@@ -29,6 +29,11 @@ setopt interactivecomments
 # 2. Completion System
 # ------------------------------------------------------------------------------
 
+# User-installed command completions.
+if [[ -d "$HOME/.local/share/zsh/site-functions" ]]; then
+  fpath=("$HOME/.local/share/zsh/site-functions" $fpath)
+fi
+
 # z plugin fpath
 if [[ -d "$HOME/.zsh/plugins/z" ]]; then
   fpath=("$HOME/.zsh/plugins/z" $fpath)

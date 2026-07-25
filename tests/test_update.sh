@@ -76,6 +76,14 @@ if [[ "$apply_packages_output" != *"install.sh --yes --dry-run"* ]]; then
     exit 1
 fi
 
+echo "==> test 6b: dry-run apply forwards desktop shell profile"
+apply_profile_output="$(update_apply "$fake_repo" true false quickshell)"
+if [[ "$apply_profile_output" != *"--desktop-shell quickshell"* ]]; then
+    echo "Expected update apply to forward the desktop shell profile" >&2
+    printf '%s\n' "$apply_profile_output" >&2
+    exit 1
+fi
+
 echo "==> test 7: full dry-run update"
 before_hash="$(find "$fake_repo" -type f -exec md5sum {} + | sort)"
 run_output="$(run_update "$fake_repo" true false false false)"

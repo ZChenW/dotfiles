@@ -19,9 +19,13 @@ Preview first:
 ## Commands
 
 ```bash
-./install.sh                         # interactive install
+./install.sh                         # interactive operation menu
+./install.sh --menu                  # force the operation menu
 ./install.sh --yes                   # non-interactive install
 ./install.sh --dry-run               # preview install
+./install.sh --yes --desktop-shell waybar     # Waybar only
+./install.sh --yes --desktop-shell quickshell # QuickShell only
+./install.sh --yes --desktop-shell dual       # switch between both
 ./install.sh --skip-packages         # restore configs only
 ./install.sh --packages-only         # install packages only
 ./install.sh --no-aur                # skip AUR packages
@@ -45,4 +49,6 @@ Preview first:
 - Installs real files, not symlinks.
 - Existing files are backed up to `~/.dotfiles-backups/`.
 - Private local values belong in `~/.zshrc.local`.
+- The selected desktop shell profile is reused by later installs and updates.
+- `desktop-shell toggle` switches Waybar and QuickShell when the `dual` profile is installed.
 - Full details: `docs/INSTALL.md`.

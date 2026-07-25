@@ -1,0 +1,15 @@
+# Build and runtime dependencies for the pinned Clavis QuickShell source.
+cava
+cmake
+gcc
+make
+ncurses
+nodejs
+npm
+pipewire
+pkgconf
+qt6-base
+qt6-declarative
+qt6-shadertools
+qtkeychain-qt6
+quickshell

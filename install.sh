@@ -5,9 +5,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
+CLI_ARGS_PROVIDED=false
+if (($# > 0)); then
+    CLI_ARGS_PROVIDED=true
+fi
 
 # shellcheck source=scripts/ui.sh
 source "$REPO_ROOT/scripts/ui.sh"
+# shellcheck source=scripts/desktop-shell-profile.sh
+source "$REPO_ROOT/scripts/desktop-shell-profile.sh"
 
 DRY_RUN=false
 ASSUME_YES=false
@@ -32,6 +38,8 @@ VERBOSE=0
 DEBUG=0
 NO_COLOR_FLAG=false
 ASCII_FLAG=false
+SHOW_MENU=false
+DESKTOP_SHELL_PROFILE=""
 MODE_LABEL=""
 BACKUP_ROOT=""
 LOG_FILE=""
@@ -68,6 +76,7 @@ Arch Linux dotfiles installer. By default, runs interactively in a TTY.
 Use --yes for non-interactive mode (scripts, CI, one-shot restore).
 
 Options:
+  --menu             Show the interactive operation menu
   --dry-run          Print planned actions without modifying $HOME
   --yes              Non-interactive mode with recommended defaults
   --skip-packages    Restore configs only, skip package installation
@@ -76,6 +85,8 @@ Options:
   --no-aur           Skip AUR packages (default in interactive mode)
   --export-packages  Export current machine packages into packages/*.txt
   --restore-only     Skip packages and optional service actions
+  --desktop-shell PROFILE
+                     Desktop shell profile: waybar, quickshell, or dual
   --snapshot         Refresh package manifests and managed configs from this machine
   --no-commit        With --snapshot: update files only, do not ask to commit
   --commit           With --snapshot: commit after checks, do not push
@@ -103,6 +114,9 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --menu)
+            SHOW_MENU=true
+            ;;
         --dry-run)
             DRY_RUN=true
             ;;
@@ -127,6 +141,14 @@ while [[ $# -gt 0 ]]; do
         --restore-only)
             SKIP_PACKAGES=true
             RESTORE_ONLY=true
+            ;;
+        --desktop-shell)
+            if (($# < 2)); then
+                ui_error "--desktop-shell requires waybar, quickshell, or dual"
+                exit 2
+            fi
+            DESKTOP_SHELL_PROFILE="${2,,}"
+            shift
             ;;
         --snapshot)
             SNAPSHOT=true
@@ -192,6 +214,14 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+case "$DESKTOP_SHELL_PROFILE" in
+    "" | waybar | quickshell | dual) ;;
+    *)
+        ui_error "--desktop-shell must be waybar, quickshell, or dual"
+        exit 2
+        ;;
+esac
 
 UI_VERBOSE="$VERBOSE"
 UI_DEBUG="$DEBUG"
@@ -379,6 +409,7 @@ print_plan_summary() {
     ui_section "Installation plan"
     echo "Repository: $REPO_ROOT"
     echo "Dry run: $DRY_RUN"
+    echo "Desktop shell: $DESKTOP_SHELL_PROFILE"
 
     if [[ "$SKIP_PACKAGES" == true ]]; then
         echo "Packages: skip"
@@ -493,31 +524,95 @@ run_interactive_setup() {
         fi
     fi
 
+    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        prompt_desktop_shell_profile
+    fi
+
     if [[ "$PACKAGES_ONLY" != true ]]; then
-        ui_section "Step 3: Config groups"
+        ui_section "Step 4: Config groups"
         echo "Available groups:"
         echo "  1) shell      - .zshrc, .zshrc.local"
         echo "  2) desktop    - niri, waybar, fcitx5, mako, environment.d, qt5ct, qt6ct"
         echo "  3) terminal   - kitty, fastfetch, cava"
         echo "  4) apps       - waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore"
         echo "  5) editors    - Code/Cursor settings, keybindings, optional snippets"
-        echo "  6) local-bin  - inir, toggle-niri-shell, toggle-wlsunset, wcr-post-apply-waybar.sh"
+        echo "  6) local-bin  - desktop-shell, toggle-wlsunset, wallpaper theme hook"
         echo "  7) media      - Pictures/wallpapers"
         read -r -p "$(ui_prompt "Select groups (comma-separated names or numbers, default all)" "all")" group_input
         resolve_config_groups "${group_input:-all}"
     fi
 
-    ui_section "Step 4: Local private config"
+    ui_section "Step 5: Local private config"
     echo "\$HOME/.zshrc.local is only handled when the shell group is selected."
     echo "Existing regular files are kept. Missing files are created from the template."
     echo "Existing symlinks are backed up and replaced with a real file."
 
     print_plan_summary
-    ui_section "Step 5: Confirm"
+    ui_section "Step 6: Confirm"
     if ! prompt_yes_no "Proceed?" n; then
         ui_warn "Aborted."
         exit 0
     fi
+}
+
+run_operation_menu() {
+    local operation uninstall_choice
+
+    ui_banner "Dotfiles Installer" "Choose an operation, then review its plan."
+    ui_section "Choose an operation"
+    echo "  1) Install or restore this machine"
+    echo "  2) Update dotfiles and apply changes"
+    echo "  3) Snapshot this machine into the repo"
+    echo "  4) Export package manifests"
+    echo "  5) Run doctor diagnostics"
+    echo "  6) Uninstall managed configs"
+    echo "  7) Exit"
+    read -r -p "$(ui_prompt "Choice" "1")" operation
+
+    case "${operation:-1}" in
+        1)
+            ;;
+        2)
+            UPDATE=true
+            if prompt_yes_no "Install changed package manifests too?" n; then
+                UPDATE_WITH_PACKAGES=true
+            fi
+            ;;
+        3)
+            SNAPSHOT=true
+            ;;
+        4)
+            EXPORT_PACKAGES=true
+            ;;
+        5)
+            DOCTOR=true
+            ;;
+        6)
+            UNINSTALL=true
+            ui_section "Uninstall mode"
+            echo "  1) Safe: archive and remove managed configs"
+            echo "  2) Restore: run the latest rollback"
+            echo "  3) Purge: remove configs and install backups"
+            read -r -p "$(ui_prompt "Choice" "1")" uninstall_choice
+            case "${uninstall_choice:-1}" in
+                1) UNINSTALL_MODE=safe ;;
+                2) UNINSTALL_MODE=restore ;;
+                3) UNINSTALL_MODE=purge ;;
+                *)
+                    ui_error "Invalid uninstall mode: $uninstall_choice"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        7)
+            ui_warn "Exited without changes."
+            exit 0
+            ;;
+        *)
+            ui_error "Invalid operation: $operation"
+            exit 1
+            ;;
+    esac
 }
 
 apply_non_interactive_defaults() {
@@ -529,6 +624,10 @@ apply_non_interactive_defaults() {
 
     if [[ "$PACKAGES_ONLY" != true ]]; then
         SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+    fi
+
+    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
     fi
 }
 
@@ -581,7 +680,9 @@ run_safety_check() {
 }
 
 plan_packages() {
-    install_package_files true "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"
+    install_package_files \
+        true "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
+        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE"
 }
 
 print_package_plan_summary() {
@@ -621,6 +722,9 @@ run_snapshot_workflow() {
     # Capture mutates the repo; home stays untouched. Plan steps still run dry.
     MODE_LABEL="snapshot"
     SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
+    fi
 
     init_log_once
     print_intro_once
@@ -692,6 +796,9 @@ run_snapshot_workflow() {
 
 run_doctor_workflow() {
     MODE_LABEL="doctor"
+    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
+    fi
     init_log_once
     print_intro_once
 
@@ -706,6 +813,9 @@ run_doctor_workflow() {
 
 run_uninstall_workflow() {
     MODE_LABEL="uninstall ($UNINSTALL_MODE)"
+    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
+    fi
     init_log_once
     print_intro_once
 
@@ -740,7 +850,9 @@ run_install_workflow() {
     if [[ "$UPDATE" == true ]]; then
         # shellcheck source=scripts/update.sh
         source "$REPO_ROOT/scripts/update.sh"
-        run_update "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$UPDATE_WITH_PACKAGES" "$UPDATE_NO_SNAPSHOT_PROMPT"
+        run_update \
+            "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$UPDATE_WITH_PACKAGES" \
+            "$UPDATE_NO_SNAPSHOT_PROMPT" "$DESKTOP_SHELL_PROFILE"
         return 0
     fi
 
@@ -753,6 +865,7 @@ run_install_workflow() {
 
     if [[ "$ASSUME_YES" == true ]]; then
         apply_non_interactive_defaults
+        print_plan_summary
     elif is_tty; then
         run_interactive_setup
     else
@@ -763,17 +876,19 @@ run_install_workflow() {
 
     if [[ "$SKIP_PACKAGES" != true ]]; then
         if [[ "$DRY_RUN" == true ]]; then
-            ui_section "3/5 Package plan"
+            ui_section "Apply 1/3: Package plan"
         else
-            ui_section "3/5 Installing packages"
+            ui_section "Apply 1/3: Installing packages"
         fi
-        if ! install_package_files "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" "$REPO_ROOT"; then
+        if ! install_package_files \
+            "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
+            "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE"; then
             ui_result_box "Result" "fail:Install failed"
             ui_note "See log: $LOG_FILE"
             return 1
         fi
     else
-        ui_section "3/5 Package plan"
+        ui_section "Apply 1/3: Package plan"
         ui_warn "Package installation skipped"
     fi
 
@@ -786,6 +901,9 @@ run_install_workflow() {
         fi
         return 0
     fi
+
+    install_desktop_shell_profile \
+        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$DRY_RUN"
 
     # shellcheck source=scripts/backup.sh
     source "$REPO_ROOT/scripts/backup.sh"
@@ -803,9 +921,9 @@ run_install_workflow() {
     fi
 
     if [[ "$DRY_RUN" == true ]]; then
-        ui_section "4/5 Config plan"
+        ui_section "Apply 2/3: Config plan"
     else
-        ui_section "4/5 Syncing configs"
+        ui_section "Apply 2/3: Syncing configs"
     fi
     if ! sync_configs "$REPO_ROOT" "$BACKUP_ROOT" "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
         ui_result_box "Result" "fail:Config sync failed"
@@ -813,11 +931,21 @@ run_install_workflow() {
         return 1
     fi
 
+    if group_selected apps "${SELECTED_GROUPS[@]}" \
+            || group_selected local-bin "${SELECTED_GROUPS[@]}" \
+            || group_selected desktop "${SELECTED_GROUPS[@]}"; then
+        if [[ "$DESKTOP_SHELL_PROFILE" == quickshell ]]; then
+            disable_wallpaper_console_theme_hook "$DRY_RUN"
+        else
+            configure_wallpaper_console_theme_hook "$DRY_RUN"
+        fi
+    fi
+
     if [[ "$RESTORE_ONLY" == true ]]; then
         verbose_log "restore-only mode: skipping optional service actions"
     fi
 
-    ui_section "5/5 Verification"
+    ui_section "Apply 3/3: Verification"
     if ! verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
         ui_result_box "Result" "fail:Verification failed" "ok:Backup preserved"
         ui_note "See log: $LOG_FILE"
@@ -827,6 +955,7 @@ run_install_workflow() {
     if [[ "$DRY_RUN" == true ]]; then
         ui_result_box "Result" "ok:Dry run complete" "ok:No changes were made" "ok:Rollback script planned"
     else
+        save_desktop_shell_profile "$DESKTOP_SHELL_PROFILE"
         ui_result_box "Result" "ok:Install complete" "ok:Backup created" "ok:Rollback script ready" "ok:Verification passed"
         ui_note "Rollback: $BACKUP_ROOT/rollback.sh"
     fi
@@ -838,6 +967,10 @@ run_dry_run_workflow() {
 }
 
 main() {
+    if [[ "$SHOW_MENU" == true || ("$CLI_ARGS_PROVIDED" == false && -t 0 && -t 1) ]]; then
+        run_operation_menu
+    fi
+
     validate_snapshot_flags
     validate_update_flags
     validate_lifecycle_flags

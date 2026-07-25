@@ -1,0 +1,32 @@
+#compdef desktop-shell
+
+local -a commands
+commands=(
+  'toggle:switch between Waybar and QuickShell'
+  'waybar:activate Waybar'
+  'quickshell:activate QuickShell'
+  'status:show the active and saved desktop shell'
+  'start:restore the saved desktop shell'
+  'launcher:open the application launcher'
+  'lock:lock the screen'
+  'hub:open the QuickShell Keystone hub'
+  'tools:open the QuickShell Keystone tools'
+  'control-center:open the QuickShell control center'
+)
+
+_arguments -C \
+  '1:command:->command' \
+  '*::argument:->argument'
+
+case "$state" in
+  command)
+    _describe -t commands 'desktop shell command' commands
+    ;;
+  argument)
+    case "${words[2]:-}" in
+      status)
+        _values 'output format' '--plain[print stable key=value output]'
+        ;;
+    esac
+    ;;
+esac

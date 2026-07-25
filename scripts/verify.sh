@@ -28,6 +28,9 @@ verify_installation() {
     shift || true
     local -a selected_groups=("$@")
     local status=0
+    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-dual}"
+    local quickshell_root="${QUICKSHELL_INSTALL_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis}"
+    local quickshell_prefix="${QUICKSHELL_PREFIX:-$HOME/.local}"
 
     if ((${#selected_groups[@]} == 0)); then
         selected_groups=(shell desktop terminal apps editors local-bin)
@@ -43,9 +46,18 @@ verify_installation() {
             ui_ok "niri config"
             verify_detail "niri" "niri validate -c ~/.config/niri/config.kdl"
             debug_log "[dry-run] verify: niri validate -c \$HOME/.config/niri/config.kdl"
-            ui_ok "waybar available"
-            verify_detail "waybar" "waybar --version"
-            debug_log "[dry-run] verify: waybar --version"
+            if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+                ui_ok "waybar available"
+                verify_detail "waybar" "waybar --version"
+                debug_log "[dry-run] verify: waybar --version"
+            fi
+            if [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
+                ui_ok "QuickShell source checkout"
+                ui_ok "QuickShell QML modules"
+                verify_detail "quickshell" "$quickshell_root/shell.qml"
+                verify_detail "qml" "$quickshell_prefix/lib/qt6/qml/{Clavis,M3Shapes}"
+                debug_log "[dry-run] verify pinned QuickShell source and user QML modules"
+            fi
         fi
         if group_selected terminal "${selected_groups[@]}"; then
             ui_ok "fastfetch available"
@@ -115,7 +127,8 @@ verify_installation() {
         done
     fi
 
-    if group_selected desktop "${selected_groups[@]}"; then
+    if group_selected desktop "${selected_groups[@]}" \
+        && [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
         if command -v waybar >/dev/null 2>&1; then
             verify_detail "waybar" "waybar --version"
             debug_log "verify: waybar --version"
@@ -130,6 +143,35 @@ verify_installation() {
         fi
     fi
 
+    if group_selected desktop "${selected_groups[@]}" \
+        && [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
+        if command -v qs >/dev/null 2>&1; then
+            ui_ok "quickshell available"
+        else
+            ui_fail "quickshell available" "command not found"
+            status=1
+        fi
+        if [[ -x "$quickshell_prefix/bin/key" ]]; then
+            ui_ok "QuickShell key helper"
+        else
+            ui_fail "QuickShell key helper" "missing at $quickshell_prefix/bin/key"
+            status=1
+        fi
+        if [[ -f "$quickshell_root/shell.qml" && -d "$quickshell_root/.git" ]]; then
+            ui_ok "QuickShell source checkout"
+        else
+            ui_fail "QuickShell source checkout" "missing or incomplete at $quickshell_root"
+            status=1
+        fi
+        if [[ -d "$quickshell_prefix/lib/qt6/qml/Clavis" \
+            && -d "$quickshell_prefix/lib/qt6/qml/M3Shapes" ]]; then
+            ui_ok "QuickShell QML modules"
+        else
+            ui_fail "QuickShell QML modules" "missing from $quickshell_prefix/lib/qt6/qml"
+            status=1
+        fi
+    fi
+
     local -a paths=()
     if group_selected shell "${selected_groups[@]}"; then
         paths+=("$HOME/.zshrc")
@@ -137,13 +179,15 @@ verify_installation() {
     if group_selected desktop "${selected_groups[@]}"; then
         paths+=(
             "$HOME/.config/niri"
-            "$HOME/.config/waybar"
             "$HOME/.config/fcitx5"
             "$HOME/.config/mako"
             "$HOME/.config/environment.d"
             "$HOME/.config/qt5ct"
             "$HOME/.config/qt6ct"
         )
+        if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+            paths+=("$HOME/.config/waybar")
+        fi
     fi
     if group_selected terminal "${selected_groups[@]}"; then
         paths+=(
@@ -172,11 +216,13 @@ verify_installation() {
     fi
     if group_selected local-bin "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.local/bin/inir"
-            "$HOME/.local/bin/toggle-niri-shell"
             "$HOME/.local/bin/toggle-wlsunset"
-            "$HOME/.local/bin/wcr-post-apply-waybar.sh"
+            "$HOME/.local/bin/desktop-shell"
+            "$HOME/.local/share/zsh/site-functions/_desktop-shell"
         )
+        if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+            paths+=("$HOME/.local/bin/wcr-post-apply-waybar.sh")
+        fi
     fi
 
     local path_item

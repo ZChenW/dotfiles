@@ -14,7 +14,12 @@ trap cleanup EXIT
 fake_home="$tmp_dir/home"
 fake_repo="$tmp_dir/repo"
 fake_bin="$tmp_dir/bin"
-mkdir -p "$fake_home/.config" "$fake_home/.local/bin" "$fake_home/Pictures/wallpapers" "$fake_bin"
+mkdir -p \
+    "$fake_home/.config" \
+    "$fake_home/.local/bin" \
+    "$fake_home/.local/share/zsh/site-functions" \
+    "$fake_home/Pictures/wallpapers" \
+    "$fake_bin"
 cp -a "$REPO_ROOT" "$fake_repo"
 
 mkdir -p \
@@ -56,10 +61,10 @@ printf '{}\n' >"$fake_home/.config/Code/User/settings.json"
 printf '[]\n' >"$fake_home/.config/Code/User/keybindings.json"
 printf '{}\n' >"$fake_home/.config/Cursor/User/settings.json"
 printf '[]\n' >"$fake_home/.config/Cursor/User/keybindings.json"
-printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/inir"
-printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/toggle-niri-shell"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/toggle-wlsunset"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/wcr-post-apply-waybar.sh"
+printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/desktop-shell"
+printf '#compdef desktop-shell\n' >"$fake_home/.local/share/zsh/site-functions/_desktop-shell"
 printf 'wallpaper\n' >"$fake_home/Pictures/wallpapers/test-wallpaper.txt"
 
 cat >"$fake_bin/pacman" <<'EOF'

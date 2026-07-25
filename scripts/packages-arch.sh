@@ -19,15 +19,43 @@ declare -a ESSENTIAL_PACKAGES=(
 
 package_available_in_pacman() {
     local pkg="$1"
+    build_official_package_index
+    if [[ "$OFFICIAL_PACKAGE_INDEX_READY" == true ]]; then
+        grep -Fxq -- "$pkg" <<<"$OFFICIAL_PACKAGE_LIST"
+        return
+    fi
+
     pacman -Si "$pkg" >/dev/null 2>&1
+}
+
+# Load official package names from the local sync databases once. Falling back
+# to pacman -Si preserves compatibility with incomplete test/mirror setups.
+build_official_package_index() {
+    if [[ "${OFFICIAL_PACKAGE_INDEX_INITIALIZED:-false}" == true ]]; then
+        return 0
+    fi
+
+    declare -g OFFICIAL_PACKAGE_LIST=""
+    declare -g OFFICIAL_PACKAGE_INDEX_READY=false
+    declare -g OFFICIAL_PACKAGE_INDEX_INITIALIZED=true
+
+    if OFFICIAL_PACKAGE_LIST="$(pacman -Slq 2>/dev/null)" \
+        && [[ -n "$OFFICIAL_PACKAGE_LIST" ]]; then
+        OFFICIAL_PACKAGE_INDEX_READY=true
+    fi
 }
 
 # Populates INSTALLED_NAMES and PROVIDES_INDEX from the local pacman DB.
 # INSTALLED_NAMES = exact package names only.
 # PROVIDES_INDEX = exact names + Provides targets.
 build_installed_package_index() {
+    if [[ "${INSTALLED_PACKAGE_INDEX_INITIALIZED:-false}" == true ]]; then
+        return 0
+    fi
+
     declare -gA INSTALLED_NAMES=()
     declare -gA PROVIDES_INDEX=()
+    declare -g INSTALLED_PACKAGE_INDEX_INITIALIZED=true
     local kind value
 
     while IFS=' ' read -r kind value; do
@@ -155,16 +183,58 @@ collect_packages_from_files() {
     dedupe_packages _packages_ref
 }
 
+filter_desktop_shell_packages() {
+    local -n _packages_ref="$1"
+    local profile="$2"
+    local -a filtered=()
+    local pkg
+
+    for pkg in "${_packages_ref[@]}"; do
+        case "$profile:$pkg" in
+            quickshell:waybar | quickshell:waybar-*)
+                continue
+                ;;
+            waybar:quickshell | waybar:quickshell-*)
+                continue
+                ;;
+        esac
+        filtered+=("$pkg")
+    done
+
+    _packages_ref=("${filtered[@]}")
+}
+
 split_official_and_aur() {
     local -n _official_ref="$1"
     local -n _aur_ref="$2"
     shift 2
-    local pkg
+    local pkg repo_package_list=""
+    local -a candidates=("$@") available_packages=()
+    local -A available_set=()
 
     _official_ref=()
     _aur_ref=()
-    for pkg in "$@"; do
-        if package_available_in_pacman "$pkg"; then
+
+    if repo_package_list="$(pacman -Slq 2>/dev/null)" && [[ -n "$repo_package_list" ]]; then
+        mapfile -t available_packages < <(
+            awk '
+                NR == FNR { wanted[$0] = 1; next }
+                ($0 in wanted) && !seen[$0]++ { print }
+            ' <(printf '%s\n' "${candidates[@]}") <(printf '%s\n' "$repo_package_list")
+        )
+        for pkg in "${available_packages[@]}"; do
+            available_set["$pkg"]=1
+        done
+    fi
+
+    for pkg in "${candidates[@]}"; do
+        if [[ -n "$repo_package_list" ]]; then
+            if [[ -n "${available_set[$pkg]+x}" ]]; then
+                _official_ref+=("$pkg")
+            else
+                _aur_ref+=("$pkg")
+            fi
+        elif package_available_in_pacman "$pkg"; then
             _official_ref+=("$pkg")
         else
             _aur_ref+=("$pkg")
@@ -318,7 +388,7 @@ resolve_aur_package_name() {
         return 0
     }
 
-    names=$(printf '%s\n' "$response" | _aur_parse_names)
+    names="$(printf '%s\n' "$response" | _aur_parse_names || true)"
 
     if [[ -z "$names" ]]; then
         printf '%s\n' "$pkg"
@@ -326,14 +396,15 @@ resolve_aur_package_name() {
     fi
 
     # Prefer the exact name match (handles wechat vs wechat-appimage, etc.)
-    first_match=$(printf '%s\n' "$names" | grep -Fx "$pkg" | head -1)
+    first_match="$(printf '%s\n' "$names" | grep -Fx "$pkg" | head -1 || true)"
     if [[ -n "$first_match" ]]; then
         printf '%s\n' "$first_match"
         return 0
     fi
 
-    # Fall back to the first search result.
-    printf '%s\n' "$names" | head -1
+    # A fuzzy result is not proof that a differently named package is safe.
+    # Preserve the requested package and let the AUR helper resolve it.
+    printf '%s\n' "$pkg"
 }
 
 # Get the Provides list for an AUR package (may be empty).
@@ -562,6 +633,7 @@ install_package_files() {
     local include_machine_local="$3"
     local include_aur="$4"
     local repo_root="$5"
+    local desktop_shell_profile="${6:-dual}"
     local packages_dir="$repo_root/packages"
 
     local -a package_files=(
@@ -573,6 +645,10 @@ install_package_files() {
 
     local -a machine_local_packages=()
     read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
+
+    if [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
+        package_files+=("$packages_dir/quickshell-build.txt")
+    fi
 
     if [[ "$include_machine_local" == true ]]; then
         package_files+=("$packages_dir/arch-machine-local.txt")
@@ -586,6 +662,7 @@ install_package_files() {
     read_package_file "$packages_dir/arch-exclude.txt" exclude_packages
     collect_packages_from_files all_packages "${package_files[@]}"
     filter_excluded_packages all_packages exclude_packages
+    filter_desktop_shell_packages all_packages "$desktop_shell_profile"
     split_official_and_aur official_packages aur_packages "${all_packages[@]}"
 
     if [[ "$dry_run" == true ]]; then
@@ -640,9 +717,23 @@ export_package_snapshot() {
 
     build_installed_package_index
 
+    local native_output foreign_output
+    if ! native_output="$(pacman -Qqen)"; then
+        ui_error "failed to query explicitly installed official packages; manifests were not changed"
+        return 1
+    fi
+    if ! foreign_output="$(pacman -Qqem)"; then
+        ui_error "failed to query explicitly installed foreign/AUR packages; manifests were not changed"
+        return 1
+    fi
+
     local -a native_packages=() foreign_packages=()
-    mapfile -t native_packages < <(pacman -Qqen 2>/dev/null || true)
-    mapfile -t foreign_packages < <(pacman -Qqem 2>/dev/null || true)
+    if [[ -n "$native_output" ]]; then
+        mapfile -t native_packages <<<"$native_output"
+    fi
+    if [[ -n "$foreign_output" ]]; then
+        mapfile -t foreign_packages <<<"$foreign_output"
+    fi
 
     local -a existing_essential=() existing_exclude=()
     read_package_file "$packages_dir/arch-essential.txt" existing_essential
@@ -778,10 +869,13 @@ install_packages_arch() {
     local include_machine_local="${3:-false}"
     local include_aur="${4:-true}"
     local repo_root="${5:-}"
+    local desktop_shell_profile="${6:-dual}"
 
     if [[ -z "$repo_root" ]]; then
         repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
     fi
 
-    install_package_files "$dry_run" "$assume_yes" "$include_machine_local" "$include_aur" "$repo_root"
+    install_package_files \
+        "$dry_run" "$assume_yes" "$include_machine_local" "$include_aur" \
+        "$repo_root" "$desktop_shell_profile"
 }

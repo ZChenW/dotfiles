@@ -1,6 +1,8 @@
 # Install Guide
 
-This repository restores an Arch Linux desktop setup with zsh, niri, Waybar, kitty, fastfetch, waypaper, and local launcher scripts.
+This repository restores an Arch Linux desktop setup with zsh, niri, a
+Waybar/QuickShell desktop shell, kitty, fastfetch, waypaper, and local launcher
+scripts.
 
 ## Supported OS
 
@@ -31,13 +33,18 @@ Preview planned changes without modifying `$HOME`:
 
 ## Interactive Installer
 
-When stdin and stdout are a TTY and `--yes` is not passed, `./install.sh` runs five steps:
+With no arguments in a terminal, `./install.sh` first offers install, update,
+snapshot, package export, doctor, uninstall, or exit. `--menu` opens the same
+operation menu explicitly.
+
+After choosing install, the installer runs six steps:
 
 1. **Install mode** — full install, packages only, configs only, or dry-run preview
 2. **Software scope** — install packages, include AUR, include `arch-machine-local.txt`
-3. **Config groups** — choose one or more groups (default: all)
-4. **Local private config** — explains `~/.zshrc.local` handling
-5. **Confirm** — prints a plan summary; proceeds only on `y` (default `N`)
+3. **Desktop shell** — Waybar, QuickShell, or both
+4. **Config groups** — choose one or more groups (default: all)
+5. **Local private config** — explains `~/.zshrc.local` handling
+6. **Confirm** — prints a plan summary; proceeds only on `y` (default `N`)
 
 `--dry-run` can be combined with interactive mode. Selections are applied, then actions are printed without modifying `$HOME`.
 
@@ -47,12 +54,16 @@ Non-TTY stdin/stdout without `--yes` fails with a message to use `--yes` or run 
 
 | Command | Behavior |
 |---------|----------|
-| `./install.sh` | Interactive: choose packages and config groups |
+| `./install.sh` | Interactive: choose an operation, then its options |
+| `./install.sh --menu` | Explicitly open the top-level operation menu |
 | `./install.sh --yes` | Non-interactive: portable packages + all config groups |
 | `./install.sh --packages-only` | Install packages only |
 | `./install.sh --skip-packages` | Restore configs only |
 | `./install.sh --full-packages` | Include `packages/arch-machine-local.txt` |
 | `./install.sh --no-aur` | Skip AUR packages |
+| `./install.sh --desktop-shell waybar` | Install Waybar only |
+| `./install.sh --desktop-shell quickshell` | Install QuickShell only |
+| `./install.sh --desktop-shell dual` | Install both and enable switching |
 | `./install.sh --export-packages` | Regenerate `packages/*.txt` from this machine |
 | `./install.sh --doctor` | Diagnostics only (tools, configs, backups, validation) |
 | `./install.sh --uninstall` | Safe uninstall: archive then remove managed configs |
@@ -69,16 +80,23 @@ Before install, snapshot, update, doctor, or uninstall, the installer runs a **p
 
 With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install official packages only. In interactive mode, AUR is off by default unless you choose to include it. If AUR is enabled and neither `paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode or asks before doing so in interactive mode.
 
+The selected desktop shell profile is stored under
+`${XDG_STATE_HOME:-~/.local/state}/dotfiles/desktop-shell-profile` and reused by
+later non-interactive installs and updates. QuickShell is checked out from the
+fork and exact commit in `packages/quickshell-source.conf`, built without root,
+and kept at `${XDG_DATA_HOME:-~/.local/share}/quickshell/clavis`. A dirty or
+unrelated directory at that path is never overwritten.
+
 ## Config Groups
 
 | Group | Restored paths |
 |-------|----------------|
 | `shell` | `~/.zshrc`, `~/.zshrc.local` |
-| `desktop` | `~/.config/niri`, waybar, fcitx5, mako, environment.d, qt5ct, qt6ct |
+| `desktop` | `~/.config/niri`, profile-selected Waybar config, fcitx5, mako, environment.d, qt5ct, qt6ct |
 | `terminal` | `~/.config/kitty`, fastfetch, cava |
-| `apps` | waypaper, Thunar, mimeapps.list, user-dirs.dirs, git/ignore |
+| `apps` | waypaper, matugen, Thunar, mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
-| `local-bin` | `~/.local/bin/inir`, `toggle-niri-shell`, `toggle-wlsunset`, `wcr-post-apply-waybar.sh` |
+| `local-bin` | `desktop-shell` and its zsh completion, `toggle-wlsunset`, profile-selected Waybar theme hook |
 | `media` | `~/Pictures/wallpapers` |
 
 `~/.zshrc.local` is handled only when the `shell` group is selected:
@@ -88,6 +106,15 @@ With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install 
 - Existing symlink: backed up and replaced with a real file from the template
 
 `chmod +x` on local-bin scripts runs only when the `local-bin` group is selected.
+
+With the Waybar or dual profile, when Wallpaper Console Rust is installed,
+syncing the desktop/apps/local-bin
+groups enables its post-apply hook, stores the synchronized helper as an
+absolute command path, and enables login restore. The helper passes the XDG
+matugen config explicitly, verifies `waybar/colors.css` was generated, and
+restarts Waybar only when it was already running. The generated
+`waybar/colors.css` is preserved during update and snapshot; the committed copy
+is used only as a first-install seed.
 
 ## Package Manifests
 
@@ -101,6 +128,8 @@ Software is managed through files in `packages/`:
 | `arch-aur.txt` | AUR and foreign packages | yes (`--yes`), no (interactive default) |
 | `arch-machine-local.txt` | Kernel, firmware, boot, GPU, audio stack | no |
 | `arch-exclude.txt` | Packages excluded from automation | never |
+| `quickshell-build.txt` | QuickShell build/runtime dependencies | QuickShell or dual profile |
+| `quickshell-source.conf` | Pinned QuickShell fork and commit | source lock, not a package list |
 
 By default, the installer restores a portable software set. Machine-local packages are listed separately and skipped unless you pass `--full-packages` or choose them in interactive mode.
 
@@ -109,6 +138,11 @@ Regenerate the manifests from the current machine:
 ```bash
 ./install.sh --export-packages
 ```
+
+The AUR/foreign manifest is rebuilt only from the current successful
+`pacman -Qqem` result. Packages removed from the machine are removed from the
+manifest; if pacman cannot provide a complete result, export stops before
+overwriting any manifest.
 
 ## Snapshot Current Machine
 
@@ -130,7 +164,7 @@ Use this on another machine after pushing a snapshot:
 ./install.sh --update
 ```
 
-By default, update pulls with `git pull --ff-only` and applies configs only. In a terminal it asks whether to snapshot and push the current machine before pulling. Use `--with-packages` to also install package manifests.
+By default, update pulls with `git pull --ff-only` and applies configs only. In a terminal it asks whether to snapshot and push the current machine before pulling. Use `--with-packages` to also install package manifests. Config mappings whose content and permissions already match are skipped before backup/copy, while changed paths keep the existing full backup and rollback behavior. Official/AUR classification loads the local pacman repository index once instead of running one query per package.
 
 Install software without touching configs:
 
@@ -164,7 +198,6 @@ If an existing target is a symlink, the symlink and a `.symlink-info` note are s
 
 ## What Is Intentionally Excluded
 
-- `~/.config/quickshell/inir` third-party source tree (large; handle separately)
 - Browser profiles and session data: Chromium, Edge, Firefox, and similar
 - Editor runtime data: `History/`, `workspaceStorage/`, `globalStorage/`, `state.vscdb*`
 - AI auth and provider state: `~/.config/github-copilot/`
@@ -224,6 +257,9 @@ Remove managed configs without touching OS packages or `~/.zshrc.local`:
 ```
 
 `--dry-run` works with uninstall modes and only prints planned removals.
+Safe uninstall also removes the saved shell profile and a clean managed
+QuickShell checkout. A checkout with local changes or a different origin is
+kept and reported.
 
 ## Verification
 
@@ -231,7 +267,8 @@ After syncing, the installer runs checks for the selected config groups:
 
 - `zsh -n ~/.zshrc` (shell group)
 - `niri validate -c ~/.config/niri/config.kdl` (desktop group)
-- `fastfetch --version`, `waybar --version`, `kitty --version` (when installed)
+- `fastfetch --version`, `kitty --version`, and the selected shell binaries
+- QuickShell source, `key`, and user-level QML modules for QuickShell/dual
 - Checks that restored paths are real files/directories, not symlinks
 
 Missing tools are reported as `SKIP` when packages were not installed.

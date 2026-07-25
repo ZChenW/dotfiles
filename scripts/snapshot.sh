@@ -7,9 +7,10 @@ DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/ui.sh
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 
-SNAPSHOT_MAPPINGS=(
+build_snapshot_mappings() {
+    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-dual}"
+    SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/niri|configs/config/niri|required"
-    "dir|$HOME/.config/waybar|configs/config/waybar|required"
     "dir|$HOME/.config/kitty|configs/config/kitty|required"
     "dir|$HOME/.config/fastfetch|configs/config/fastfetch|required"
     "dir|$HOME/.config/waypaper|configs/config/waypaper|required"
@@ -31,12 +32,21 @@ SNAPSHOT_MAPPINGS=(
     "file|$HOME/.config/Cursor/User/settings.json|configs/config/Cursor/User/settings.json|optional"
     "file|$HOME/.config/Cursor/User/keybindings.json|configs/config/Cursor/User/keybindings.json|optional"
     "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
-    "file|$HOME/.local/bin/inir|configs/local-bin/inir|required"
-    "file|$HOME/.local/bin/toggle-niri-shell|configs/local-bin/toggle-niri-shell|required"
     "file|$HOME/.local/bin/toggle-wlsunset|configs/local-bin/toggle-wlsunset|required"
-    "file|$HOME/.local/bin/wcr-post-apply-waybar.sh|configs/local-bin/wcr-post-apply-waybar.sh|required"
+    "file|$HOME/.local/bin/desktop-shell|configs/local-bin/desktop-shell|required"
+    "file|$HOME/.local/share/zsh/site-functions/_desktop-shell|configs/zsh/site-functions/_desktop-shell|required"
     "dir|$HOME/Pictures/wallpapers|configs/Pictures/wallpapers|optional"
-)
+    )
+
+    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
+        SNAPSHOT_MAPPINGS+=(
+            "dir|$HOME/.config/waybar|configs/config/waybar|required"
+            "file|$HOME/.local/bin/wcr-post-apply-waybar.sh|configs/local-bin/wcr-post-apply-waybar.sh|required"
+        )
+    fi
+}
+
+build_snapshot_mappings
 
 SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS=(
     Cookies
@@ -231,13 +241,19 @@ snapshot_capture_configs() {
             for exclude in "${SNAPSHOT_RSYNC_EXCLUDES[@]}"; do
                 rsync_args+=(--exclude="$exclude")
             done
+            if [[ "$dest" == configs/config/waybar ]]; then
+                # colors.css is runtime output from the wallpaper hook. Keep
+                # the committed seed file stable instead of snapshotting the
+                # currently selected wallpaper palette.
+                rsync_args+=(--filter="P /colors.css" --exclude=/colors.css)
+            fi
             rsync "${rsync_args[@]}" -- "$src/" "$repo_root/$dest/"
         else
             install -Dm644 -- "$src" "$repo_root/$dest"
         fi
 
         case "$dest" in
-            configs/local-bin/inir | configs/local-bin/toggle-niri-shell | configs/local-bin/toggle-wlsunset | configs/local-bin/wcr-post-apply-waybar.sh)
+            configs/local-bin/toggle-wlsunset | configs/local-bin/wcr-post-apply-waybar.sh | configs/local-bin/desktop-shell)
                 chmod +x "$repo_root/$dest"
                 ;;
         esac

@@ -10,6 +10,49 @@ source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 
 DOTFILES_BACKUP_BASE="${DOTFILES_BACKUP_BASE:-$HOME/.dotfiles-backups}"
 
+uninstall_quickshell_root() {
+    printf '%s/quickshell/clavis\n' "${XDG_DATA_HOME:-$HOME/.local/share}"
+}
+
+uninstall_quickshell_checkout_is_managed() {
+    local source_root state_dir origin_url dirty_state managed_root installed_ref checked_out_ref
+    source_root="$(uninstall_quickshell_root)"
+    state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+    [[ -d "$source_root/.git" ]] || return 1
+    [[ -f "$state_dir/quickshell-managed-root" \
+        && -f "$state_dir/quickshell-install-ref" ]] || return 1
+
+    IFS= read -r managed_root <"$state_dir/quickshell-managed-root" || return 1
+    IFS= read -r installed_ref <"$state_dir/quickshell-install-ref" || return 1
+    [[ "$managed_root" == "$source_root" && "$installed_ref" =~ ^[0-9a-f]{40}$ ]] \
+        || return 1
+
+    origin_url="$(git -C "$source_root" config --get remote.origin.url 2>/dev/null || true)"
+    [[ "$origin_url" == https://github.com/ZChenW/quickshell.git ]] || return 1
+    dirty_state="$(git -C "$source_root" status --porcelain 2>/dev/null || printf 'unknown\n')"
+    [[ -z "$dirty_state" ]] || return 1
+    checked_out_ref="$(git -C "$source_root" rev-parse HEAD 2>/dev/null || true)"
+    [[ "$checked_out_ref" == "$installed_ref" ]]
+}
+
+uninstall_list_extra_managed_paths() {
+    local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+    local source_root source_is_managed=false
+    source_root="$(uninstall_quickshell_root)"
+    if uninstall_quickshell_checkout_is_managed; then
+        source_is_managed=true
+    fi
+
+    printf '%s\n' \
+        "$state_dir/desktop-shell-profile" \
+        "$state_dir/desktop-shell" \
+        "$state_dir/quickshell-install-ref" \
+        "$state_dir/quickshell-managed-root"
+    if [[ "$source_is_managed" == true ]]; then
+        printf '%s\n' "$source_root"
+    fi
+}
+
 uninstall_prompt_yes_no() {
     local prompt="$1"
     local default="${2:-n}"
@@ -59,6 +102,12 @@ uninstall_archive_managed_paths() {
             paths+=("$path_item")
         fi
     done < <(list_managed_dest_paths "$repo_root")
+    while IFS= read -r path_item; do
+        [[ -n "$path_item" ]] || continue
+        if [[ -e "$path_item" || -L "$path_item" ]]; then
+            paths+=("$path_item")
+        fi
+    done < <(uninstall_list_extra_managed_paths)
 
     if ((${#paths[@]} == 0)); then
         ui_warn "Archive" "no managed paths present to archive"
@@ -101,7 +150,16 @@ uninstall_remove_managed_paths() {
         rm -rf -- "$path_item"
         verbose_log "remove   $display_path"
         ((++removed)) || true
-    done < <(list_managed_dest_paths "$repo_root")
+    done < <(
+        list_managed_dest_paths "$repo_root"
+        uninstall_list_extra_managed_paths
+    )
+
+    local source_root
+    source_root="$(uninstall_quickshell_root)"
+    if [[ -e "$source_root" ]] && ! uninstall_quickshell_checkout_is_managed; then
+        ui_warn "QuickShell source kept" "checkout has a different origin or local changes"
+    fi
 
     ui_ok "Removed managed paths" "$removed"
 }
