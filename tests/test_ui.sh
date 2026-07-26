@@ -215,7 +215,7 @@ echo "==> test 11: arrow navigation avoids full-region clears"
 if command -v script >/dev/null 2>&1; then
     pty_command="NO_COLOR= TERM=xterm DOTFILES_COLOR=never bash -e -c 'source \"$REPO_ROOT/scripts/ui.sh\"; ui_init; ui_menu \"Select\" 1 \"First|one\" \"Second|two\"; printf \"choice=%s\\\\n\" \"\$UI_MENU_CHOICE\"'"
     navigation_output="$(
-        printf '\033[B\n' |
+        printf '\033[B\033[B\033[A\n' |
             script -qec "$pty_command" /dev/null
     )"
     if [[ "$navigation_output" == *$'\033[J'* ]]; then
@@ -225,6 +225,14 @@ if command -v script >/dev/null 2>&1; then
     if [[ "$navigation_output" != *"choice=2"* ]]; then
         echo "Expected arrow navigation to select the second item" >&2
         printf '%q\n' "$navigation_output" >&2
+        exit 1
+    fi
+    navigation_help_count="$(
+        grep -F -c "quick select" <<<"$navigation_output" || true
+    )"
+    if [[ "$navigation_help_count" != 1 ]]; then
+        echo "Expected arrow navigation to render the menu frame only once" >&2
+        printf 'Observed help rows: %s\n' "$navigation_help_count" >&2
         exit 1
     fi
 else

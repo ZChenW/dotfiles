@@ -513,13 +513,14 @@ ui_menu() {
         return 1
     fi
 
+    ui_menu_render "$selected" "${options[@]}"
+    if [[ -n "${DOTFILES_ASCII:-}" ]]; then
+        printf '  %s\n' "$(ui_color "$UI_DIM" "Up/Down move  Enter select  1-$count quick select")"
+    else
+        printf '  %s\n' "$(ui_color "$UI_DIM" "↑/↓ move  Enter select  1–$count quick select")"
+    fi
+
     while true; do
-        ui_menu_render "$selected" "${options[@]}"
-        if [[ -n "${DOTFILES_ASCII:-}" ]]; then
-            printf '  %s\n' "$(ui_color "$UI_DIM" "Up/Down move  Enter select  1-$count quick select")"
-        else
-            printf '  %s\n' "$(ui_color "$UI_DIM" "↑/↓ move  Enter select  1–$count quick select")"
-        fi
         if ! IFS= read -r -s -n 1 key; then
             printf '\n'
             return 1
