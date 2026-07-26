@@ -148,38 +148,57 @@ snapshot_path_is_managed() {
     return 1
 }
 
+snapshot_git_changed_paths() {
+    local repo_root="$1"
+    local record status path renamed_from
+
+    while IFS= read -r -d '' record; do
+        status="${record:0:2}"
+        path="${record:3}"
+        printf '%s\0' "$path"
+
+        # In porcelain v1 -z output, rename/copy entries contain a second
+        # NUL-delimited source path. Check both sides so moving a file across
+        # the managed boundary cannot bypass the snapshot safety check.
+        if [[ "$status" == *R* || "$status" == *C* ]]; then
+            if IFS= read -r -d '' renamed_from; then
+                printf '%s\0' "$renamed_from"
+            fi
+        fi
+    done < <(
+        git -C "$repo_root" status \
+            --porcelain=v1 -z --untracked-files=all
+    )
+}
+
 snapshot_has_non_snapshot_changes() {
     local repo_root="$1"
-    local line path
+    local path
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        path="${line:3}"
+    while IFS= read -r -d '' path; do
         if [[ "$path" == */ ]]; then
             path="${path%/}"
         fi
         if ! snapshot_path_is_managed "$repo_root" "$path"; then
             return 0
         fi
-    done < <(git -C "$repo_root" status --porcelain)
+    done < <(snapshot_git_changed_paths "$repo_root")
 
     return 1
 }
 
 snapshot_non_snapshot_changes() {
     local repo_root="$1"
-    local line path
+    local path
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        path="${line:3}"
+    while IFS= read -r -d '' path; do
         if [[ "$path" == */ ]]; then
             path="${path%/}"
         fi
         if ! snapshot_path_is_managed "$repo_root" "$path"; then
             printf '%s\n' "$path"
         fi
-    done < <(git -C "$repo_root" status --porcelain)
+    done < <(snapshot_git_changed_paths "$repo_root")
 }
 
 snapshot_reject_source_symlinks() {

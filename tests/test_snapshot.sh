@@ -223,6 +223,23 @@ if [[ "$non_snapshot_output" != *"README.md"* ]]; then
     exit 1
 fi
 
+echo "==> test 6c: managed non-ASCII paths are not misclassified"
+mkdir -p "$fake_repo/configs/Pictures/wallpapers"
+git -C "$fake_repo" config core.quotePath true
+SNAPSHOT_MAPPINGS=(
+    "file|$fake_repo/configs/config/mako/config|configs/config/mako/config|required"
+    "dir|$fake_repo/configs/Pictures/wallpapers|configs/Pictures/wallpapers|required"
+)
+non_snapshot_before="$(snapshot_non_snapshot_changes "$fake_repo")"
+printf 'wallpaper\n' >"$fake_repo/configs/Pictures/wallpapers/主题壁纸.png"
+non_snapshot_output="$(snapshot_non_snapshot_changes "$fake_repo")"
+if [[ "$non_snapshot_output" != "$non_snapshot_before" ]]; then
+    echo "Managed non-ASCII path was misclassified as a non-snapshot change" >&2
+    printf '%s\n' "Before:" "$non_snapshot_before" >&2
+    printf '%s\n' "After:" "$non_snapshot_output" >&2
+    exit 1
+fi
+
 echo "==> test 7: snapshot rejects symlinks in source config"
 rm -rf "$fake_home/.config/mako-link"
 mkdir -p "$fake_home/.config/mako-link"
