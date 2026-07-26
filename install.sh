@@ -817,6 +817,10 @@ run_snapshot_workflow() {
         "ok:Repo files may have been updated" \
         "ok:$(snapshot_result_detail)"
 
+    if ! snapshot_has_managed_changes "$REPO_ROOT"; then
+        return 0
+    fi
+
     if [[ "$SNAPSHOT_NO_COMMIT" == true ]]; then
         return 0
     fi

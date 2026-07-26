@@ -125,3 +125,44 @@ assert_contains "zsh syntax"
 assert_contains "Home directory unchanged"
 assert_contains "Repo files may have been updated"
 assert_contains "Preflight"
+
+echo "==> no-op snapshot skips commit and push"
+/usr/bin/git -C "$fake_repo" config user.email "test@example.com"
+/usr/bin/git -C "$fake_repo" config user.name "Test User"
+/usr/bin/git -C "$fake_repo" add -A
+/usr/bin/git -C "$fake_repo" commit -q -m "snapshot baseline"
+
+push_log="$tmp_dir/push.log"
+cat >"$fake_bin/git" <<EOF
+#!/usr/bin/env bash
+if [[ " \$* " == *" push "* ]]; then
+    printf 'push %s\n' "\$*" >>"$push_log"
+    exit 99
+fi
+exec /usr/bin/git "\$@"
+EOF
+chmod +x "$fake_bin/git"
+
+set +e
+noop_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+        "$fake_repo/install.sh" --snapshot --push --yes 2>&1
+)"
+noop_rc=$?
+set -e
+
+if ((noop_rc != 0)); then
+    echo "No-op snapshot unexpectedly failed" >&2
+    printf '%s\n' "$noop_output" >&2
+    exit 1
+fi
+if [[ -s "$push_log" ]]; then
+    echo "No-op snapshot unexpectedly attempted to push" >&2
+    cat "$push_log" >&2
+    exit 1
+fi
+if [[ "$noop_output" != *"No changes detected"* ]]; then
+    echo "No-op snapshot did not report that the repository is current" >&2
+    printf '%s\n' "$noop_output" >&2
+    exit 1
+fi

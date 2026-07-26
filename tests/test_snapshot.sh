@@ -240,6 +240,51 @@ if [[ "$non_snapshot_output" != "$non_snapshot_before" ]]; then
     exit 1
 fi
 
+echo "==> test 6d: jj repositories use jj commit and push semantics"
+jj_repo="$tmp_dir/jj-repo"
+mkdir -p "$jj_repo/configs/example" "$jj_repo/.jj"
+printf '.jj/\n' >"$jj_repo/.gitignore"
+printf 'before\n' >"$jj_repo/configs/example/config"
+git -C "$jj_repo" init -q
+git -C "$jj_repo" config user.email "test@example.com"
+git -C "$jj_repo" config user.name "Test User"
+git -C "$jj_repo" add .gitignore configs/example/config
+git -C "$jj_repo" commit -q -m "init"
+printf 'after\n' >"$jj_repo/configs/example/config"
+
+jj_log="$tmp_dir/jj.log"
+cat >"$tmp_dir/bin/jj" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$jj_log"
+EOF
+chmod +x "$tmp_dir/bin/jj"
+
+SNAPSHOT_MAPPINGS=(
+    "file|$jj_repo/configs/example/config|configs/example/config|required"
+)
+head_before="$(git -C "$jj_repo" rev-parse HEAD)"
+snapshot_commit "$jj_repo"
+head_after="$(git -C "$jj_repo" rev-parse HEAD)"
+
+if [[ "${SNAPSHOT_COMMIT_CREATED:-false}" != true \
+    || "${SNAPSHOT_COMMIT_VCS:-}" != jj ]]; then
+    echo "Snapshot did not record a jj commit" >&2
+    exit 1
+fi
+if [[ "$head_after" != "$head_before" ]]; then
+    echo "Snapshot created a detached Git commit inside a jj repository" >&2
+    exit 1
+fi
+
+snapshot_push "$jj_repo"
+if ! grep -Fq -- "-R $jj_repo describe -m chore: update dotfiles snapshot" "$jj_log" \
+    || ! grep -Fq -- "-R $jj_repo git push --change @" "$jj_log" \
+    || ! grep -Fq -- "-R $jj_repo new @" "$jj_log"; then
+    echo "Snapshot did not run the expected jj commit/push lifecycle" >&2
+    cat "$jj_log" >&2
+    exit 1
+fi
+
 echo "==> test 7: snapshot rejects symlinks in source config"
 rm -rf "$fake_home/.config/mako-link"
 mkdir -p "$fake_home/.config/mako-link"

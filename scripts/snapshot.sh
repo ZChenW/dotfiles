@@ -566,15 +566,54 @@ snapshot_stage_managed_changes() {
     done < <(snapshot_managed_paths "$repo_root")
 }
 
+snapshot_has_managed_changes() {
+    local repo_root="$1"
+    local managed
+
+    while IFS= read -r managed; do
+        [[ -z "$managed" ]] && continue
+        if [[ -n "$(git -C "$repo_root" status --porcelain -- "$managed")" ]]; then
+            return 0
+        fi
+    done < <(snapshot_managed_paths "$repo_root")
+
+    return 1
+}
+
+snapshot_repo_uses_jj() {
+    local repo_root="$1"
+
+    [[ -d "$repo_root/.jj" ]] && command -v jj >/dev/null 2>&1
+}
+
 snapshot_commit() {
     local repo_root="$1"
+    local message="chore: update dotfiles snapshot"
     local -a blockers=()
+
+    SNAPSHOT_COMMIT_CREATED=false
+    SNAPSHOT_COMMIT_VCS=""
 
     mapfile -t blockers < <(snapshot_non_snapshot_changes "$repo_root")
     if ((${#blockers[@]} > 0)); then
         ui_error "non-snapshot changes are present. Commit or stash them before running --snapshot commit/push."
         printf '  %s\n' "${blockers[@]}" >&2
         return 1
+    fi
+
+    if ! snapshot_has_managed_changes "$repo_root"; then
+        ui_warn "No snapshot changes to commit."
+        return 0
+    fi
+
+    if snapshot_repo_uses_jj "$repo_root"; then
+        if ! jj -R "$repo_root" describe -m "$message"; then
+            ui_error "jj failed to describe the snapshot commit."
+            return 1
+        fi
+        SNAPSHOT_COMMIT_CREATED=true
+        SNAPSHOT_COMMIT_VCS=jj
+        return 0
     fi
 
     snapshot_stage_managed_changes "$repo_root"
@@ -584,19 +623,37 @@ snapshot_commit() {
         return 0
     fi
 
-    git -C "$repo_root" commit -m "$(cat <<'EOF'
-chore: update dotfiles snapshot
-EOF
-)"
+    git -C "$repo_root" commit -m "$message"
+    SNAPSHOT_COMMIT_CREATED=true
+    SNAPSHOT_COMMIT_VCS=git
 }
 
 snapshot_push() {
     local repo_root="$1"
 
+    if [[ "${SNAPSHOT_COMMIT_CREATED:-false}" != true ]]; then
+        ui_warn "No snapshot commit to push."
+        return 0
+    fi
+
+    if [[ "${SNAPSHOT_COMMIT_VCS:-}" == jj ]]; then
+        if ! jj -R "$repo_root" git push --change @; then
+            ui_error "jj push failed. The snapshot commit remains local."
+            return 1
+        fi
+        if ! jj -R "$repo_root" new @; then
+            ui_error "Snapshot was pushed, but jj could not create a clean working-copy commit."
+            return 1
+        fi
+        SNAPSHOT_COMMIT_CREATED=false
+        return 0
+    fi
+
     if ! git -C "$repo_root" push; then
         ui_error "git push failed. Commit was created locally."
         return 1
     fi
+    SNAPSHOT_COMMIT_CREATED=false
 }
 
 snapshot_prompt_yes_no() {
