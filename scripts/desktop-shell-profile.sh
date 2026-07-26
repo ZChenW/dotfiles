@@ -42,20 +42,27 @@ save_desktop_shell_profile() {
 }
 
 prompt_desktop_shell_profile() {
+    local step="${1:-}"
+    local total="${2:-}"
     local saved_profile default_choice choice
     saved_profile="$(load_saved_desktop_shell_profile || true)"
-    case "$saved_profile" in
+    case "${DESKTOP_SHELL_PROFILE:-$saved_profile}" in
         quickshell) default_choice=2 ;;
         dual) default_choice=3 ;;
         *) default_choice=1 ;;
     esac
 
-    ui_section "Desktop shell"
-    echo "  1) Waybar"
-    echo "  2) QuickShell"
-    echo "  3) Waybar + QuickShell (switch with desktop-shell)"
-    read -r -p "$(ui_prompt "Choice" "$default_choice")" choice
-    case "${choice:-$default_choice}" in
+    if [[ -n "$step" && -n "$total" ]]; then
+        ui_stage "$step" "$total" "Desktop shell"
+    else
+        ui_section "Desktop shell"
+    fi
+    ui_menu "Select" "$default_choice" \
+        "Waybar|Use the current Waybar desktop shell" \
+        "QuickShell|Use the pinned Clavis QuickShell" \
+        "Waybar + QuickShell|Switch at any time with desktop-shell"
+    choice="$UI_MENU_CHOICE"
+    case "$choice" in
         1) DESKTOP_SHELL_PROFILE=waybar ;;
         2) DESKTOP_SHELL_PROFILE=quickshell ;;
         3) DESKTOP_SHELL_PROFILE=dual ;;
