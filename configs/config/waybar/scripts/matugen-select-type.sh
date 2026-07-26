@@ -49,13 +49,10 @@ if [[ -z "$wallpaper" || ! -f "$wallpaper" ]]; then
     exit 1
 fi
 
-matugen image "$wallpaper" -t "$selected" -m dark --prefer darkness
+matugen image "$wallpaper" -t "$selected" -m dark --prefer saturation
 
-if pgrep -x waybar >/dev/null 2>&1; then
-    pkill -x waybar 2>/dev/null || true
-    sleep 0.15
-    nohup waybar >/dev/null 2>&1 &
-    disown || true
-fi
+# Waybar watches style.css and its imports via reload_style_on_change.
+# Touch the root stylesheet to make the CSS-only reload explicit.
+touch "${XDG_CONFIG_HOME:-$HOME/.config}/waybar/style.css"
 
 notify-send "matugen" "Applied $selected" 2>/dev/null || true

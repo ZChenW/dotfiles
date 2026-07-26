@@ -58,40 +58,17 @@ fi
 "$matugen_bin" \
   --config "$matugen_config" \
   image "$still" \
+  --type scheme-content \
   --mode dark \
-  --prefer darkness
+  --prefer saturation
 
 if [[ ! -s "$waybar_colors" ]]; then
   echo "wcr-post-apply-waybar: matugen did not generate $waybar_colors" >&2
   exit 1
 fi
 
-# Do NOT use `killall -SIGUSR2` — on this system it can terminate waybar
-# instead of reloading, which makes the bar disappear.
-# Restart only if waybar was already running (matches niri spawn-at-startup).
-if pgrep -x waybar >/dev/null 2>&1; then
-  waybar_bin="$(command -v waybar 2>/dev/null || true)"
-  if [[ -z "$waybar_bin" && -x /usr/bin/waybar ]]; then
-    waybar_bin=/usr/bin/waybar
-  fi
-  if [[ -z "$waybar_bin" ]]; then
-    echo "wcr-post-apply-waybar: running Waybar cannot be restarted; binary not found" >&2
-    exit 1
-  fi
-
-  pkill -x waybar 2>/dev/null || true
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    pgrep -x waybar >/dev/null 2>&1 || break
-    sleep 0.05
-  done
-
-  # setsid prevents the hook runner's process group from owning the new bar.
-  if command -v setsid >/dev/null 2>&1; then
-    setsid -f "$waybar_bin" >/dev/null 2>&1 9>&-
-  else
-    nohup "$waybar_bin" >/dev/null 2>&1 9>&- &
-    disown || true
-  fi
-fi
+# Waybar watches style.css and its imports via reload_style_on_change.
+# Touch the root stylesheet to make the CSS-only reload explicit.
+touch "$config_home/waybar/style.css"
 
 exit 0

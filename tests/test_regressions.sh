@@ -272,39 +272,46 @@ if ! grep -Fq -- "--config $xdg_config/matugen/config.toml" "$matugen_log"; then
     cat "$matugen_log" >&2
     exit 1
 fi
+if ! grep -Fq -- "--type scheme-content" "$matugen_log" \
+    || ! grep -Fq -- "--prefer saturation" "$matugen_log"; then
+    echo "Hook did not request content-oriented saturated colors" >&2
+    cat "$matugen_log" >&2
+    exit 1
+fi
 if [[ ! -s "$xdg_config/waybar/colors.css" ]]; then
     echo "Hook did not generate Waybar colors" >&2
     exit 1
 fi
+if [[ ! -e "$xdg_config/waybar/style.css" ]]; then
+    echo "Hook did not trigger a CSS-only Waybar refresh" >&2
+    exit 1
+fi
 
-echo "==> test 4b: restarted Waybar does not inherit the theme lock"
-touch "$tmp_dir/waybar-running"
+echo "==> test 4b: theme refresh does not restart Waybar"
+waybar_control_log="$tmp_dir/waybar-control.log"
 cat >"$fake_bin/pgrep" <<EOF
 #!/usr/bin/env bash
-[[ -e "$tmp_dir/waybar-running" ]]
+printf 'pgrep %s\n' "\$*" >>"$waybar_control_log"
 EOF
 cat >"$fake_bin/pkill" <<EOF
 #!/usr/bin/env bash
-rm -f "$tmp_dir/waybar-running"
+printf 'pkill %s\n' "\$*" >>"$waybar_control_log"
 EOF
 cat >"$fake_bin/setsid" <<EOF
 #!/usr/bin/env bash
-[[ "\${1:-}" == -f ]] && shift
-if [[ -e /proc/\$\$/fd/9 ]]; then
-    printf 'inherited\n' >"$tmp_dir/inherited-lock"
-fi
-"\$@"
+printf 'setsid %s\n' "\$*" >>"$waybar_control_log"
 EOF
-cat >"$fake_bin/waybar" <<'EOF'
+cat >"$fake_bin/waybar" <<EOF
 #!/usr/bin/env bash
-:
+printf 'waybar %s\n' "\$*" >>"$waybar_control_log"
 EOF
 chmod +x "$fake_bin/pgrep" "$fake_bin/pkill" "$fake_bin/setsid" "$fake_bin/waybar"
 HOME="$fake_home" XDG_CONFIG_HOME="$xdg_config" PATH="$fake_bin:/usr/bin" \
     WCR_STILL="$tmp_dir/wall.png" \
     "$REPO_ROOT/configs/local-bin/wcr-post-apply-waybar.sh"
-if [[ -e "$tmp_dir/inherited-lock" ]]; then
-    echo "Restarted Waybar inherited the wallpaper theme lock" >&2
+if [[ -s "$waybar_control_log" ]]; then
+    echo "Theme refresh unexpectedly invoked a Waybar lifecycle command" >&2
+    cat "$waybar_control_log" >&2
     exit 1
 fi
 
