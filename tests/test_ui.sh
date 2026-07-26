@@ -189,4 +189,46 @@ if ! awk 'length($0) > 24 { exit 1 }' <<<"$very_narrow_output"; then
     exit 1
 fi
 
+echo "==> test 10: colored menu descriptions share one column"
+colored_menu="$(
+    NO_COLOR='' TERM=dumb DOTFILES_COLOR=always COLUMNS=78 bash -c '
+        source "$1"
+        ui_init
+        ui_menu_render 1 \
+            "A|Description" \
+            "Much longer label|Description"
+    ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+# shellcheck disable=SC2001
+plain_menu="$(sed $'s/\033\\[[0-9;]*m//g' <<<"$colored_menu")"
+mapfile -t description_columns < <(
+    awk '/Description/ { print index($0, "Description") }' <<<"$plain_menu"
+)
+if ((${#description_columns[@]} != 2)) \
+    || [[ "${description_columns[0]}" != "${description_columns[1]}" ]]; then
+    echo "Expected colored menu descriptions to share one starting column" >&2
+    printf '%s\n' "$plain_menu" >&2
+    exit 1
+fi
+
+echo "==> test 11: arrow navigation avoids full-region clears"
+if command -v script >/dev/null 2>&1; then
+    pty_command="NO_COLOR= TERM=xterm DOTFILES_COLOR=never bash -e -c 'source \"$REPO_ROOT/scripts/ui.sh\"; ui_init; ui_menu \"Select\" 1 \"First|one\" \"Second|two\"; printf \"choice=%s\\\\n\" \"\$UI_MENU_CHOICE\"'"
+    navigation_output="$(
+        printf '\033[B\n' |
+            script -qec "$pty_command" /dev/null
+    )"
+    if [[ "$navigation_output" == *$'\033[J'* ]]; then
+        echo "Expected arrow navigation not to clear and redraw the full menu region" >&2
+        exit 1
+    fi
+    if [[ "$navigation_output" != *"choice=2"* ]]; then
+        echo "Expected arrow navigation to select the second item" >&2
+        printf '%q\n' "$navigation_output" >&2
+        exit 1
+    fi
+else
+    echo "script(1) unavailable; PTY navigation check skipped"
+fi
+
 echo "All UI tests passed."
