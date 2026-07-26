@@ -44,11 +44,18 @@ After choosing install, the installer runs six steps:
 3. **Desktop shell** — Waybar, QuickShell, or both
 4. **Config groups** — choose one or more groups (default: all)
 5. **Local private config** — explains `~/.zshrc.local` handling
-6. **Confirm** — prints a plan summary; proceeds only on `y` (default `N`)
+6. **Review** — prints a plan summary, then install, revise, or cancel
+
+Interactive menus support Up/Down, Enter, and number shortcuts. The final
+review can start the install, return to the first step, or cancel without
+changes.
 
 `--dry-run` can be combined with interactive mode. Selections are applied, then actions are printed without modifying `$HOME`.
 
 Non-TTY stdin/stdout without `--yes` fails with a message to use `--yes` or run in a terminal.
+TTY output includes step progress and compact result cards. Redirected and CI
+output stays deterministic and plain; use `--verbose` for individual
+operations or `--debug` for raw commands.
 
 ## Installer Modes
 

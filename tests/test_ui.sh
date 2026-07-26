@@ -109,4 +109,84 @@ if [[ "$ascii_logo_output" == *"█"* ]]; then
     exit 1
 fi
 
+echo "==> test 7: stages and plan cards render"
+plan_output="$(
+    TERM=dumb DOTFILES_COLOR=auto COLUMNS=72 bash -c '
+        source "$1"
+        ui_init
+        ui_stage 2 6 "Software scope"
+        ui_plan_box "Installation plan" \
+            "Desktop shell|dual" \
+            "Packages|Official + AUR" \
+            "Private config|~/.zshrc.local preserved"
+    ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+if [[ "$plan_output" != *"2/6"*"Software scope"* \
+    || "$plan_output" != *"Installation plan"* \
+    || "$plan_output" != *"Desktop shell"*"dual"* ]]; then
+    echo "Expected stage and installation plan output" >&2
+    printf '%s\n' "$plan_output" >&2
+    exit 1
+fi
+
+echo "==> test 8: scripted menu input remains deterministic"
+menu_output="$(
+    printf '2\n' |
+        TERM=dumb DOTFILES_COLOR=auto bash -c '
+            source "$1"
+            ui_init
+            ui_menu "Select" 1 \
+                "Waybar|Current shell" \
+                "QuickShell|Pinned shell"
+            printf "choice=%s\n" "$UI_MENU_CHOICE"
+        ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+if [[ "$menu_output" != *"1) Waybar"* \
+    || "$menu_output" != *"2) QuickShell"* \
+    || "$menu_output" != *"choice=2"* ]]; then
+    echo "Expected numbered menu fallback and selected value" >&2
+    printf '%s\n' "$menu_output" >&2
+    exit 1
+fi
+
+echo "==> test 9: narrow output stays readable"
+narrow_output="$(
+    TERM=dumb DOTFILES_COLOR=auto DOTFILES_ASCII=1 COLUMNS=40 bash -c '
+        source "$1"
+        ui_init
+        ui_plan_box "Narrow plan" \
+            "Desktop shell|Waybar and QuickShell" \
+            "Very long setting name|A deliberately long value that must fit"
+        ui_result_box "Installation complete" \
+            "ok:A deliberately long result that must fit the terminal"
+    ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+if [[ "$narrow_output" != *"Narrow plan"* \
+    || "$narrow_output" != *"Installation complete"* ]]; then
+    echo "Expected narrow fallback output" >&2
+    printf '%s\n' "$narrow_output" >&2
+    exit 1
+fi
+if awk 'length($0) > 40 { exit 1 }' <<<"$narrow_output"; then
+    :
+else
+    echo "Expected narrow UI lines to fit within 40 columns" >&2
+    printf '%s\n' "$narrow_output" >&2
+    exit 1
+fi
+
+very_narrow_output="$(
+    TERM=dumb DOTFILES_COLOR=auto DOTFILES_ASCII=1 COLUMNS=24 bash -c '
+        source "$1"
+        ui_init
+        ui_result_box "Installation complete" \
+            "ok:A deliberately long result"
+    ' _ "$REPO_ROOT/scripts/ui.sh"
+)"
+if ! awk 'length($0) > 24 { exit 1 }' <<<"$very_narrow_output"; then
+    echo "Expected result box to respect a 24-column terminal" >&2
+    printf '%s\n' "$very_narrow_output" >&2
+    exit 1
+fi
+
 echo "All UI tests passed."

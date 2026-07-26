@@ -109,7 +109,7 @@ dual_plan="$(
         --yes --skip-packages --dry-run --desktop-shell dual \
         2>&1
 )"
-if [[ "$dual_plan" != *"Desktop shell: dual"* ]]; then
+if [[ "$dual_plan" != *"Desktop shell"*"dual"* ]]; then
     echo "Dual desktop shell profile is missing from the installation plan" >&2
     printf '%s\n' "$dual_plan" >&2
     exit 1
@@ -151,7 +151,7 @@ saved_plan="$(
         --yes --skip-packages --dry-run \
         2>&1
 )"
-if [[ "$saved_plan" != *"Desktop shell: dual"* ]]; then
+if [[ "$saved_plan" != *"Desktop shell"*"dual"* ]]; then
     echo "Installer did not reuse the saved desktop shell profile" >&2
     printf '%s\n' "$saved_plan" >&2
     exit 1
