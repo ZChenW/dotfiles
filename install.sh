@@ -54,6 +54,7 @@ SELECTED_GROUPS=()
 
 cleanup_on_exit() {
     local exit_code=$?
+    ui_cursor_show || true
     if ((exit_code == 0 || exit_code == 130)); then
         return 0
     fi

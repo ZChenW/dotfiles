@@ -222,6 +222,14 @@ if command -v script >/dev/null 2>&1; then
         echo "Expected arrow navigation not to clear and redraw the full menu region" >&2
         exit 1
     fi
+    if [[ "$navigation_output" != *$'\033[?25l'* ]]; then
+        echo "Expected interactive menus to hide the blinking terminal cursor" >&2
+        exit 1
+    fi
+    if [[ "$navigation_output" != *$'\033[?25h'* ]]; then
+        echo "Expected interactive menus to restore the terminal cursor" >&2
+        exit 1
+    fi
     if [[ "$navigation_output" != *"choice=2"* ]]; then
         echo "Expected arrow navigation to select the second item" >&2
         printf '%q\n' "$navigation_output" >&2
@@ -233,6 +241,17 @@ if command -v script >/dev/null 2>&1; then
     if [[ "$navigation_help_count" != 1 ]]; then
         echo "Expected arrow navigation to render the menu frame only once" >&2
         printf 'Observed help rows: %s\n' "$navigation_help_count" >&2
+        exit 1
+    fi
+
+    interrupt_command="NO_COLOR= TERM=xterm DOTFILES_COLOR=never \"$REPO_ROOT/install.sh\" --menu --ascii --no-color"
+    interrupt_output="$(
+        { sleep 0.2; printf '\003'; } |
+            script -qec "$interrupt_command" /dev/null || true
+    )"
+    if [[ "$interrupt_output" != *$'\033[?25l'* \
+        || "$interrupt_output" != *$'\033[?25h'* ]]; then
+        echo "Expected Ctrl+C to restore a cursor hidden by the menu" >&2
         exit 1
     fi
 else

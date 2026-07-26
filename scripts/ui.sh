@@ -33,6 +33,7 @@ BOX_VERTICAL="│"
 UI_VERBOSE="${UI_VERBOSE:-0}"
 UI_DEBUG="${UI_DEBUG:-0}"
 DOTFILES_LOG_FILE="${DOTFILES_LOG_FILE:-}"
+UI_CURSOR_HIDDEN=false
 
 ui_supports_color() {
     if [[ -n "${NO_COLOR:-}" ]]; then
@@ -114,6 +115,19 @@ ui_compact_width() {
     else
         printf '%s\n' "$terminal_width"
     fi
+}
+
+ui_cursor_hide() {
+    [[ -t 1 ]] || return 0
+    printf '\033[?25l'
+    UI_CURSOR_HIDDEN=true
+}
+
+ui_cursor_show() {
+    if [[ "${UI_CURSOR_HIDDEN:-false}" == true ]]; then
+        printf '\033[?25h'
+    fi
+    UI_CURSOR_HIDDEN=false
 }
 
 ui_repeat() {
@@ -513,6 +527,7 @@ ui_menu() {
         return 1
     fi
 
+    ui_cursor_hide
     ui_menu_render "$selected" "${options[@]}"
     if [[ -n "${DOTFILES_ASCII:-}" ]]; then
         printf '  %s\n' "$(ui_color "$UI_DIM" "Up/Down move  Enter select  1-$count quick select")"
@@ -523,12 +538,14 @@ ui_menu() {
     while true; do
         if ! IFS= read -r -s -n 1 key; then
             printf '\n'
+            ui_cursor_show
             return 1
         fi
         case "$key" in
             "")
-                UI_MENU_CHOICE="$selected"
                 printf '\n'
+                ui_cursor_show
+                UI_MENU_CHOICE="$selected"
                 return 0
                 ;;
             [1-9])
@@ -548,6 +565,7 @@ ui_menu() {
                     printf '\033[1A\r\033[K  %s %s\n\n' \
                         "$(ui_color "$UI_DIM" "Selected:")" \
                         "$(ui_color "$UI_BOLD" "$label")"
+                    ui_cursor_show
                     # Consumed by the caller after this function returns.
                     # shellcheck disable=SC2034
                     UI_MENU_CHOICE="$selected"
