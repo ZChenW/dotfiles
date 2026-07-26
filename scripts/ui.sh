@@ -407,36 +407,71 @@ ui_result_box() {
     printf '%s%s%s\n' "$(ui_color "$UI_BLUE" "$BOX_BOTTOM_LEFT")" "$(ui_color "$UI_BLUE" "$(ui_repeat "$BOX_HORIZONTAL" "$inner")")" "$(ui_color "$UI_BLUE" "$BOX_BOTTOM_RIGHT")"
 }
 
+ui_menu_render_item() {
+    local selected="$1"
+    local index="$2"
+    local item="$3"
+    local width="$4"
+    local option_width label description marker color label_text description_text
+
+    option_width=$((width - 8))
+    label="${item%%|*}"
+    description="${item#*|}"
+    if ((index == selected)); then
+        marker="$ICON_ACTIVE"
+        color="$UI_CYAN$UI_BOLD"
+    else
+        marker="$ICON_INACTIVE"
+        color="$UI_DIM"
+    fi
+
+    if ((width < 58)) || [[ "$description" == "$label" || -z "$description" ]]; then
+        printf '  %s %s\n' \
+            "$(ui_color "$color" "$marker")" \
+            "$(ui_color "$color" "$(ui_truncate "$label" "$option_width")")"
+        return 0
+    fi
+
+    # Pad the visible label before adding ANSI color codes. Padding a colored
+    # string makes printf count escape bytes and shifts every description.
+    label_text="$(ui_truncate "$label" 22)"
+    label_text="$(printf '%-22s' "$label_text")"
+    description_text="$(ui_truncate "$description" "$((option_width - 23))")"
+    printf '  %s %s %s\n' \
+        "$(ui_color "$color" "$marker")" \
+        "$(ui_color "$color" "$label_text")" \
+        "$(ui_color "$UI_DIM" "$description_text")"
+}
+
 ui_menu_render() {
     local selected="$1"
     shift
-    local width option_width index=1 item label description marker color
+    local width index=1 item
 
     width="$(ui_compact_width)"
-    option_width=$((width - 8))
     for item in "$@"; do
-        label="${item%%|*}"
-        description="${item#*|}"
-        if ((index == selected)); then
-            marker="$ICON_ACTIVE"
-            color="$UI_CYAN$UI_BOLD"
-        else
-            marker="$ICON_INACTIVE"
-            color="$UI_DIM"
-        fi
-
-        if ((width < 58)) || [[ "$description" == "$label" || -z "$description" ]]; then
-            printf '  %s %s\n' \
-                "$(ui_color "$color" "$marker")" \
-                "$(ui_color "$color" "$(ui_truncate "$label" "$option_width")")"
-        else
-            printf '  %s %-22s %s\n' \
-                "$(ui_color "$color" "$marker")" \
-                "$(ui_color "$color" "$(ui_truncate "$label" 22)")" \
-                "$(ui_color "$UI_DIM" "$(ui_truncate "$description" "$((option_width - 23))")")"
-        fi
+        ui_menu_render_item "$selected" "$index" "$item" "$width"
         ((++index))
     done
+}
+
+ui_menu_update_row() {
+    local row="$1"
+    local selected="$2"
+    shift 2
+    local -a options=("$@")
+    local count="${#options[@]}"
+    local up width
+
+    up=$((count + 2 - row))
+    width="$(ui_compact_width)"
+
+    # Keep the cursor at the prompt and repaint only the row whose selection
+    # marker changed. Avoiding ESC[J prevents full-menu flashes.
+    printf '\0337\033[%dA\r' "$up"
+    ui_menu_render_item \
+        "$selected" "$row" "${options[$((row - 1))]}" "$width"
+    printf '\0338'
 }
 
 # Sets UI_MENU_CHOICE to a one-based option index.
@@ -449,7 +484,7 @@ ui_menu() {
     local -a options=("$@")
     local count="${#options[@]}"
     local selected="$default"
-    local key sequence lines item index label description
+    local key sequence item index label description previous
 
     UI_MENU_CHOICE=""
     ((count > 0)) || return 1
@@ -485,8 +520,6 @@ ui_menu() {
         else
             printf '  %s\n' "$(ui_color "$UI_DIM" "↑/↓ move  Enter select  1–$count quick select")"
         fi
-        lines=$((count + 1))
-
         if ! IFS= read -r -s -n 1 key; then
             printf '\n'
             return 1
@@ -499,16 +532,19 @@ ui_menu() {
                 ;;
             [1-9])
                 if ((key <= count)); then
+                    previous="$selected"
                     selected="$key"
                     # Number shortcuts select immediately. Consume an optional
                     # trailing Enter so it cannot answer the next prompt.
                     sequence=""
                     IFS= read -r -s -n 1 -t 0.05 sequence || true
-                    printf '\033[%dA\r\033[J' "$lines"
-                    ui_menu_render "$selected" "${options[@]}"
+                    ui_menu_update_row "$previous" "$selected" "${options[@]}"
+                    if ((previous != selected)); then
+                        ui_menu_update_row "$selected" "$selected" "${options[@]}"
+                    fi
                     item="${options[$((selected - 1))]}"
                     label="${item%%|*}"
-                    printf '  %s %s\n\n' \
+                    printf '\033[1A\r\033[K  %s %s\n\n' \
                         "$(ui_color "$UI_DIM" "Selected:")" \
                         "$(ui_color "$UI_BOLD" "$label")"
                     # Consumed by the caller after this function returns.
@@ -520,6 +556,7 @@ ui_menu() {
             $'\e')
                 sequence=""
                 IFS= read -r -s -n 2 -t 0.1 sequence || true
+                previous="$selected"
                 case "$sequence" in
                     "[A")
                         selected=$((selected - 1))
@@ -530,9 +567,12 @@ ui_menu() {
                         ((selected > count)) && selected=1
                         ;;
                 esac
+                if ((previous != selected)); then
+                    ui_menu_update_row "$previous" "$selected" "${options[@]}"
+                    ui_menu_update_row "$selected" "$selected" "${options[@]}"
+                fi
                 ;;
         esac
-        printf '\033[%dA\r\033[J' "$lines"
     done
 }
 
