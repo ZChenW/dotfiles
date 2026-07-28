@@ -21,6 +21,12 @@ mkdir -p \
     "$fake_home/Pictures/wallpapers" \
     "$fake_bin"
 cp -a "$REPO_ROOT" "$fake_repo"
+rm -rf "$fake_repo/.git"
+/usr/bin/git -C "$fake_repo" init -q
+/usr/bin/git -C "$fake_repo" config user.email "test@example.com"
+/usr/bin/git -C "$fake_repo" config user.name "Test User"
+/usr/bin/git -C "$fake_repo" add -A
+/usr/bin/git -C "$fake_repo" commit -qm "test baseline"
 
 mkdir -p \
     "$fake_home/.config/niri" \
@@ -85,6 +91,15 @@ esac
 EOF
 chmod +x "$fake_bin/pacman"
 
+cat >"$fake_bin/git" <<'EOF'
+#!/usr/bin/env bash
+if [[ " $* " == *" pull --ff-only "* ]]; then
+    exit 0
+fi
+exec /usr/bin/git "$@"
+EOF
+chmod +x "$fake_bin/git"
+
 output="$(HOME="$fake_home" PATH="$fake_bin:$PATH" "$fake_repo/install.sh" --snapshot 2>&1)"
 
 assert_count() {
@@ -132,9 +147,49 @@ echo "==> no-op snapshot skips commit and push"
 /usr/bin/git -C "$fake_repo" add -A
 /usr/bin/git -C "$fake_repo" commit -q -m "snapshot baseline"
 
+echo "==> Lightweight snapshot updates only arch-lightweight.txt"
+mkdir -p "$fake_home/.local/state/dotfiles"
+printf 'lightweight\n' >"$fake_home/.local/state/dotfiles/install-profile"
+standard_hash_before="$(
+    /usr/bin/git -C "$fake_repo" hash-object \
+        packages/arch-essential.txt \
+        packages/arch-desktop.txt \
+        packages/arch-apps.txt \
+        packages/arch-aur.txt \
+        packages/arch-machine-local.txt \
+        packages/arch-exclude.txt
+)"
+lightweight_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+        "$fake_repo/install.sh" --snapshot --no-commit 2>&1
+)"
+standard_hash_after="$(
+    /usr/bin/git -C "$fake_repo" hash-object \
+        packages/arch-essential.txt \
+        packages/arch-desktop.txt \
+        packages/arch-apps.txt \
+        packages/arch-aur.txt \
+        packages/arch-machine-local.txt \
+        packages/arch-exclude.txt
+)"
+if [[ "$standard_hash_before" != "$standard_hash_after" ]]; then
+    echo "Lightweight public Snapshot changed Standard manifests" >&2
+    exit 1
+fi
+if [[ "$lightweight_output" != *"Lightweight export complete"* ]]; then
+    echo "Expected public Snapshot to use saved Lightweight profile" >&2
+    printf '%s\n' "$lightweight_output" >&2
+    exit 1
+fi
+/usr/bin/git -C "$fake_repo" add -A
+/usr/bin/git -C "$fake_repo" commit -q -m "lightweight snapshot baseline"
+
 push_log="$tmp_dir/push.log"
 cat >"$fake_bin/git" <<EOF
 #!/usr/bin/env bash
+if [[ " \$* " == *" pull --ff-only "* ]]; then
+    exit 0
+fi
 if [[ " \$* " == *" push "* ]]; then
     printf 'push %s\n' "\$*" >>"$push_log"
     exit 99

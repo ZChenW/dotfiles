@@ -21,8 +21,10 @@ cd ~/Projects/dotfiles
 Non-interactive flow for scripts or a new machine:
 
 ```bash
-./install.sh --dry-run --yes
-./install.sh --yes
+./install.sh --install-profile standard --dry-run --yes
+./install.sh --install-profile standard --yes
+./install.sh --install-profile lightweight --dry-run --yes
+./install.sh --install-profile lightweight --yes
 ```
 
 Preview planned changes without modifying `$HOME`:
@@ -37,14 +39,20 @@ With no arguments in a terminal, `./install.sh` first offers install, update,
 snapshot, package export, doctor, uninstall, or exit. `--menu` opens the same
 operation menu explicitly.
 
-After choosing install, the installer runs six steps:
+After choosing Install, choose an installation profile first:
 
-1. **Install mode** — full install, packages only, configs only, or dry-run preview
-2. **Software scope** — install packages, include AUR, include `arch-machine-local.txt`
-3. **Desktop shell** — Waybar, QuickShell, or both
-4. **Config groups** — choose one or more groups (default: all)
-5. **Local private config** — explains `~/.zshrc.local` handling
-6. **Review** — prints a plan summary, then install, revise, or cancel
+- **Standard** is the default complete portable software scope.
+- **Lightweight** is the X230-friendly daily development scope. It keeps
+  Firefox, Thunar, VS Code, Neovim, Vim, Codex, Kitty, Zsh, the Node/Python
+  toolchain, Chinese input, fonts, Waybar, and every managed configuration
+  group including wallpapers. It excludes QuickShell, games, Office, duplicate
+  browsers, communication clients, KDE applications, heavyweight media tools,
+  and specialist toolchains.
+
+Then choose **Automatic** (recommended) or **Customize**. Automatic applies the
+profile defaults and presents one final review. Customize exposes the existing
+package, desktop-shell, and configuration-group controls. Lightweight always
+uses Waybar and never offers QuickShell, dual-shell, or machine-local packages.
 
 Interactive menus support Up/Down, Enter, and number shortcuts. The final
 review can start the install, return to the first step, or cancel without
@@ -64,6 +72,8 @@ operations or `--debug` for raw commands.
 | `./install.sh` | Interactive: choose an operation, then its options |
 | `./install.sh --menu` | Explicitly open the top-level operation menu |
 | `./install.sh --yes` | Non-interactive: portable packages + all config groups |
+| `./install.sh --install-profile standard --yes` | Explicit Standard install |
+| `./install.sh --install-profile lightweight --yes` | Explicit Lightweight install |
 | `./install.sh --packages-only` | Install packages only |
 | `./install.sh --skip-packages` | Restore configs only |
 | `./install.sh --full-packages` | Include `packages/arch-machine-local.txt` |
@@ -85,7 +95,17 @@ Other flags:
 
 Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, and `tar` for uninstall). Missing tools fail early with an install hint.
 
-With `--yes`, AUR packages are installed by default. Pass `--no-aur` to install official packages only. In interactive mode, AUR is off by default unless you choose to include it. If AUR is enabled and neither `paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode or asks before doing so in interactive mode.
+With `--yes` and Automatic, AUR packages required by the selected profile are
+installed by default. Pass `--no-aur` to continue without them; the plan lists
+the capabilities that will be unavailable. If AUR is enabled and neither
+`paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode
+or asks before doing so in Customize.
+
+The selected installation profile is stored under
+`${XDG_STATE_HOME:-~/.local/state}/dotfiles/install-profile` only after a
+successful real install. An explicit `--install-profile` wins over saved state;
+saved state wins over the Standard default. Dry runs, cancellations, and
+failures never update it.
 
 The selected desktop shell profile is stored under
 `${XDG_STATE_HOME:-~/.local/state}/dotfiles/desktop-shell-profile` and reused by
@@ -132,13 +152,18 @@ Software is managed through files in `packages/`:
 | `arch-essential.txt` | Installer-required and core shell/desktop packages | yes |
 | `arch-desktop.txt` | Fonts, portals, Bluetooth, desktop utilities | yes |
 | `arch-apps.txt` | User applications from official repositories | yes |
-| `arch-aur.txt` | AUR and foreign packages | yes (`--yes`), no (interactive default) |
+| `arch-aur.txt` | AUR and foreign packages | Standard unless `--no-aur` |
+| `arch-lightweight.txt` | Lightweight official and AUR allowlist | Lightweight only |
 | `arch-machine-local.txt` | Kernel, firmware, boot, GPU, audio stack | no |
 | `arch-exclude.txt` | Packages excluded from automation | never |
 | `quickshell-build.txt` | QuickShell build/runtime dependencies | QuickShell or dual profile |
 | `quickshell-source.conf` | Pinned QuickShell fork and commit | source lock, not a package list |
 
-By default, the installer restores a portable software set. Machine-local packages are listed separately and skipped unless you pass `--full-packages` or choose them in interactive mode.
+Standard restores the existing portable software set. Lightweight reads only
+`arch-lightweight.txt`. Machine-local packages are skipped unless Standard is
+combined with `--full-packages`; that flag is rejected for Lightweight. The
+installer never removes packages when switching profiles and reports
+out-of-profile packages for manual review.
 
 Regenerate the manifests from the current machine:
 
@@ -159,7 +184,18 @@ Use this after changing configs or installing/removing packages:
 ./install.sh --snapshot
 ```
 
-The snapshot command refreshes `packages/*.txt` and managed config files from this machine into the repo, runs safety checks (including secret markers / token shapes in managed files), prints a dry-run plan for what install would do on `$HOME` (home is not modified), then asks whether to commit and push when run in a TTY. It stages only snapshot-managed files and never uses `git add .`. Secrets belong in `~/.zshrc.local`, which is never snapshotted; if a secret is found in tracked configs, snapshot fails.
+Snapshot is the publication flow. It requires a clean repository, pulls with
+`git pull --ff-only`, captures managed config files, runs safety checks
+(including secret markers/token shapes), shows the diff, and asks once before
+commit/push. It never stashes, resets, merges, or guesses through divergence.
+
+Package ownership is profile-specific. Standard updates only
+`arch-essential.txt`, `arch-desktop.txt`, `arch-apps.txt`, `arch-aur.txt`,
+`arch-machine-local.txt`, and `arch-exclude.txt`. Lightweight updates only
+`arch-lightweight.txt`, using explicitly installed packages while filtering
+machine-local packages, base packages, AUR helpers, and global exclusions. A
+no-op Snapshot skips commit and push. Snapshot stages only managed paths and
+never uses `git add .`.
 
 Use `--no-commit` to update files only, `--commit` to commit without pushing, and `--push` to request commit+push explicitly.
 
@@ -171,7 +207,13 @@ Use this on another machine after pushing a snapshot:
 ./install.sh --update
 ```
 
-By default, update pulls with `git pull --ff-only` and applies configs only. In a terminal it asks whether to snapshot and push the current machine before pulling. Use `--with-packages` to also install package manifests. Config mappings whose content and permissions already match are skipped before backup/copy, while changed paths keep the existing full backup and rollback behavior. Official/AUR classification loads the local pacman repository index once instead of running one query per package.
+Update is the consumption flow. It requires a clean repository, pulls with
+`git pull --ff-only`, reuses the saved installation profile, applies every
+managed configuration group including wallpapers, installs missing profile
+packages, and verifies the result. It never invokes Snapshot, commits, pushes,
+removes packages, runs `pacman -Syu`, or performs a full AUR upgrade. Dirty or
+diverged repositories fail without stash/reset/merge. `--with-packages` and
+`--no-snapshot-prompt` remain accepted only as compatibility no-ops.
 
 Install software without touching configs:
 
@@ -244,7 +286,12 @@ Run diagnostics without changing configs:
 ./install.sh --doctor
 ```
 
-Doctor checks Arch OS, required tools, AUR helper presence, login shell, desktop tools, managed path presence/symlink safety, backup/rollback availability, and reuses the post-install verification checks.
+Doctor checks Arch OS, required tools, AUR helper presence, login shell,
+desktop tools, managed path presence/symlink safety, backup/rollback
+availability, and reuses the post-install verification checks. On machines
+with 8 GB RAM or less and no swap/zram, it emits an advisory warning that
+Firefox, VS Code, and Codex may create memory pressure; this warning alone does
+not make Doctor fail.
 
 ## Uninstall
 

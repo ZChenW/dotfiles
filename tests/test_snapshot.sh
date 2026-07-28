@@ -458,4 +458,52 @@ if ! printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}" | grep -Fq '/waybar|'; then
     exit 1
 fi
 
+echo "==> test 13: Snapshot manages only the active profile package manifests"
+INSTALL_PROFILE=lightweight
+lightweight_paths="$(snapshot_managed_paths "$fake_repo")"
+if [[ "$lightweight_paths" != *"packages/arch-lightweight.txt"* \
+    || "$lightweight_paths" == *"packages/arch-essential.txt"* ]]; then
+    echo "Expected Lightweight Snapshot to own only arch-lightweight.txt" >&2
+    printf '%s\n' "$lightweight_paths" >&2
+    exit 1
+fi
+
+INSTALL_PROFILE=standard
+standard_paths="$(snapshot_managed_paths "$fake_repo")"
+if [[ "$standard_paths" != *"packages/arch-essential.txt"* \
+    || "$standard_paths" == *"packages/arch-lightweight.txt"* ]]; then
+    echo "Expected Standard Snapshot to own only Standard manifests" >&2
+    printf '%s\n' "$standard_paths" >&2
+    exit 1
+fi
+
+echo "==> test 14: Snapshot refuses dirty repositories before capture"
+prepare_repo="$tmp_dir/prepare-repo"
+mkdir -p "$prepare_repo"
+/usr/bin/git -C "$prepare_repo" init -q
+/usr/bin/git -C "$prepare_repo" config user.email test@example.com
+/usr/bin/git -C "$prepare_repo" config user.name "Test User"
+printf 'clean\n' >"$prepare_repo/tracked"
+/usr/bin/git -C "$prepare_repo" add tracked
+/usr/bin/git -C "$prepare_repo" commit -qm initial
+snapshot_prepare_repo "$prepare_repo" true >/dev/null
+printf 'dirty\n' >"$prepare_repo/tracked"
+if snapshot_prepare_repo "$prepare_repo" true >/dev/null 2>&1; then
+    echo "Expected dirty Snapshot preparation to fail" >&2
+    exit 1
+fi
+
+echo "==> test 15: Snapshot diff includes untracked file contents"
+untracked_repo="$tmp_dir/untracked-repo"
+mkdir -p "$untracked_repo/configs/example"
+/usr/bin/git -C "$untracked_repo" init -q
+printf 'new snapshot content\n' >"$untracked_repo/configs/example/new.conf"
+INSTALL_PROFILE=standard
+untracked_diff="$(snapshot_show_diff "$untracked_repo")"
+if [[ "$untracked_diff" != *"new snapshot content"* ]]; then
+    echo "Expected untracked captured content in Snapshot review diff" >&2
+    printf '%s\n' "$untracked_diff" >&2
+    exit 1
+fi
+
 echo "All snapshot tests passed."

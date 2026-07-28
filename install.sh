@@ -14,6 +14,8 @@ fi
 source "$REPO_ROOT/scripts/ui.sh"
 # shellcheck source=scripts/desktop-shell-profile.sh
 source "$REPO_ROOT/scripts/desktop-shell-profile.sh"
+# shellcheck source=scripts/install-profile.sh
+source "$REPO_ROOT/scripts/install-profile.sh"
 
 DRY_RUN=false
 DRY_RUN_CLI=false
@@ -41,6 +43,7 @@ NO_COLOR_FLAG=false
 ASCII_FLAG=false
 SHOW_MENU=false
 DESKTOP_SHELL_PROFILE=""
+INSTALL_PROFILE=""
 MODE_LABEL=""
 BACKUP_ROOT=""
 LOG_FILE=""
@@ -90,9 +93,11 @@ Options:
   --skip-packages    Restore configs only, skip package installation
   --packages-only    Install packages only, skip config restore
   --full-packages    Include machine-local packages from packages/arch-machine-local.txt
-  --no-aur           Skip AUR packages (default in interactive mode)
+  --no-aur           Skip AUR packages and report degraded capabilities
   --export-packages  Export current machine packages into packages/*.txt
   --restore-only     Skip packages and optional service actions
+  --install-profile PROFILE
+                     Installation profile: standard or lightweight
   --desktop-shell PROFILE
                      Desktop shell profile: waybar, quickshell, or dual
   --snapshot         Refresh package manifests and managed configs from this machine
@@ -100,8 +105,8 @@ Options:
   --commit           With --snapshot: commit after checks, do not push
   --push             With --snapshot: ask, then commit and push
   --update           Pull repo updates, then apply configs
-  --with-packages    With --update: install package manifests after pulling
-  --no-snapshot-prompt  With --update: do not ask to snapshot before pulling
+  --with-packages    Deprecated update compatibility flag (packages are automatic)
+  --no-snapshot-prompt  Deprecated compatibility flag (Update never snapshots)
   --doctor           Run diagnostics without changing configs
   --uninstall [MODE] Remove managed configs (safe|restore|purge); default: safe
   --purge            Shortcut for --uninstall purge
@@ -150,6 +155,14 @@ while [[ $# -gt 0 ]]; do
         --restore-only)
             SKIP_PACKAGES=true
             RESTORE_ONLY=true
+            ;;
+        --install-profile)
+            if (($# < 2)); then
+                ui_error "--install-profile requires standard or lightweight"
+                exit 2
+            fi
+            INSTALL_PROFILE="${2,,}"
+            shift
             ;;
         --desktop-shell)
             if (($# < 2)); then
@@ -231,6 +244,23 @@ case "$DESKTOP_SHELL_PROFILE" in
         exit 2
         ;;
 esac
+
+if ! INSTALL_PROFILE="$(resolve_install_profile "$INSTALL_PROFILE")"; then
+    ui_error "--install-profile must be standard or lightweight"
+    exit 2
+fi
+
+if [[ "$INSTALL_PROFILE" == lightweight ]]; then
+    if [[ "$FULL_PACKAGES" == true ]]; then
+        ui_error "Lightweight installation profile cannot include machine-local packages (--full-packages)."
+        exit 2
+    fi
+    if [[ -n "$DESKTOP_SHELL_PROFILE" && "$DESKTOP_SHELL_PROFILE" != waybar ]]; then
+        ui_error "Lightweight installation profile requires the Waybar desktop shell."
+        exit 2
+    fi
+    DESKTOP_SHELL_PROFILE=waybar
+fi
 
 UI_VERBOSE="$VERBOSE"
 UI_DEBUG="$DEBUG"
@@ -416,6 +446,14 @@ resolve_config_groups() {
 
 print_plan_summary() {
     local packages_label aur_label machine_label groups_label private_label
+    local saved_profile saved_profile_label
+
+    saved_profile="$(load_saved_install_profile 2>/dev/null || true)"
+    if [[ -n "$saved_profile" ]]; then
+        saved_profile_label="$(install_profile_label "$saved_profile")"
+    else
+        saved_profile_label="Not set"
+    fi
 
     if [[ "$DRY_RUN" == true ]]; then
         private_label="Preview only; no changes"
@@ -455,6 +493,8 @@ print_plan_summary() {
 
     ui_plan_box "Installation plan" \
         "Mode|$(mode_label)" \
+        "Installation profile|$(install_profile_label "$INSTALL_PROFILE")" \
+        "Saved profile|$saved_profile_label" \
         "Desktop shell|$DESKTOP_SHELL_PROFILE" \
         "Packages|$packages_label" \
         "AUR|$aur_label" \
@@ -495,7 +535,7 @@ mode_label() {
     fi
 }
 
-run_interactive_setup() {
+run_interactive_customize() {
     local group_input mode_default action
 
     while true; do
@@ -547,7 +587,10 @@ run_interactive_setup() {
                     INCLUDE_AUR=false
                 fi
 
-                if prompt_yes_no "Include machine-local packages?" "$([[ "$FULL_PACKAGES" == true ]] && printf y || printf n)"; then
+                if [[ "$INSTALL_PROFILE" == lightweight ]]; then
+                    FULL_PACKAGES=false
+                    ui_warn "Machine-local packages" "not part of Lightweight"
+                elif prompt_yes_no "Include machine-local packages?" "$([[ "$FULL_PACKAGES" == true ]] && printf y || printf n)"; then
                     FULL_PACKAGES=true
                 else
                     FULL_PACKAGES=false
@@ -557,7 +600,13 @@ run_interactive_setup() {
             ui_warn "Package installation" "skipped"
         fi
 
-        prompt_desktop_shell_profile 3 6
+        if [[ "$INSTALL_PROFILE" == lightweight ]]; then
+            DESKTOP_SHELL_PROFILE=waybar
+            ui_stage 3 6 "Desktop shell"
+            ui_ok "Waybar" "required by Lightweight"
+        else
+            prompt_desktop_shell_profile 3 6
+        fi
 
         ui_stage 4 6 "Configuration groups"
         if [[ "$PACKAGES_ONLY" != true ]]; then
@@ -601,6 +650,88 @@ run_interactive_setup() {
     done
 }
 
+run_interactive_automatic() {
+    local action
+
+    PACKAGES_ONLY=false
+    SKIP_PACKAGES=false
+    FULL_PACKAGES=false
+    [[ "$DRY_RUN_CLI" == true ]] || DRY_RUN=false
+    if [[ "$NO_AUR" == true ]]; then
+        INCLUDE_AUR=false
+    else
+        INCLUDE_AUR=true
+    fi
+    SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
+
+    if [[ "$INSTALL_PROFILE" == lightweight ]]; then
+        DESKTOP_SHELL_PROFILE=waybar
+    elif [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
+        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
+    fi
+
+    ui_section "Review Automatic installation"
+    print_plan_summary
+    ui_note "All managed configuration groups, including wallpapers, are selected."
+    ui_note "No installed packages will be removed."
+    ui_menu "Action" 1 \
+        "Install now|Apply the recommended profile plan" \
+        "Review choices|Return to profile selection" \
+        "Cancel|Exit without changing this machine"
+    action="$UI_MENU_CHOICE"
+    case "$action" in
+        1) return 0 ;;
+        2) return 2 ;;
+        3)
+            ui_warn "Cancelled" "no changes were made"
+            exit 0
+            ;;
+    esac
+}
+
+run_interactive_setup() {
+    local saved_profile profile_default setup_mode
+
+    while true; do
+        saved_profile="$(load_saved_install_profile 2>/dev/null || true)"
+        profile_default=1
+        [[ "${saved_profile:-$INSTALL_PROFILE}" == lightweight ]] && profile_default=2
+
+        ui_stage 1 2 "Installation profile"
+        ui_menu "Select" "$profile_default" \
+            "Standard|Complete portable software scope" \
+            "Lightweight|Daily development scope for resource-constrained machines"
+        case "$UI_MENU_CHOICE" in
+            1) INSTALL_PROFILE=standard ;;
+            2) INSTALL_PROFILE=lightweight ;;
+        esac
+
+        if [[ "$INSTALL_PROFILE" == lightweight ]]; then
+            if [[ "$FULL_PACKAGES" == true ]]; then
+                ui_error "Lightweight cannot include machine-local packages."
+                return 1
+            fi
+            DESKTOP_SHELL_PROFILE=waybar
+        fi
+
+        ui_stage 2 2 "Setup style"
+        ui_menu "Select" 1 \
+            "Automatic|Recommended profile defaults, then one review" \
+            "Customize|Choose package, shell, and configuration options"
+        setup_mode="$UI_MENU_CHOICE"
+
+        if [[ "$setup_mode" == 1 ]]; then
+            if run_interactive_automatic; then
+                return 0
+            fi
+            continue
+        fi
+
+        run_interactive_customize
+        return 0
+    done
+}
+
 run_operation_menu() {
     local operation uninstall_choice
 
@@ -622,9 +753,6 @@ run_operation_menu() {
             ;;
         2)
             UPDATE=true
-            if prompt_yes_no "Install changed package manifests too?" n; then
-                UPDATE_WITH_PACKAGES=true
-            fi
             ;;
         3)
             SNAPSHOT=true
@@ -720,7 +848,7 @@ snapshot_managed_configs() {
 }
 
 export_package_manifests() {
-    export_package_snapshot "$REPO_ROOT"
+    export_package_snapshot "$REPO_ROOT" "$INSTALL_PROFILE"
 }
 
 normalize_captured_text_files() {
@@ -734,7 +862,7 @@ run_safety_check() {
 plan_packages() {
     install_package_files \
         true "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
-        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE"
+        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$INSTALL_PROFILE"
 }
 
 print_package_plan_summary() {
@@ -790,6 +918,8 @@ run_snapshot_workflow() {
     # shellcheck source=scripts/snapshot.sh
     source "$REPO_ROOT/scripts/snapshot.sh"
 
+    snapshot_prepare_repo "$REPO_ROOT" "$DRY_RUN" || return 1
+
     ui_stage 1 5 "Snapshot"
     snapshot_managed_configs
     normalize_captured_text_files
@@ -820,6 +950,8 @@ run_snapshot_workflow() {
     if ! snapshot_has_managed_changes "$REPO_ROOT"; then
         return 0
     fi
+
+    snapshot_show_diff "$REPO_ROOT"
 
     if [[ "$SNAPSHOT_NO_COMMIT" == true ]]; then
         return 0
@@ -919,14 +1051,14 @@ run_install_workflow() {
         # shellcheck source=scripts/update.sh
         source "$REPO_ROOT/scripts/update.sh"
         run_update \
-            "$REPO_ROOT" "$DRY_RUN" "$ASSUME_YES" "$UPDATE_WITH_PACKAGES" \
-            "$UPDATE_NO_SNAPSHOT_PROMPT" "$DESKTOP_SHELL_PROFILE"
+            "$REPO_ROOT" "$DRY_RUN" "$INSTALL_PROFILE" \
+            "$DESKTOP_SHELL_PROFILE"
         return 0
     fi
 
     if [[ "$EXPORT_PACKAGES" == true ]]; then
         ui_section "Package manifests"
-        export_package_snapshot "$REPO_ROOT"
+        export_package_snapshot "$REPO_ROOT" "$INSTALL_PROFILE"
         ui_result_box "Result" "ok:Package export complete"
         return 0
     fi
@@ -956,7 +1088,7 @@ run_install_workflow() {
         fi
         if ! install_package_files \
             "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
-            "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE"; then
+            "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$INSTALL_PROFILE"; then
             report_install_failure "Package installation failed"
             return 1
         fi
@@ -972,8 +1104,10 @@ run_install_workflow() {
                 "ok:Package plan reviewed" \
                 "ok:No configuration changes were made"
         else
+            save_install_profile "$INSTALL_PROFILE"
             ui_result_box "Installation complete" \
                 "ok:Package installation finished" \
+                "ok:Installation profile: $(install_profile_label "$INSTALL_PROFILE")" \
                 "ok:Configurations were not changed"
         fi
         ui_note "Log: $LOG_FILE"
@@ -1043,7 +1177,9 @@ run_install_workflow() {
             "ok:Rollback path planned"
     else
         save_desktop_shell_profile "$DESKTOP_SHELL_PROFILE"
+        save_install_profile "$INSTALL_PROFILE"
         ui_result_box "Installation complete" \
+            "ok:Installation profile: $(install_profile_label "$INSTALL_PROFILE")" \
             "ok:Desktop profile: $DESKTOP_SHELL_PROFILE" \
             "ok:Configurations verified" \
             "ok:Backup and rollback ready"
