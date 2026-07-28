@@ -219,6 +219,29 @@ if command -v jj >/dev/null 2>&1; then
         jj -R "$jj_work" status >&2
         exit 1
     fi
+
+    echo "==> test 10b: colocated Jujutsu divergence is rejected"
+    printf 'local only\n' >"$jj_work/local-change"
+    jj -R "$jj_work" describe -m "local change" >/dev/null
+    jj -R "$jj_work" new >/dev/null
+    if [[ -n "$(/usr/bin/git -C "$jj_work" status --porcelain)" ]]; then
+        echo "Expected described Jujutsu change to look clean to Git" >&2
+        exit 1
+    fi
+
+    printf 'three\n' >"$jj_seed/version"
+    /usr/bin/git -C "$jj_seed" add version
+    /usr/bin/git -C "$jj_seed" commit -qm three
+    /usr/bin/git -C "$jj_seed" push -q
+
+    if repo_pull_ff_only "$jj_work" false >/dev/null 2>&1; then
+        echo "Expected Jujutsu/Git divergence to fail fast-forward pull" >&2
+        exit 1
+    fi
+    if [[ "$(<"$jj_work/local-change")" != "local only" ]]; then
+        echo "Diverged Jujutsu pull changed the local described commit" >&2
+        exit 1
+    fi
 else
     echo "jj unavailable; colocated fast-forward check skipped"
 fi
