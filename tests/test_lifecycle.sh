@@ -93,6 +93,70 @@ if [[ "$doctor_output" == *"Desktop tool"*"waybar"* ]]; then
     exit 1
 fi
 
+echo "==> doctor warns for 8 GB or less without swap/zram"
+facts_root="$tmp_dir/facts"
+mkdir -p "$facts_root/proc" "$facts_root/sys-block"
+cat >"$facts_root/proc/meminfo" <<'EOF'
+MemTotal:        8192000 kB
+SwapTotal:             0 kB
+EOF
+low_memory_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+    DOTFILES_PROC_ROOT="$facts_root/proc" \
+    DOTFILES_SYS_BLOCK_ROOT="$facts_root/sys-block" \
+        "$fake_repo/install.sh" --doctor --ascii --no-color 2>&1 || true
+)"
+assert_contains "$low_memory_output" "Memory pressure"
+assert_contains "$low_memory_output" "Firefox, VS Code, and Codex"
+
+echo "==> doctor suppresses memory warning with swap or more than 8 GB"
+cat >"$facts_root/proc/meminfo" <<'EOF'
+MemTotal:        8192000 kB
+SwapTotal:       1048576 kB
+EOF
+with_swap_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+    DOTFILES_PROC_ROOT="$facts_root/proc" \
+    DOTFILES_SYS_BLOCK_ROOT="$facts_root/sys-block" \
+        "$fake_repo/install.sh" --doctor --ascii --no-color 2>&1 || true
+)"
+if [[ "$with_swap_output" == *"Memory pressure"* ]]; then
+    echo "Doctor warned despite available swap" >&2
+    exit 1
+fi
+
+cat >"$facts_root/proc/meminfo" <<'EOF'
+MemTotal:        8192000 kB
+SwapTotal:             0 kB
+EOF
+mkdir -p "$facts_root/sys-block/zram0"
+with_zram_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+    DOTFILES_PROC_ROOT="$facts_root/proc" \
+    DOTFILES_SYS_BLOCK_ROOT="$facts_root/sys-block" \
+        "$fake_repo/install.sh" --doctor --ascii --no-color 2>&1 || true
+)"
+if [[ "$with_zram_output" == *"Memory pressure"* ]]; then
+    echo "Doctor warned despite available zram" >&2
+    exit 1
+fi
+rm -rf "$facts_root/sys-block/zram0"
+
+cat >"$facts_root/proc/meminfo" <<'EOF'
+MemTotal:       16777216 kB
+SwapTotal:             0 kB
+EOF
+high_memory_output="$(
+    HOME="$fake_home" PATH="$fake_bin:$PATH" \
+    DOTFILES_PROC_ROOT="$facts_root/proc" \
+    DOTFILES_SYS_BLOCK_ROOT="$facts_root/sys-block" \
+        "$fake_repo/install.sh" --doctor --ascii --no-color 2>&1 || true
+)"
+if [[ "$high_memory_output" == *"Memory pressure"* ]]; then
+    echo "Doctor warned above the 8 GB threshold" >&2
+    exit 1
+fi
+
 # --- uninstall dry-run (safe) ---
 mkdir -p "$fake_home/.config/niri" "$fake_home/.local/bin"
 printf 'niri\n' >"$fake_home/.config/niri/config.kdl"

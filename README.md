@@ -23,6 +23,8 @@ Preview first:
 ./install.sh --menu                  # force the operation menu
 ./install.sh --yes                   # non-interactive install
 ./install.sh --dry-run               # preview install
+./install.sh --install-profile standard --yes
+./install.sh --install-profile lightweight --yes
 ./install.sh --yes --desktop-shell waybar     # Waybar only
 ./install.sh --yes --desktop-shell quickshell # QuickShell only
 ./install.sh --yes --desktop-shell dual       # switch between both
@@ -36,8 +38,7 @@ Preview first:
 ./install.sh --snapshot --commit     # capture and commit
 ./install.sh --snapshot --push       # capture, ask, then commit+push
 
-./install.sh --update                # pull latest dotfiles and apply configs
-./install.sh --update --with-packages # pull and install packages too
+./install.sh --update                # pull and apply saved profile + configs
 ./install.sh --update --yes          # non-interactive update
 
 ./install.sh --export-packages       # refresh package manifests only
@@ -50,5 +51,12 @@ Preview first:
 - Existing files are backed up to `~/.dotfiles-backups/`.
 - Private local values belong in `~/.zshrc.local`.
 - The selected desktop shell profile is reused by later installs and updates.
+- Standard is the default complete portable scope; Lightweight is the
+  X230-friendly Waybar daily-development scope.
+- The selected installation profile is saved only after a successful real
+  install and is reused by Update and Snapshot.
+- Update only consumes repository state. Snapshot is the explicit publication
+  flow and updates only the active profile's package manifests.
+- Profile switching never removes installed packages.
 - `desktop-shell toggle` switches Waybar and QuickShell when the `dual` profile is installed.
 - Full details: `docs/INSTALL.md`.

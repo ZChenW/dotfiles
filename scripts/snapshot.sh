@@ -48,6 +48,45 @@ build_snapshot_mappings() {
 
 build_snapshot_mappings
 
+snapshot_profile_package_paths() {
+    local repo_root="$1"
+    local install_profile="${INSTALL_PROFILE:-standard}"
+    local manifest
+
+    if [[ "$install_profile" == lightweight ]]; then
+        printf 'packages/arch-lightweight.txt\n'
+        return 0
+    fi
+
+    for manifest in \
+        arch-essential.txt \
+        arch-desktop.txt \
+        arch-apps.txt \
+        arch-aur.txt \
+        arch-machine-local.txt \
+        arch-exclude.txt; do
+        printf 'packages/%s\n' "$manifest"
+    done
+}
+
+snapshot_prepare_repo() {
+    local repo_root="$1"
+    local dry_run="$2"
+
+    if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
+        ui_error "Snapshot requires a clean repository before capture."
+        ui_note "Commit or otherwise resolve local changes; Snapshot will not stash, reset, or merge."
+        return 1
+    fi
+
+    if [[ "$dry_run" == true ]]; then
+        echo "[dry-run] git pull --ff-only"
+        return 0
+    fi
+
+    git -C "$repo_root" pull --ff-only
+}
+
 SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS=(
     Cookies
     History
@@ -124,11 +163,7 @@ snapshot_managed_paths() {
         printf '%s\n' "$dest"
     done
 
-    local pkg
-    for pkg in "$repo_root"/packages/*.txt; do
-        [[ -f "$pkg" ]] || continue
-        printf '%s\n' "packages/$(basename "$pkg")"
-    done
+    snapshot_profile_package_paths "$repo_root"
 }
 
 snapshot_path_is_managed() {
@@ -285,6 +320,7 @@ snapshot_capture_configs() {
 snapshot_run_package_export() {
     local repo_root="$1"
     local dry_run="$2"
+    local install_profile="${3:-${INSTALL_PROFILE:-standard}}"
 
     if [[ "$dry_run" == true ]]; then
         ui_ok "Export planned"
@@ -292,7 +328,7 @@ snapshot_run_package_export() {
         return 0
     fi
 
-    export_package_snapshot "$repo_root"
+    export_package_snapshot "$repo_root" "$install_profile"
 }
 
 snapshot_is_text_file() {
@@ -330,17 +366,17 @@ snapshot_normalize_text_file() {
 snapshot_normalize_captured_files() {
     local repo_root="$1"
     local -a normalize_paths=()
-    local mapping _mode _src dest _required path found pkg
+    local mapping _mode _src dest _required path found package_path
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
         IFS='|' read -r _mode _src dest _required <<<"$mapping"
         normalize_paths+=("$repo_root/$dest")
     done
 
-    for pkg in "$repo_root"/packages/*.txt; do
-        [[ -f "$pkg" ]] || continue
-        normalize_paths+=("$pkg")
-    done
+    while IFS= read -r package_path; do
+        [[ -n "$package_path" ]] || continue
+        normalize_paths+=("$repo_root/$package_path")
+    done < <(snapshot_profile_package_paths "$repo_root")
 
     for path in "${normalize_paths[@]}"; do
         [[ -e "$path" ]] || continue
@@ -447,11 +483,11 @@ snapshot_safety_check() {
         scan_paths+=("$repo_root/$dest")
     done
 
-    local pkg
-    for pkg in "$repo_root"/packages/*.txt; do
-        [[ -f "$pkg" ]] || continue
-        scan_paths+=("$pkg")
-    done
+    local package_path
+    while IFS= read -r package_path; do
+        [[ -n "$package_path" ]] || continue
+        scan_paths+=("$repo_root/$package_path")
+    done < <(snapshot_profile_package_paths "$repo_root")
 
     local path
     for path in "${scan_paths[@]}"; do
@@ -552,6 +588,21 @@ snapshot_print_summary() {
     fi
 
     return 0
+}
+
+snapshot_show_diff() {
+    local repo_root="$1"
+    local -a paths=(configs)
+    local package_path
+
+    while IFS= read -r package_path; do
+        [[ -n "$package_path" ]] || continue
+        paths+=("$package_path")
+    done < <(snapshot_profile_package_paths "$repo_root")
+
+    ui_section "Snapshot diff"
+    git --no-pager -C "$repo_root" diff -- "${paths[@]}"
+    git -C "$repo_root" status --short -- "${paths[@]}"
 }
 
 snapshot_stage_managed_changes() {

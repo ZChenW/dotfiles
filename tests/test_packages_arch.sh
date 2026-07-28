@@ -237,4 +237,57 @@ if [[ "$resolved" != requested ]]; then
     exit 1
 fi
 
+echo "==> test 6: Lightweight snapshot updates only its owned manifest"
+profile_repo="$tmp_dir/profile-repo"
+mkdir -p "$profile_repo/packages"
+for manifest in arch-essential arch-desktop arch-apps arch-aur arch-machine-local arch-exclude; do
+    printf '# %s\nkeep-%s\n' "$manifest" "$manifest" \
+        >"$profile_repo/packages/$manifest.txt"
+done
+printf '# Lightweight\nold-lightweight\n' \
+    >"$profile_repo/packages/arch-lightweight.txt"
+standard_before="$(
+    find "$profile_repo/packages" -type f ! -name arch-lightweight.txt \
+        -exec sha256sum {} + | sort
+)"
+
+cat >"$fakebin/pacman" <<'EOF'
+#!/usr/bin/bash
+case "${1:-}" in
+    -Qqen)
+        printf '%s\n' base firefox git linux steam
+        ;;
+    -Qqem)
+        printf '%s\n' cursor-bin visual-studio-code-bin
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+EOF
+chmod +x "$fakebin/pacman"
+
+PATH="$fakebin:/usr/bin" export_package_snapshot "$profile_repo" lightweight >/dev/null
+
+standard_after="$(
+    find "$profile_repo/packages" -type f ! -name arch-lightweight.txt \
+        -exec sha256sum {} + | sort
+)"
+if [[ "$standard_before" != "$standard_after" ]]; then
+    echo "Lightweight snapshot changed a Standard-owned manifest" >&2
+    exit 1
+fi
+for expected in firefox git steam visual-studio-code-bin cursor-bin; do
+    if ! grep -Fxq "$expected" "$profile_repo/packages/arch-lightweight.txt"; then
+        echo "Expected Lightweight snapshot to include explicit package: $expected" >&2
+        exit 1
+    fi
+done
+for excluded in base linux; do
+    if grep -Fxq "$excluded" "$profile_repo/packages/arch-lightweight.txt"; then
+        echo "Expected Lightweight snapshot to filter: $excluded" >&2
+        exit 1
+    fi
+done
+
 echo "All package helper tests passed."

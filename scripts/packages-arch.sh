@@ -166,6 +166,43 @@ filter_excluded_packages() {
     _packages_ref=("${filtered[@]}")
 }
 
+report_out_of_profile_packages() {
+    local -n _profile_packages_ref="$1"
+    local -n _exclude_packages_ref="$2"
+    local -A profile_set=() exclude_set=()
+    local -a explicit_packages=() extras=()
+    local pkg
+
+    for pkg in "${_profile_packages_ref[@]}"; do
+        profile_set["$pkg"]=1
+    done
+    for pkg in "${_exclude_packages_ref[@]}"; do
+        exclude_set["$pkg"]=1
+    done
+
+    mapfile -t explicit_packages < <(
+        {
+            pacman -Qqen 2>/dev/null || true
+            pacman -Qqem 2>/dev/null || true
+        } | LC_ALL=C sort -u
+    )
+
+    for pkg in "${explicit_packages[@]}"; do
+        [[ -n "${profile_set[$pkg]+x}" ]] && continue
+        [[ -n "${exclude_set[$pkg]+x}" ]] && continue
+        is_machine_local_pkg "$pkg" && continue
+        extras+=("$pkg")
+    done
+
+    ui_note "No packages will be removed."
+    if ((${#extras[@]} > 0)); then
+        ui_warn "Out-of-profile packages" "${#extras[@]} packages; review manually"
+        verbose_log "out-of-profile: ${extras[*]}"
+    else
+        ui_ok "Out-of-profile packages" "none detected"
+    fi
+}
+
 collect_packages_from_files() {
     local -n _packages_ref="$1"
     shift
@@ -634,14 +671,26 @@ install_package_files() {
     local include_aur="$4"
     local repo_root="$5"
     local desktop_shell_profile="${6:-dual}"
+    local install_profile="${7:-standard}"
     local packages_dir="$repo_root/packages"
 
-    local -a package_files=(
-        "$packages_dir/arch-essential.txt"
-        "$packages_dir/arch-desktop.txt"
-        "$packages_dir/arch-apps.txt"
-        "$packages_dir/arch-aur.txt"
-    )
+    local -a package_files=()
+    if [[ "$install_profile" == lightweight ]]; then
+        if [[ ! -f "$packages_dir/arch-lightweight.txt" ]]; then
+            ui_error "Lightweight package manifest is missing: packages/arch-lightweight.txt"
+            return 1
+        fi
+        package_files=("$packages_dir/arch-lightweight.txt")
+        include_machine_local=false
+        desktop_shell_profile=waybar
+    else
+        package_files=(
+            "$packages_dir/arch-essential.txt"
+            "$packages_dir/arch-desktop.txt"
+            "$packages_dir/arch-apps.txt"
+            "$packages_dir/arch-aur.txt"
+        )
+    fi
 
     local -a machine_local_packages=()
     read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
@@ -668,6 +717,11 @@ install_package_files() {
     if [[ "$dry_run" == true ]]; then
         ui_ok "Pacman packages" "${#official_packages[@]} packages"
         ui_ok "AUR packages" "${#aur_packages[@]} packages"
+        ui_note "Official package names: ${official_packages[*]:-(none)}"
+        ui_note "AUR package names: ${aur_packages[*]:-(none)}"
+        if [[ "$install_profile" == lightweight ]]; then
+            ui_note "Lightweight exclusions: QuickShell, games, Office, duplicate browsers, communication clients, KDE apps, heavyweight media and specialist toolchains."
+        fi
         if [[ "$include_machine_local" != true && ${#machine_local_packages[@]} -gt 0 ]]; then
             ui_warn "Machine-local skipped" "use --full-packages"
         fi
@@ -676,11 +730,14 @@ install_package_files() {
         ui_ok "AUR packages" "${#aur_packages[@]} packages"
     fi
 
+    report_out_of_profile_packages all_packages exclude_packages
+
     install_packages_batch "$dry_run" "$assume_yes" pacman "${official_packages[@]}"
 
     if [[ "$include_aur" != true ]]; then
         if ((${#aur_packages[@]} > 0)); then
             ui_warn "AUR packages skipped" "${#aur_packages[@]} packages"
+            ui_note "Unavailable without AUR: ${aur_packages[*]}"
             debug_log "AUR packages skipped: ${aur_packages[*]}"
         fi
         return 0
@@ -712,6 +769,7 @@ package_manifest_line_count() {
 
 export_package_snapshot() {
     local repo_root="$1"
+    local install_profile="${2:-standard}"
     local packages_dir="$repo_root/packages"
     mkdir -p "$packages_dir"
 
@@ -733,6 +791,35 @@ export_package_snapshot() {
     fi
     if [[ -n "$foreign_output" ]]; then
         mapfile -t foreign_packages <<<"$foreign_output"
+    fi
+
+    if [[ "$install_profile" == lightweight ]]; then
+        local -a lightweight_packages=() lightweight_exclude=()
+        local -A lightweight_exclude_set=()
+        local lightweight_pkg
+
+        read_package_file "$packages_dir/arch-exclude.txt" lightweight_exclude
+        for lightweight_pkg in "${lightweight_exclude[@]}"; do
+            lightweight_exclude_set["$lightweight_pkg"]=1
+        done
+
+        for lightweight_pkg in "${native_packages[@]}" "${foreign_packages[@]}"; do
+            is_default_excluded_pkg "$lightweight_pkg" && continue
+            is_machine_local_pkg "$lightweight_pkg" && continue
+            [[ -n "${lightweight_exclude_set[$lightweight_pkg]+x}" ]] && continue
+            lightweight_packages+=("$lightweight_pkg")
+        done
+
+        write_package_file "$packages_dir/arch-lightweight.txt" \
+            "# Lightweight daily development machine packages (official and AUR)." \
+            "${lightweight_packages[@]}"
+
+        ui_ok "Lightweight export complete"
+        ui_table_header "manifest" "lines"
+        ui_table_row "arch-lightweight.txt" \
+            "$(package_manifest_line_count "$packages_dir/arch-lightweight.txt")"
+        ui_warn "Machine-local and installer helpers" "excluded"
+        return 0
     fi
 
     local -a existing_essential=() existing_exclude=()

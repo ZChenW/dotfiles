@@ -81,6 +81,33 @@ doctor_check_shell() {
     fi
 }
 
+doctor_check_memory() {
+    local proc_root="${DOTFILES_PROC_ROOT:-/proc}"
+    local sys_block_root="${DOTFILES_SYS_BLOCK_ROOT:-/sys/block}"
+    local meminfo="$proc_root/meminfo"
+    local mem_total_kb swap_total_kb
+    local memory_threshold_kb=$((8 * 1024 * 1024))
+    local has_zram=false
+
+    [[ -r "$meminfo" ]] || return 0
+    mem_total_kb="$(awk '/^MemTotal:/ { print $2; exit }' "$meminfo")"
+    swap_total_kb="$(awk '/^SwapTotal:/ { print $2; exit }' "$meminfo")"
+    [[ "$mem_total_kb" =~ ^[0-9]+$ ]] || return 0
+    [[ "$swap_total_kb" =~ ^[0-9]+$ ]] || swap_total_kb=0
+
+    if compgen -G "$sys_block_root/zram*" >/dev/null; then
+        has_zram=true
+    fi
+
+    if ((mem_total_kb <= memory_threshold_kb && swap_total_kb == 0)) \
+        && [[ "$has_zram" != true ]]; then
+        doctor_warn "Memory pressure" \
+            "8 GB or less without swap/zram; Firefox, VS Code, and Codex may exhaust memory"
+    else
+        doctor_ok "Memory" "swap/zram or more than 8 GB available"
+    fi
+}
+
 doctor_check_desktop_tools() {
     local cmd
     local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-waybar}"
@@ -190,6 +217,7 @@ run_doctor() {
     doctor_check_tools
     doctor_check_aur_helper
     doctor_check_shell
+    doctor_check_memory
 
     ui_section "Doctor: desktop tools"
     doctor_check_desktop_tools
