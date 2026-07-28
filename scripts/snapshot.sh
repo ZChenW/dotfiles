@@ -6,6 +6,8 @@ set -euo pipefail
 DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/ui.sh
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+# shellcheck source=scripts/repo-sync.sh
+source "$DOTFILES_UI_SCRIPT_DIR/repo-sync.sh"
 
 build_snapshot_mappings() {
     local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-dual}"
@@ -79,12 +81,7 @@ snapshot_prepare_repo() {
         return 1
     fi
 
-    if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] git pull --ff-only"
-        return 0
-    fi
-
-    git -C "$repo_root" pull --ff-only
+    repo_pull_ff_only "$repo_root" "$dry_run"
 }
 
 SNAPSHOT_FORBIDDEN_PATH_FRAGMENTS=(
@@ -593,7 +590,7 @@ snapshot_print_summary() {
 snapshot_show_diff() {
     local repo_root="$1"
     local -a paths=(configs)
-    local package_path
+    local package_path untracked_path diff_status
 
     while IFS= read -r package_path; do
         [[ -n "$package_path" ]] || continue
@@ -602,6 +599,19 @@ snapshot_show_diff() {
 
     ui_section "Snapshot diff"
     git --no-pager -C "$repo_root" diff -- "${paths[@]}"
+    while IFS= read -r untracked_path; do
+        [[ -n "$untracked_path" ]] || continue
+        [[ -f "$repo_root/$untracked_path" ]] || continue
+        diff_status=0
+        git --no-pager diff --no-index -- /dev/null \
+            "$repo_root/$untracked_path" || diff_status=$?
+        if ((diff_status > 1)); then
+            return "$diff_status"
+        fi
+    done < <(
+        git -C "$repo_root" ls-files \
+            --others --exclude-standard -- "${paths[@]}"
+    )
     git -C "$repo_root" status --short -- "${paths[@]}"
 }
 

@@ -56,20 +56,3 @@ install_profile_label() {
         *) printf 'Standard\n' ;;
     esac
 }
-
-install_profile_manifest() {
-    local repo_root="$1"
-    local profile="$2"
-
-    case "$profile" in
-        lightweight)
-            printf '%s/packages/arch-lightweight.txt\n' "$repo_root"
-            ;;
-        standard)
-            return 1
-            ;;
-        *)
-            return 2
-            ;;
-    esac
-}

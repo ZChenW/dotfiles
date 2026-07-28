@@ -6,6 +6,8 @@ set -euo pipefail
 DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/ui.sh
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+# shellcheck source=scripts/repo-sync.sh
+source "$DOTFILES_UI_SCRIPT_DIR/repo-sync.sh"
 
 update_repo_has_changes() {
     local repo_root="$1"
@@ -24,12 +26,7 @@ update_pull() {
     local repo_root="$1"
     local dry_run="$2"
 
-    if [[ "$dry_run" == true ]]; then
-        echo "[dry-run] git pull --ff-only"
-        return 0
-    fi
-
-    git -C "$repo_root" pull --ff-only
+    repo_pull_ff_only "$repo_root" "$dry_run"
 }
 
 update_apply() {

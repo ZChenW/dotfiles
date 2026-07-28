@@ -493,4 +493,17 @@ if snapshot_prepare_repo "$prepare_repo" true >/dev/null 2>&1; then
     exit 1
 fi
 
+echo "==> test 15: Snapshot diff includes untracked file contents"
+untracked_repo="$tmp_dir/untracked-repo"
+mkdir -p "$untracked_repo/configs/example"
+/usr/bin/git -C "$untracked_repo" init -q
+printf 'new snapshot content\n' >"$untracked_repo/configs/example/new.conf"
+INSTALL_PROFILE=standard
+untracked_diff="$(snapshot_show_diff "$untracked_repo")"
+if [[ "$untracked_diff" != *"new snapshot content"* ]]; then
+    echo "Expected untracked captured content in Snapshot review diff" >&2
+    printf '%s\n' "$untracked_diff" >&2
+    exit 1
+fi
+
 echo "All snapshot tests passed."

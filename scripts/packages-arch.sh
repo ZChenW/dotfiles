@@ -57,6 +57,7 @@ build_installed_package_index() {
     declare -gA PROVIDES_INDEX=()
     declare -g INSTALLED_PACKAGE_INDEX_INITIALIZED=true
     local kind value
+    local pacman_db_root="${DOTFILES_PACMAN_DB_ROOT:-/var/lib/pacman/local}"
 
     while IFS=' ' read -r kind value; do
         [[ -n "$value" ]] || continue
@@ -76,7 +77,7 @@ build_installed_package_index() {
             /^$/ { section = ""; next }
             section == "%NAME%" { print "N", $0 }
             section == "%PROVIDES%" { print "P", $0 }
-        ' /var/lib/pacman/local/*/desc 2>/dev/null || true
+        ' "$pacman_db_root"/*/desc 2>/dev/null || true
     )
 }
 
@@ -218,6 +219,34 @@ collect_packages_from_files() {
 
     _packages_ref=("${collected[@]}")
     dedupe_packages _packages_ref
+}
+
+count_standard_packages_excluded_by_lightweight() {
+    local repo_root="$1"
+    local -n _lightweight_packages_ref="$2"
+    local packages_dir="$repo_root/packages"
+    local -a standard_packages=() exclude_packages=()
+    local -A lightweight_set=()
+    local pkg excluded_count=0
+
+    collect_packages_from_files standard_packages \
+        "$packages_dir/arch-essential.txt" \
+        "$packages_dir/arch-desktop.txt" \
+        "$packages_dir/arch-apps.txt" \
+        "$packages_dir/arch-aur.txt"
+    read_package_file "$packages_dir/arch-exclude.txt" exclude_packages
+    filter_excluded_packages standard_packages exclude_packages
+    filter_desktop_shell_packages standard_packages waybar
+
+    for pkg in "${_lightweight_packages_ref[@]}"; do
+        lightweight_set["$pkg"]=1
+    done
+    for pkg in "${standard_packages[@]}"; do
+        [[ -n "${lightweight_set[$pkg]+x}" ]] && continue
+        ((++excluded_count)) || true
+    done
+
+    printf '%s\n' "$excluded_count"
 }
 
 filter_desktop_shell_packages() {
@@ -720,6 +749,12 @@ install_package_files() {
         ui_note "Official package names: ${official_packages[*]:-(none)}"
         ui_note "AUR package names: ${aur_packages[*]:-(none)}"
         if [[ "$install_profile" == lightweight ]]; then
+            local lightweight_excluded_count
+            lightweight_excluded_count="$(
+                count_standard_packages_excluded_by_lightweight \
+                    "$repo_root" all_packages
+            )"
+            ui_note "Lightweight excludes $lightweight_excluded_count Standard packages."
             ui_note "Lightweight exclusions: QuickShell, games, Office, duplicate browsers, communication clients, KDE apps, heavyweight media and specialist toolchains."
         fi
         if [[ "$include_machine_local" != true && ${#machine_local_packages[@]} -gt 0 ]]; then
@@ -732,7 +767,9 @@ install_package_files() {
 
     report_out_of_profile_packages all_packages exclude_packages
 
-    install_packages_batch "$dry_run" "$assume_yes" pacman "${official_packages[@]}"
+    install_packages_batch \
+        "$dry_run" "$assume_yes" pacman "${official_packages[@]}" \
+        || return 1
 
     if [[ "$include_aur" != true ]]; then
         if ((${#aur_packages[@]} > 0)); then
@@ -751,11 +788,13 @@ install_package_files() {
     aur_helper="$(find_aur_helper)"
 
     if [[ -z "$aur_helper" ]]; then
-        bootstrap_paru "$dry_run" "$assume_yes"
+        bootstrap_paru "$dry_run" "$assume_yes" || return 1
         aur_helper=paru
     fi
 
-    install_packages_batch "$dry_run" "$assume_yes" "$aur_helper" "${aur_packages[@]}"
+    install_packages_batch \
+        "$dry_run" "$assume_yes" "$aur_helper" "${aur_packages[@]}" \
+        || return 1
 }
 
 package_manifest_line_count() {

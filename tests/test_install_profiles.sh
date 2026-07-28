@@ -134,6 +134,57 @@ if command -v script >/dev/null 2>&1; then
         echo "Interactive dry-run must not persist profile state" >&2
         exit 1
     fi
+
+    echo "==> saved profile is the interactive default"
+    saved_menu_home="$tmp_dir/saved-menu-home"
+    mkdir -p "$saved_menu_home/.local/state/dotfiles"
+    printf 'lightweight\n' \
+        >"$saved_menu_home/.local/state/dotfiles/install-profile"
+    saved_menu_command="HOME=\"$saved_menu_home\" DOTFILES_TEST_REPO=\"$REPO_ROOT\" DOTFILES_PACMAN_DB_ROOT=\"$fake_pacman_db\" PATH=\"$fake_bin:$PATH\" TERM=xterm DOTFILES_COLOR=never \"$REPO_ROOT/install.sh\" --menu --dry-run --no-aur --ascii --no-color"
+    saved_menu_output="$(
+        printf '1\n\n1\n3\n' |
+            script -qec "$saved_menu_command" /dev/null
+    )"
+    if [[ "$saved_menu_output" != *"Installation profile"*"Lightweight"* \
+        || "$saved_menu_output" != *"Cancelled"* ]]; then
+        echo "Expected Enter to accept the saved Lightweight profile default" >&2
+        printf '%q\n' "$saved_menu_output" >&2
+        exit 1
+    fi
+
+    echo "==> Customize remains reachable and cancellation is non-persistent"
+    customize_home="$tmp_dir/customize-home"
+    mkdir -p "$customize_home"
+    customize_command="HOME=\"$customize_home\" DOTFILES_TEST_REPO=\"$REPO_ROOT\" DOTFILES_PACMAN_DB_ROOT=\"$fake_pacman_db\" PATH=\"$fake_bin:$PATH\" TERM=xterm DOTFILES_COLOR=never \"$REPO_ROOT/install.sh\" --menu --dry-run --no-aur --ascii --no-color"
+    customize_output="$(
+        {
+            printf '1\n'
+            sleep 0.1
+            printf '2\n'
+            sleep 0.1
+            printf '2\n'
+            sleep 0.1
+            printf '4\n'
+            sleep 0.1
+            printf 'y\n'
+            sleep 0.1
+            printf 'all\n'
+            sleep 0.1
+            printf '3\n'
+        } |
+            script -qec "$customize_command" /dev/null
+    )"
+    if [[ "$customize_output" != *"Installation mode"* \
+        || "$customize_output" != *"Configuration groups"* \
+        || "$customize_output" != *"Cancelled"* ]]; then
+        echo "Expected Customize to retain detailed controls and cancellation" >&2
+        printf '%q\n' "$customize_output" >&2
+        exit 1
+    fi
+    if [[ -e "$customize_home/.local/state/dotfiles/install-profile" ]]; then
+        echo "Cancelled Customize flow must not persist profile state" >&2
+        exit 1
+    fi
 else
     echo "script(1) unavailable; interactive profile check skipped"
 fi
@@ -148,6 +199,12 @@ done
 
 if [[ "$package_output" != *"No packages will be removed"* ]]; then
     echo "Expected package plan to state the no-removal guarantee" >&2
+    printf '%s\n' "$package_output" >&2
+    exit 1
+fi
+if ! grep -Eq 'Lightweight excludes [0-9]+ Standard packages' \
+    <<<"$package_output"; then
+    echo "Expected Lightweight plan to quantify the Standard package reduction" >&2
     printf '%s\n' "$package_output" >&2
     exit 1
 fi
@@ -183,6 +240,40 @@ for flags in "${invalid_combinations[@]}"; do
         exit 1
     fi
 done
+
+echo "==> failed install preserves the previously saved profile"
+failure_home="$tmp_dir/failure-home"
+failure_bin="$tmp_dir/failure-bin"
+failure_db="$tmp_dir/failure-pacman-local"
+mkdir -p "$failure_home/.local/state/dotfiles" "$failure_bin" "$failure_db"
+printf 'standard\n' >"$failure_home/.local/state/dotfiles/install-profile"
+cp "$fake_bin/pacman" "$failure_bin/pacman"
+cat >"$failure_bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+exit 23
+EOF
+chmod +x "$failure_bin/pacman" "$failure_bin/sudo"
+set +e
+failure_output="$(
+    HOME="$failure_home" \
+    DOTFILES_TEST_REPO="$REPO_ROOT" \
+    DOTFILES_PACMAN_DB_ROOT="$failure_db" \
+    PATH="$failure_bin:$PATH" \
+        "$REPO_ROOT/install.sh" \
+        --install-profile lightweight --packages-only --yes --no-aur \
+        --ascii --no-color 2>&1
+)"
+failure_rc=$?
+set -e
+if ((failure_rc == 0)); then
+    echo "Expected simulated package installation failure" >&2
+    printf '%s\n' "$failure_output" >&2
+    exit 1
+fi
+if [[ "$(<"$failure_home/.local/state/dotfiles/install-profile")" != standard ]]; then
+    echo "Failed install changed the previously saved profile" >&2
+    exit 1
+fi
 
 echo "==> Standard remains the default portable package scope"
 standard_home="$tmp_dir/standard-home"

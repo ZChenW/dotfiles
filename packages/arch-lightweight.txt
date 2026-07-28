@@ -1,5 +1,4 @@
 # Lightweight daily development machine packages (official and AUR).
-awww
 brightnessctl
 blueman
 bluetui
@@ -58,6 +57,7 @@ shellcheck
 slurp
 stylua
 swayidle
+swaybg
 swaylock
 thunar
 tree

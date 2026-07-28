@@ -184,4 +184,43 @@ if grep -Eq '(^| )(commit|push)( |$)' "$git_log"; then
     exit 1
 fi
 
+if command -v jj >/dev/null 2>&1; then
+    echo "==> test 10: colocated Jujutsu repository fast-forwards cleanly"
+    jj_remote="$tmp_dir/jj-remote.git"
+    jj_seed="$tmp_dir/jj-seed"
+    jj_work="$tmp_dir/jj-work"
+    /usr/bin/git init -q --bare "$jj_remote"
+    /usr/bin/git init -q -b main "$jj_seed"
+    /usr/bin/git -C "$jj_seed" config user.email test@example.com
+    /usr/bin/git -C "$jj_seed" config user.name "Test User"
+    printf 'one\n' >"$jj_seed/version"
+    /usr/bin/git -C "$jj_seed" add version
+    /usr/bin/git -C "$jj_seed" commit -qm one
+    /usr/bin/git -C "$jj_seed" remote add origin "$jj_remote"
+    /usr/bin/git -C "$jj_seed" push -qu origin main
+    /usr/bin/git clone -q "$jj_remote" "$jj_work"
+    /usr/bin/git -C "$jj_work" config user.email test@example.com
+    /usr/bin/git -C "$jj_work" config user.name "Test User"
+    jj git init --colocate "$jj_work" >/dev/null
+    jj -R "$jj_work" new main >/dev/null
+
+    printf 'two\n' >"$jj_seed/version"
+    /usr/bin/git -C "$jj_seed" add version
+    /usr/bin/git -C "$jj_seed" commit -qm two
+    /usr/bin/git -C "$jj_seed" push -q
+
+    repo_pull_ff_only "$jj_work" false >/dev/null
+    if [[ "$(<"$jj_work/version")" != two ]]; then
+        echo "Expected colocated Jujutsu worktree to fast-forward" >&2
+        exit 1
+    fi
+    if [[ "$(jj -R "$jj_work" diff --summary)" != "" ]]; then
+        echo "Expected clean Jujutsu working copy after fast-forward" >&2
+        jj -R "$jj_work" status >&2
+        exit 1
+    fi
+else
+    echo "jj unavailable; colocated fast-forward check skipped"
+fi
+
 echo "All update tests passed."
