@@ -93,13 +93,23 @@ Other flags:
 - `--restore-only` — same as `--skip-packages`, and skip optional service actions
 - `--dry-run` — preview actions without modifying `$HOME` (also works with `--uninstall`)
 
-Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, and `tar` for uninstall). Missing tools fail early with an install hint.
+Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, `tee`, and `tar` for uninstall). Missing tools fail early with an install hint.
 
 With `--yes` and Automatic, AUR packages required by the selected profile are
 installed by default. Pass `--no-aur` to continue without them; the plan lists
 the capabilities that will be unavailable. If AUR is enabled and neither
 `paru` nor `yay` is available, the installer bootstraps `paru` in `--yes` mode
 or asks before doing so in Customize.
+
+Before a real package install starts, the installer asks the AUR RPC for every
+selected AUR name in one exact-match batch. Confirmed missing names stop the
+install before either package manager writes; if the RPC itself is unavailable,
+the installed AUR helper performs the final check. Package-manager output stays
+visible and is also copied to the install log for failure diagnosis.
+
+Snapshot canonicalizes known retired package names to their current install
+targets so an older machine cannot reintroduce stale aliases into either
+profile. It reports legacy packages as out-of-profile but never removes them.
 
 The selected installation profile is stored under
 `${XDG_STATE_HOME:-~/.local/state}/dotfiles/install-profile` only after a

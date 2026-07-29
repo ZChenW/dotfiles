@@ -603,6 +603,27 @@ log_raw() {
     return 0
 }
 
+# Keep child-process output visible while also preserving it for post-mortems.
+# Capture the command status separately so tee never masks an install failure.
+run_logged_command() {
+    if [[ -z "${DOTFILES_LOG_FILE:-}" ]]; then
+        "$@"
+        return
+    fi
+
+    local -a pipeline_status=()
+    if "$@" 2>&1 | tee -a "$DOTFILES_LOG_FILE"; then
+        pipeline_status=("${PIPESTATUS[@]}")
+    else
+        pipeline_status=("${PIPESTATUS[@]}")
+    fi
+
+    if ((pipeline_status[0] != 0)); then
+        return "${pipeline_status[0]}"
+    fi
+    return "${pipeline_status[1]}"
+}
+
 verbose_log() {
     local msg="$1"
     ui_detail "$msg"

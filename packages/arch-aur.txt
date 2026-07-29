@@ -11,6 +11,9 @@ freetype2-wps
 hyprmag-git
 libffi7
 linuxqq
+maplemono-nf-cn-unhinted
+maplemono-nf-unhinted
+maplemono-ttf
 microsoft-edge-beta-bin
 mpvpaper
 obsidian-bin

@@ -32,6 +32,8 @@ kitty
 less
 lsd
 mako
+maplemono-nf-cn-unhinted
+maplemono-ttf
 matugen
 neovim
 network-manager-applet
@@ -62,8 +64,6 @@ swaylock
 thunar
 tree
 tree-sitter-cli
-ttf-maplemono
-ttf-maplemono-nf-cn-unhinted
 ttf-material-symbols-variable
 unzip
 uv
