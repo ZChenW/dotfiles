@@ -132,6 +132,52 @@ read_package_file() {
     done <"$file"
 }
 
+canonical_package_name() {
+    case "$1" in
+        ttf-maplemono)
+            printf 'maplemono-ttf\n'
+            ;;
+        ttf-maplemono-nf-cn-unhinted)
+            printf 'maplemono-nf-cn-unhinted\n'
+            ;;
+        ttf-maplemono-nf-unhinted)
+            printf 'maplemono-nf-unhinted\n'
+            ;;
+        *)
+            printf '%s\n' "$1"
+            ;;
+    esac
+}
+
+canonicalize_snapshot_packages() {
+    local -n _native_packages_ref="$1"
+    local -n _foreign_packages_ref="$2"
+    local -a canonical_native=() canonical_foreign=()
+    local pkg canonical
+
+    for pkg in "${_native_packages_ref[@]}"; do
+        canonical="$(canonical_package_name "$pkg")"
+        if [[ "$canonical" != "$pkg" ]]; then
+            debug_log "package renamed for Snapshot: $pkg → $canonical (portable/AUR)"
+            canonical_foreign+=("$canonical")
+        else
+            canonical_native+=("$canonical")
+        fi
+    done
+    for pkg in "${_foreign_packages_ref[@]}"; do
+        canonical="$(canonical_package_name "$pkg")"
+        if [[ "$canonical" != "$pkg" ]]; then
+            debug_log "package renamed for Snapshot: $pkg → $canonical"
+        fi
+        canonical_foreign+=("$canonical")
+    done
+
+    _native_packages_ref=("${canonical_native[@]}")
+    _foreign_packages_ref=("${canonical_foreign[@]}")
+    dedupe_packages _native_packages_ref
+    dedupe_packages _foreign_packages_ref
+}
+
 dedupe_packages() {
     local -n packages_ref=$1
     if ((${#packages_ref[@]} == 0)); then
@@ -430,6 +476,35 @@ _aur_rpc_info() {
     return 0
 }
 
+# Query exact metadata for a batch of AUR package names in one request.
+# Writes raw JSON to stdout and returns 1 when validation is unavailable.
+_aur_rpc_info_many() {
+    (($# > 0)) || return 0
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local -a curl_args=(
+        -sS
+        --connect-timeout 5
+        --max-time 10
+        --get
+    )
+    local pkg response
+    for pkg in "$@"; do
+        curl_args+=(--data-urlencode "arg[]=$pkg")
+    done
+
+    response="$(
+        curl "${curl_args[@]}" \
+            https://aur.archlinux.org/rpc/v5/info 2>/dev/null
+    )" || return 1
+    if [[ -z "$response" || "$response" != *'"type":"multiinfo"'* ]]; then
+        return 1
+    fi
+    printf '%s\n' "$response"
+}
+
 # Extract "Name" values from AUR RPC JSON on stdin (one per line).
 _aur_parse_names() {
     grep -oP '"Name":"\K[^"]+'
@@ -439,6 +514,37 @@ _aur_parse_names() {
 # Produces one package name per line, stripping version constraints.
 _aur_parse_provides() {
     grep -oP '"Provides":\[\K[^\]]*' | grep -oP '(?<=")[^",]+(?=")' || true
+}
+
+# Reject deleted or renamed AUR targets before either package manager writes.
+# An unavailable RPC is non-fatal because paru/yay remains the source of truth.
+validate_aur_package_names() {
+    local -a packages=("$@") missing=()
+    ((${#packages[@]} > 0)) || return 0
+
+    local response names pkg
+    if ! response="$(_aur_rpc_info_many "${packages[@]}")"; then
+        ui_warn "AUR package validation" "RPC unavailable; helper will verify names"
+        debug_log "AUR package validation skipped: RPC unavailable"
+        return 0
+    fi
+
+    names="$(printf '%s\n' "$response" | _aur_parse_names || true)"
+    for pkg in "${packages[@]}"; do
+        if ! grep -Fxq -- "$pkg" <<<"$names"; then
+            missing+=("$pkg")
+        fi
+    done
+
+    if ((${#missing[@]} > 0)); then
+        ui_fail "AUR package validation" "${#missing[@]} package(s) unavailable"
+        ui_error "AUR package names not found: ${missing[*]}"
+        ui_note "Refresh packages/*.txt before retrying; no packages were changed."
+        debug_log "AUR package names not found: ${missing[*]}"
+        return 1
+    fi
+
+    debug_log "AUR package validation passed (${#packages[@]} packages)"
 }
 
 # Resolve a single AUR package name to its canonical form.
@@ -537,7 +643,7 @@ install_packages_batch() {
         fi
         verbose_log "pacman   install started (${#packages[@]} packages)"
         debug_log "sudo ${pacman_args[*]} ${packages[*]}"
-        if sudo "${pacman_args[@]}" "${packages[@]}"; then
+        if run_logged_command sudo "${pacman_args[@]}" "${packages[@]}"; then
             ui_ok "Pacman install complete"
         else
             ui_fail "Pacman install failed"
@@ -586,7 +692,8 @@ install_packages_batch() {
     if ((${#pre_install_packages[@]} > 0)); then
         verbose_log "$helper     pre-install providers (${#pre_install_packages[@]} packages)"
         debug_log "$helper ${aur_args[*]} ${pre_install_packages[*]}"
-        if ! "$helper" "${aur_args[@]}" "${pre_install_packages[@]}"; then
+        if ! run_logged_command \
+            "$helper" "${aur_args[@]}" "${pre_install_packages[@]}"; then
             ui_fail "AUR pre-install failed"
             return 1
         fi
@@ -600,7 +707,7 @@ install_packages_batch() {
 
     verbose_log "$helper     install started (${#packages[@]} packages)"
     debug_log "$helper ${aur_args[*]} ${packages[*]}"
-    if "$helper" "${aur_args[@]}" "${packages[@]}"; then
+    if run_logged_command "$helper" "${aur_args[@]}" "${packages[@]}"; then
         ui_ok "AUR install complete"
     else
         ui_fail "AUR install failed"
@@ -681,10 +788,11 @@ bootstrap_paru() {
     (
         set -euo pipefail
         trap 'rm -rf "$build_root"' EXIT
-        sudo "${pacman_args[@]}"
-        git clone https://aur.archlinux.org/paru.git "$build_root/paru"
+        run_logged_command sudo "${pacman_args[@]}"
+        run_logged_command \
+            git clone https://aur.archlinux.org/paru.git "$build_root/paru"
         cd "$build_root/paru"
-        makepkg "${makepkg_args[@]}"
+        run_logged_command makepkg "${makepkg_args[@]}"
     )
 
     if ! command -v paru >/dev/null 2>&1; then
@@ -742,6 +850,11 @@ install_package_files() {
     filter_excluded_packages all_packages exclude_packages
     filter_desktop_shell_packages all_packages "$desktop_shell_profile"
     split_official_and_aur official_packages aur_packages "${all_packages[@]}"
+
+    if [[ "$dry_run" != true && "$include_aur" == true ]] \
+        && ((${#aur_packages[@]} > 0)); then
+        validate_aur_package_names "${aur_packages[@]}" || return 1
+    fi
 
     if [[ "$dry_run" == true ]]; then
         ui_ok "Pacman packages" "${#official_packages[@]} packages"
@@ -831,6 +944,7 @@ export_package_snapshot() {
     if [[ -n "$foreign_output" ]]; then
         mapfile -t foreign_packages <<<"$foreign_output"
     fi
+    canonicalize_snapshot_packages native_packages foreign_packages
 
     if [[ "$install_profile" == lightweight ]]; then
         local -a lightweight_packages=() lightweight_exclude=()

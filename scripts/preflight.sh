@@ -8,7 +8,7 @@ DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 
 # Required host tools for install / sync / snapshot / update.
-PREFLIGHT_REQUIRED_CMDS=(bash sudo pacman rsync install git mkdir date)
+PREFLIGHT_REQUIRED_CMDS=(bash sudo pacman rsync install git mkdir date tee)
 
 # Extra tools used by specific modes.
 PREFLIGHT_UNINSTALL_CMDS=(tar)
