@@ -48,8 +48,17 @@ cat >"$fake_bin/pkill" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
     -x)
-        [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == "${2:-}" ]] && exit 1
-        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}"
+        process_name=${2:?}
+        if [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == "$process_name" ]] \
+            || { [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == quickshell ]] \
+                && [[ "$process_name" == qs ]]; }; then
+            exit 1
+        fi
+        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/$process_name"
+        if [[ "$process_name" == qs || "$process_name" == quickshell ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
+        fi
         ;;
     -f)
         ;;
@@ -85,6 +94,13 @@ case " $* " in
         printf '%s\n' qs-kill >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
         [[ "${DESKTOP_SHELL_TEST_QS_KILL_FAIL:-0}" == 1 ]] && exit 1
         rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+        if [[ "${DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL:-0}" == 1 ]]; then
+            (
+                sleep 0.2
+                [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped" ]] \
+                    || touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            ) &
+        fi
         ;;
     *" ipc "*" call "*)
         printf '%s\n' "$*" >>"$DESKTOP_SHELL_TEST_RUNTIME/ipc.log"
@@ -93,6 +109,7 @@ case " $* " in
     *)
         printf '%s\n' qs-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
         printf '%s\n' "$QML_IMPORT_PATH" >"$DESKTOP_SHELL_TEST_RUNTIME/qml-import-path"
+        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
         touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
         [[ "${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" == 1 ]] \
             && touch "$DESKTOP_SHELL_TEST_RUNTIME/mako"
@@ -142,6 +159,7 @@ run_shell() {
         DESKTOP_SHELL_TEST_WCR_FORK="${DESKTOP_SHELL_TEST_WCR_FORK:-}" \
         DESKTOP_SHELL_TEST_MAKO_RACE="${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" \
         DESKTOP_SHELL_TEST_QS_KILL_FAIL="${DESKTOP_SHELL_TEST_QS_KILL_FAIL:-0}" \
+        DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL="${DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL:-0}" \
         DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL="${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" \
         "$REPO_ROOT/configs/local-bin/desktop-shell" "$@"
 }
@@ -194,7 +212,10 @@ DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
 grep -Fxq "stop" "$runtime_state/wcr.log"
 
 : >"$runtime_state/lifecycle.log"
-DESKTOP_SHELL_TEST_WCR_FORK=restore DESKTOP_SHELL_FOREGROUND=1 run_shell toggle
+DESKTOP_SHELL_TEST_WCR_FORK=restore \
+    DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL=1 \
+    DESKTOP_SHELL_FOREGROUND=1 run_shell toggle
+sleep 0.4
 [[ ! -e "$runtime_state/quickshell" ]]
 [[ -e "$runtime_state/waybar" ]]
 [[ -e "$runtime_state/mako" ]]
@@ -247,7 +268,9 @@ mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "waybar-start wcr-restore" ]]
 
 : >"$runtime_state/lifecycle.log"
-if DESKTOP_SHELL_TEST_QS_KILL_FAIL=1 DESKTOP_SHELL_FOREGROUND=1 run_shell waybar; then
+if DESKTOP_SHELL_TEST_QS_KILL_FAIL=1 \
+    DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL=quickshell \
+    DESKTOP_SHELL_FOREGROUND=1 run_shell waybar; then
     echo "Waybar switch unexpectedly succeeded when QuickShell did not stop" >&2
     exit 1
 fi

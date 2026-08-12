@@ -187,6 +187,18 @@ wait_for_quickshell() {
     return 1
 }
 
+stop_quickshell() {
+    quickshell_running || return 0
+
+    # `qs kill` stops the active config, but the long-lived Quickshell crash
+    # supervisor can immediately launch it again. Stop both layers before
+    # considering the Waybar handoff complete.
+    qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+    pkill -x qs >/dev/null 2>&1 || true
+    pkill -x quickshell >/dev/null 2>&1 || true
+    wait_for_quickshell stopped
+}
+
 ensure_process() {
     local process_name="$1"
     shift
@@ -314,8 +326,7 @@ activate_waybar() {
     fi
 
     if quickshell_running; then
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if ! wait_for_quickshell stopped; then
+        if ! stop_quickshell; then
             log "cannot activate Waybar: QuickShell did not stop"
             run_wallpaper_console stop \
                 || log "warning: Wallpaper Console did not stop during rollback"
@@ -381,8 +392,7 @@ activate_quickshell() {
 
     if ! wait_for_quickshell_notification_owner; then
         log "QuickShell failed to acquire notification ownership; restoring Waybar companions"
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        wait_for_quickshell stopped || log "warning: QuickShell did not stop after notification ownership failure"
+        stop_quickshell || log "warning: QuickShell did not stop after notification ownership failure"
         ensure_mako || log "warning: Mako did not restart after notification ownership failure"
         notify "QuickShell could not acquire notifications; Waybar was kept"
         return 1
@@ -390,8 +400,7 @@ activate_quickshell() {
 
     if ! run_wallpaper_console stop; then
         log "cannot activate QuickShell: Wallpaper Console backends did not stop"
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if ! wait_for_quickshell stopped; then
+        if ! stop_quickshell; then
             log "warning: QuickShell did not stop cleanly during rollback"
         fi
         ensure_mako || log "warning: Mako did not restart during rollback"
@@ -401,8 +410,7 @@ activate_quickshell() {
 
     if ! stop_process waybar; then
         log "cannot activate QuickShell: Waybar did not stop"
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if wait_for_quickshell stopped; then
+        if stop_quickshell; then
             run_wallpaper_console restore \
                 || log "warning: Wallpaper Console did not restore during rollback"
         else
