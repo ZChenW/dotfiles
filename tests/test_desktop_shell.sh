@@ -87,12 +87,15 @@ case " $* " in
         rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
         ;;
     *" ipc "*" call "*)
+        printf '%s\n' "$*" >>"$DESKTOP_SHELL_TEST_RUNTIME/ipc.log"
         [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell" ]]
         ;;
     *)
         printf '%s\n' qs-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
         printf '%s\n' "$QML_IMPORT_PATH" >"$DESKTOP_SHELL_TEST_RUNTIME/qml-import-path"
         touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+        [[ "${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" == 1 ]] \
+            && touch "$DESKTOP_SHELL_TEST_RUNTIME/mako"
         ;;
 esac
 EOF
@@ -114,6 +117,17 @@ cat >"$fake_bin/notify-send" <<'EOF'
 :
 EOF
 
+cat >"$fake_bin/busctl" <<'EOF'
+#!/usr/bin/env bash
+if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/mako" ]]; then
+    printf '%s\n' Comm=mako
+elif [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell" ]]; then
+    printf '%s\n' Comm=qs
+else
+    exit 1
+fi
+EOF
+
 chmod +x "$fake_bin"/* "$fake_home/.config/niri/scripts/swayidle.sh"
 touch "$runtime_state/waybar" "$runtime_state/mako" "$runtime_state/swayidle"
 
@@ -126,6 +140,7 @@ run_shell() {
         DESKTOP_SHELL_TEST_RUNTIME="$runtime_state" \
         DESKTOP_SHELL_TEST_WCR_FAIL="${DESKTOP_SHELL_TEST_WCR_FAIL:-}" \
         DESKTOP_SHELL_TEST_WCR_FORK="${DESKTOP_SHELL_TEST_WCR_FORK:-}" \
+        DESKTOP_SHELL_TEST_MAKO_RACE="${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" \
         DESKTOP_SHELL_TEST_QS_KILL_FAIL="${DESKTOP_SHELL_TEST_QS_KILL_FAIL:-0}" \
         DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL="${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" \
         "$REPO_ROOT/configs/local-bin/desktop-shell" "$@"
@@ -158,10 +173,13 @@ if run_shell status --unknown >"$tmp_dir/invalid-status.out" 2>&1; then
 fi
 grep -Fq "desktop-shell status --plain" "$tmp_dir/invalid-status.out"
 
-DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+DESKTOP_SHELL_TEST_MAKO_RACE=1 DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
 [[ -e "$runtime_state/quickshell" ]]
 [[ ! -e "$runtime_state/waybar" ]]
-[[ ! -e "$runtime_state/mako" ]]
+if [[ -e "$runtime_state/mako" ]]; then
+    echo "Mako retained notification ownership after QuickShell became ready" >&2
+    exit 1
+fi
 [[ ! -e "$runtime_state/swayidle" ]]
 [[ "$(cat "$fake_state/dotfiles/desktop-shell")" == quickshell ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
@@ -170,7 +188,9 @@ mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "qs-start wcr-stop" ]]
 
 : >"$runtime_state/wcr.log"
+touch "$runtime_state/mako"
 DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+[[ ! -e "$runtime_state/mako" ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
 
 : >"$runtime_state/lifecycle.log"
@@ -184,6 +204,16 @@ grep -Fxq "restore" "$runtime_state/wcr.log"
 mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "waybar-start wcr-restore qs-kill" ]]
 flock -n "$fake_state/dotfiles/desktop-shell.lock" true
+
+mkdir -p "$fake_state/idle-control"
+touch "$fake_state/idle-control/active"
+rm -f "$runtime_state/swayidle"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
+[[ ! -e "$runtime_state/swayidle" ]]
+DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+grep -Fq "call idle setExternalOwner true" "$runtime_state/ipc.log"
+rm -f "$fake_state/idle-control/active"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
 
 status_output="$(run_shell status)"
 [[ "$status_output" == *"configured=waybar"* ]]

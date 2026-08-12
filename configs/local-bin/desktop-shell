@@ -21,7 +21,9 @@ state_file="$state_dir/desktop-shell"
 profile_file="$state_dir/desktop-shell-profile"
 lock_file="$state_dir/desktop-shell.lock"
 log_file="$state_dir/desktop-shell.log"
+idle_control_marker="$state_home/idle-control/active"
 swayidle_script="${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/swayidle.sh"
+notification_bus_name=org.freedesktop.Notifications
 notify_enabled="${DESKTOP_SHELL_NOTIFY:-1}"
 script_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
 desktop_shell_profile=dual
@@ -200,6 +202,38 @@ stop_process() {
     wait_for_process "$process_name" stopped
 }
 
+notification_owner_comm() {
+    command -v busctl >/dev/null 2>&1 || return 1
+    busctl --user status "$notification_bus_name" 2>/dev/null \
+        | sed -n 's/^Comm=//p'
+}
+
+wait_for_quickshell_notification_owner() {
+    local attempt=0
+    local owner_comm=""
+    while ((attempt < 60)); do
+        quickshell_running || return 1
+        owner_comm="$(notification_owner_comm || true)"
+        case "$owner_comm" in
+            qs | quickshell)
+                return 0
+                ;;
+            mako)
+                stop_process mako || return 1
+                ;;
+            "")
+                ;;
+            *)
+                log "cannot activate QuickShell notifications: owned by $owner_comm"
+                return 1
+                ;;
+        esac
+        sleep 0.1
+        ((attempt += 1))
+    done
+    return 1
+}
+
 write_state() {
     local mode="$1"
     printf '%s\n' "$mode" >"$state_file.tmp"
@@ -217,6 +251,11 @@ ensure_mako() {
 }
 
 ensure_swayidle() {
+    if [[ -f "$idle_control_marker" ]]; then
+        stop_swayidle
+        log "skipped legacy swayidle because Idle Control is active"
+        return 0
+    fi
     [[ -x "$swayidle_script" ]] || {
         log "swayidle script is unavailable: $swayidle_script"
         return 1
@@ -227,6 +266,15 @@ ensure_swayidle() {
 stop_swayidle() {
     stop_process swayidle || true
     pkill -f -- "$swayidle_script" >/dev/null 2>&1 || true
+}
+
+sync_quickshell_idle_owner() {
+    quickshell_running || return 0
+    local external_owner=false
+    [[ -f "$idle_control_marker" ]] && external_owner=true
+    qs ipc --path "$quickshell_config" call idle setExternalOwner "$external_owner" \
+        >>"$log_file" 2>&1 \
+        || log "warning: QuickShell idle ownership could not be synchronized"
 }
 
 run_wallpaper_console() {
@@ -294,6 +342,13 @@ activate_quickshell() {
     fi
 
     if quickshell_running; then
+        stop_process mako || true
+        if ! wait_for_quickshell_notification_owner; then
+            log "cannot reconcile QuickShell: notification ownership was not acquired"
+            ensure_mako || log "warning: Mako did not restart after notification ownership failure"
+            notify "QuickShell could not acquire notifications"
+            return 1
+        fi
         if ! run_wallpaper_console stop; then
             log "cannot reconcile QuickShell: Wallpaper Console backends did not stop"
             notify "Wallpaper renderer could not be stopped"
@@ -304,8 +359,8 @@ activate_quickshell() {
             notify "Waybar could not be stopped"
             return 1
         fi
-        stop_process mako || true
         stop_swayidle
+        sync_quickshell_idle_owner
         write_state quickshell
         log "QuickShell was already running; reconciled companion services"
         notify "QuickShell mode"
@@ -321,6 +376,15 @@ activate_quickshell() {
         log "QuickShell failed to become ready; restoring Waybar companions"
         ensure_mako || true
         notify "QuickShell failed to start; Waybar was kept"
+        return 1
+    fi
+
+    if ! wait_for_quickshell_notification_owner; then
+        log "QuickShell failed to acquire notification ownership; restoring Waybar companions"
+        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+        wait_for_quickshell stopped || log "warning: QuickShell did not stop after notification ownership failure"
+        ensure_mako || log "warning: Mako did not restart after notification ownership failure"
+        notify "QuickShell could not acquire notifications; Waybar was kept"
         return 1
     fi
 
@@ -349,6 +413,7 @@ activate_quickshell() {
         return 1
     fi
     stop_swayidle
+    sync_quickshell_idle_owner
     write_state quickshell
     log "activated QuickShell from $quickshell_config"
     notify "QuickShell mode"
