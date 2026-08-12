@@ -670,7 +670,7 @@ binds {
 
     Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
 
-    Mod+Shift+7 hotkey-overlay-title="Switch Waybar/QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell toggle"; }
+    Mod+Shift+7 hotkey-overlay-title="Choose Waybar or QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell switcher"; }
     Mod+Shift+Space hotkey-overlay-title="QuickShell Keystone Hub" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell hub"; }
     Mod+Ctrl+Space hotkey-overlay-title="QuickShell Keystone Tools" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell tools"; }
     Mod+Shift+C hotkey-overlay-title="QuickShell Control Center" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell control-center"; }

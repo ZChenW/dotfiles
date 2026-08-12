@@ -228,6 +228,11 @@
     "on-click": "fuzzel",
     "on-click-right": "waypaper"
   },
+  "custom/desktop-shell": {
+    "format": "󰹑",
+    "tooltip-format": "桌面模式：Waybar\n点击选择 QuickShell 或 Waybar\nMod+Shift+7",
+    "on-click": "desktop-shell switcher"
+  },
   //电源菜单
   "group/powermenu": {
     "orientation": "inherit",

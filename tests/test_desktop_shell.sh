@@ -41,7 +41,23 @@ EOF
 cat >"$fake_bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
 [[ "${1:-}" == -x ]] || exit 2
-[[ -e "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}" ]]
+if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}" ]]; then
+    printf '4242\n'
+    exit 0
+fi
+exit 1
+EOF
+
+cat >"$fake_bin/ps" <<'EOF'
+#!/usr/bin/env bash
+[[ "${1:-}" == -C ]] || exec /usr/bin/ps "$@"
+process_name=${2:?}
+[[ -e "$DESKTOP_SHELL_TEST_RUNTIME/$process_name" ]] || exit 1
+if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/$process_name.zombie" ]]; then
+    printf 'Z\n'
+else
+    printf 'S\n'
+fi
 EOF
 
 cat >"$fake_bin/pkill" <<'EOF'
@@ -61,6 +77,14 @@ case "${1:-}" in
         fi
         ;;
     -f)
+        if [[ " $* " == *" qs "* || " $* " == *"/qs "* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
+        elif [[ " $* " == *"cava.sh"* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava-sh"
+        elif [[ " $* " == *"waybar_cava_config"* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava"
+        fi
         ;;
 esac
 EOF
@@ -69,6 +93,7 @@ for process_name in waybar mako; do
     cat >"$fake_bin/$process_name" <<EOF
 #!/usr/bin/env bash
 touch "\$DESKTOP_SHELL_TEST_RUNTIME/$process_name"
+rm -f "\$DESKTOP_SHELL_TEST_RUNTIME/$process_name.zombie"
 [[ "$process_name" == waybar ]] \
     && printf '%s\n' waybar-start >>"\$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
 EOF
@@ -81,6 +106,16 @@ EOF
 
 cat >"$fake_bin/qs" <<'EOF'
 #!/usr/bin/env bash
+if [[ " $* " == *" switcher.qml "* ]]; then
+    case " $* " in
+        *" ipc "*" call "*) [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/switcher" ]] ;;
+        *)
+            printf '%s\n' switcher-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
+            touch "$DESKTOP_SHELL_TEST_RUNTIME/switcher"
+            ;;
+    esac
+    exit $?
+fi
 case " $* " in
     *" ipc "*" show "*)
         if [[ -n "${DESKTOP_SHELL_TEST_IPC_DELAY:-}" ]] \
@@ -179,6 +214,14 @@ pretty_status_output="$(DESKTOP_SHELL_STATUS_STYLE=pretty run_shell)"
 plain_status_output="$(DESKTOP_SHELL_STATUS_STYLE=pretty run_shell status --plain)"
 [[ "$plain_status_output" == "$status_output" ]]
 
+# A zombie does not own a usable bar and must not suppress a replacement.
+: >"$runtime_state/lifecycle.log"
+touch "$runtime_state/waybar.zombie"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
+grep -Fxq "waybar-start" "$runtime_state/lifecycle.log"
+[[ ! -e "$runtime_state/waybar.zombie" ]]
+: >"$runtime_state/lifecycle.log"
+
 if run_shell wayvar >"$tmp_dir/invalid.out" 2>&1; then
     echo "Invalid desktop-shell action unexpectedly succeeded" >&2
     exit 1
@@ -207,8 +250,11 @@ mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 
 : >"$runtime_state/wcr.log"
 touch "$runtime_state/mako"
+touch "$runtime_state/cava-sh" "$runtime_state/cava"
 DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
 [[ ! -e "$runtime_state/mako" ]]
+[[ ! -e "$runtime_state/cava-sh" ]]
+[[ ! -e "$runtime_state/cava" ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
 
 : >"$runtime_state/lifecycle.log"
@@ -343,6 +389,10 @@ for _ in {1..30}; do
 done
 flock -n "$fake_state/dotfiles/desktop-shell.lock" true
 
+DESKTOP_SHELL_FOREGROUND=1 run_shell switcher
+[[ -e "$runtime_state/switcher" ]]
+grep -Fxq "switcher-start" "$runtime_state/lifecycle.log"
+
 printf 'waybar\n' >"$fake_state/dotfiles/desktop-shell-profile"
 if DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell >"$tmp_dir/waybar-profile.out" 2>&1; then
     echo "Waybar-only profile unexpectedly allowed QuickShell" >&2
@@ -359,7 +409,7 @@ grep -Fq "profile is quickshell" "$tmp_dir/quickshell-profile.out"
 
 completion_file="$REPO_ROOT/configs/zsh/site-functions/_desktop-shell"
 grep -Fxq '#compdef desktop-shell' "$completion_file"
-for completion in toggle waybar quickshell status start launcher lock hub tools control-center; do
+for completion in toggle waybar quickshell status switcher start launcher lock hub tools control-center; do
     grep -Fq "'$completion:" "$completion_file"
 done
 grep -Fq -- "'--plain[" "$completion_file"
