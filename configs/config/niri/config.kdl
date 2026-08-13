@@ -355,6 +355,7 @@ window-rule {
     match app-id="nm-connection-editor"
     match app-id="wallpaper-console-gui-rust"
     match app-id="wallpaper-console"
+    match app-id="idle-control-desktop"
     open-floating true
 }
 
@@ -425,11 +426,9 @@ binds {
     XF86AudioPrev        allow-when-locked=true { spawn-sh "playerctl previous"; }
     XF86AudioNext        allow-when-locked=true { spawn-sh "playerctl next"; }
 
-    // Example brightness key mappings for brightnessctl.
-    // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
-    // but you need to manually put each argument in separate "" quotes.
-    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
+    // Map the focused connector to its backlight instead of trusting an arbitrary default device.
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "$HOME/.config/niri/scripts/brightness.sh +10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "$HOME/.config/niri/scripts/brightness.sh -10%"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -672,7 +671,7 @@ binds {
 
     Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
 
-    Mod+Shift+7 hotkey-overlay-title="Switch Waybar/QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell toggle"; }
+    Mod+Shift+7 hotkey-overlay-title="Choose Waybar or QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell switcher"; }
     Mod+Shift+Space hotkey-overlay-title="QuickShell Keystone Hub" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell hub"; }
     Mod+Ctrl+Space hotkey-overlay-title="QuickShell Keystone Tools" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell tools"; }
     Mod+Shift+C hotkey-overlay-title="QuickShell Control Center" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell control-center"; }
@@ -696,3 +695,12 @@ layer-rule {
 // workspace "side" {
 //     open-on-output "Beihai Century Joint Innovation Technology Co.,Ltd P2410R 0000000000000"
 // }
+
+// BEGIN CLAVIS OUTPUTS
+// QuickShell only owns mode, scale, and position in this fragment.
+include optional=true "clavis/outputs.kdl"
+// END CLAVIS OUTPUTS
+
+// BEGIN CLAVIS CURSOR
+include optional=true "clavis/cursor.kdl"
+// END CLAVIS CURSOR

@@ -6,6 +6,7 @@ commands=(
   'waybar:activate Waybar'
   'quickshell:activate QuickShell'
   'status:show the active and saved desktop shell'
+  'switcher:open the graphical desktop mode switcher'
   'start:restore the saved desktop shell'
   'launcher:open the application launcher'
   'lock:lock the screen'

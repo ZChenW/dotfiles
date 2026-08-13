@@ -21,7 +21,9 @@ state_file="$state_dir/desktop-shell"
 profile_file="$state_dir/desktop-shell-profile"
 lock_file="$state_dir/desktop-shell.lock"
 log_file="$state_dir/desktop-shell.log"
+idle_control_marker="$state_home/idle-control/active"
 swayidle_script="${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/swayidle.sh"
+notification_bus_name=org.freedesktop.Notifications
 notify_enabled="${DESKTOP_SHELL_NOTIFY:-1}"
 script_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
 desktop_shell_profile=dual
@@ -42,13 +44,13 @@ export QML_IMPORT_PATH
 
 usage() {
     cat >&2 <<'EOF'
-Usage: desktop-shell {start|toggle|waybar|quickshell|status|launcher|lock|hub|tools|control-center}
+Usage: desktop-shell {start|toggle|waybar|quickshell|status|switcher|launcher|lock|hub|tools|control-center}
        desktop-shell status --plain
 EOF
 }
 
 case "$action" in
-    start | toggle | waybar | quickshell | status | launcher | lock | hub | tools | control-center)
+    start | toggle | waybar | quickshell | status | switcher | launcher | lock | hub | tools | control-center)
         ;;
     *)
         usage
@@ -150,7 +152,7 @@ wait_for_process() {
     local expected="$2"
     local attempt=0
     while ((attempt < 50)); do
-        if pgrep -x "$process_name" >/dev/null 2>&1; then
+        if process_running "$process_name"; then
             [[ "$expected" == running ]] && return 0
         else
             [[ "$expected" == stopped ]] && return 0
@@ -158,6 +160,17 @@ wait_for_process() {
         sleep 0.1
         ((attempt += 1))
     done
+    return 1
+}
+
+process_running() {
+    local process_name="$1"
+    local process_state
+
+    while IFS= read -r process_state; do
+        process_state="${process_state//[[:space:]]/}"
+        [[ -n "$process_state" && "$process_state" != Z* ]] && return 0
+    done < <(ps -C "$process_name" -o stat= 2>/dev/null || true)
     return 1
 }
 
@@ -185,19 +198,111 @@ wait_for_quickshell() {
     return 1
 }
 
+stop_quickshell() {
+    local escaped_config
+
+    quickshell_running || return 0
+
+    # `qs kill` stops the active config, but the long-lived Quickshell crash
+    # supervisor can immediately launch it again. Stop both layers before
+    # considering the Waybar handoff complete.
+    qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
+    escaped_config="$(printf '%s' "$quickshell_config" \
+        | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
+    # Keep auxiliary configs such as switcher.qml alive while stopping only
+    # the supervisor whose --path is exactly the main Clavis directory.
+    pkill -f -- "(^|/)qs .*--path $escaped_config($| )" \
+        >/dev/null 2>&1 || true
+    pkill -x quickshell >/dev/null 2>&1 || true
+    wait_for_quickshell stopped
+}
+
 ensure_process() {
     local process_name="$1"
     shift
-    pgrep -x "$process_name" >/dev/null 2>&1 && return 0
+    process_running "$process_name" && return 0
     start_detached "$@"
     wait_for_process "$process_name" running
 }
 
 stop_process() {
     local process_name="$1"
-    pgrep -x "$process_name" >/dev/null 2>&1 || return 0
+    process_running "$process_name" || return 0
     pkill -x "$process_name" >/dev/null 2>&1 || true
     wait_for_process "$process_name" stopped
+}
+
+stop_waybar_companions() {
+    pkill -f -- "^/bin/bash ${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/cava\\.sh$" \
+        >/dev/null 2>&1 || true
+    pkill -f -- '^cava -p /tmp/waybar_cava_config$' \
+        >/dev/null 2>&1 || true
+}
+
+notification_owner_comm() {
+    command -v busctl >/dev/null 2>&1 || return 1
+    busctl --user status "$notification_bus_name" 2>/dev/null \
+        | sed -n 's/^Comm=//p'
+}
+
+secret_service_running() {
+    command -v busctl >/dev/null 2>&1 || return 1
+    busctl --user status org.freedesktop.secrets >/dev/null 2>&1
+}
+
+ensure_secret_service() {
+    local candidate attempt
+
+    secret_service_running && return 0
+
+    # Ask D-Bus for the standard service first, then KDE's compatibility
+    # provider. This keeps the shell independent of a provider executable and
+    # also works when another implementation owns org.freedesktop.secrets.
+    for candidate in \
+        org.freedesktop.secrets \
+        org.kde.secretservicecompat; do
+        busctl --user call \
+            org.freedesktop.DBus \
+            /org/freedesktop/DBus \
+            org.freedesktop.DBus \
+            StartServiceByName \
+            su "$candidate" 0 >/dev/null 2>&1 || true
+
+        attempt=0
+        while ((attempt < 20)); do
+            secret_service_running && return 0
+            sleep 0.05
+            ((attempt += 1))
+        done
+    done
+
+    return 1
+}
+
+wait_for_quickshell_notification_owner() {
+    local attempt=0
+    local owner_comm=""
+    while ((attempt < 60)); do
+        quickshell_running || return 1
+        owner_comm="$(notification_owner_comm || true)"
+        case "$owner_comm" in
+            qs | quickshell)
+                return 0
+                ;;
+            mako)
+                stop_process mako || return 1
+                ;;
+            "")
+                ;;
+            *)
+                log "cannot activate QuickShell notifications: owned by $owner_comm"
+                return 1
+                ;;
+        esac
+        sleep 0.1
+        ((attempt += 1))
+    done
+    return 1
 }
 
 write_state() {
@@ -217,6 +322,11 @@ ensure_mako() {
 }
 
 ensure_swayidle() {
+    if [[ -f "$idle_control_marker" ]]; then
+        stop_swayidle
+        log "skipped legacy swayidle because Idle Control is active"
+        return 0
+    fi
     [[ -x "$swayidle_script" ]] || {
         log "swayidle script is unavailable: $swayidle_script"
         return 1
@@ -227,6 +337,15 @@ ensure_swayidle() {
 stop_swayidle() {
     stop_process swayidle || true
     pkill -f -- "$swayidle_script" >/dev/null 2>&1 || true
+}
+
+sync_quickshell_idle_owner() {
+    quickshell_running || return 0
+    local external_owner=false
+    [[ -f "$idle_control_marker" ]] && external_owner=true
+    qs ipc --path "$quickshell_config" call idle setExternalOwner "$external_owner" \
+        >>"$log_file" 2>&1 \
+        || log "warning: QuickShell idle ownership could not be synchronized"
 }
 
 run_wallpaper_console() {
@@ -245,7 +364,7 @@ activate_waybar() {
         return 1
     fi
 
-    if pgrep -x waybar >/dev/null 2>&1; then
+    if process_running waybar; then
         waybar_was_running=true
     fi
 
@@ -266,8 +385,7 @@ activate_waybar() {
     fi
 
     if quickshell_running; then
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if ! wait_for_quickshell stopped; then
+        if ! stop_quickshell; then
             log "cannot activate Waybar: QuickShell did not stop"
             run_wallpaper_console stop \
                 || log "warning: Wallpaper Console did not stop during rollback"
@@ -293,7 +411,20 @@ activate_quickshell() {
         return 1
     fi
 
+    ensure_secret_service \
+        || log "warning: no Secret Service provider is available; weather API keys cannot be read"
+
     if quickshell_running; then
+        qs ipc --path "$quickshell_config" \
+            call weather-map reloadCredentials >/dev/null 2>&1 \
+            || log "warning: weather credentials could not be refreshed"
+        stop_process mako || true
+        if ! wait_for_quickshell_notification_owner; then
+            log "cannot reconcile QuickShell: notification ownership was not acquired"
+            ensure_mako || log "warning: Mako did not restart after notification ownership failure"
+            notify "QuickShell could not acquire notifications"
+            return 1
+        fi
         if ! run_wallpaper_console stop; then
             log "cannot reconcile QuickShell: Wallpaper Console backends did not stop"
             notify "Wallpaper renderer could not be stopped"
@@ -304,8 +435,9 @@ activate_quickshell() {
             notify "Waybar could not be stopped"
             return 1
         fi
-        stop_process mako || true
+        stop_waybar_companions
         stop_swayidle
+        sync_quickshell_idle_owner
         write_state quickshell
         log "QuickShell was already running; reconciled companion services"
         notify "QuickShell mode"
@@ -324,10 +456,17 @@ activate_quickshell() {
         return 1
     fi
 
+    if ! wait_for_quickshell_notification_owner; then
+        log "QuickShell failed to acquire notification ownership; restoring Waybar companions"
+        stop_quickshell || log "warning: QuickShell did not stop after notification ownership failure"
+        ensure_mako || log "warning: Mako did not restart after notification ownership failure"
+        notify "QuickShell could not acquire notifications; Waybar was kept"
+        return 1
+    fi
+
     if ! run_wallpaper_console stop; then
         log "cannot activate QuickShell: Wallpaper Console backends did not stop"
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if ! wait_for_quickshell stopped; then
+        if ! stop_quickshell; then
             log "warning: QuickShell did not stop cleanly during rollback"
         fi
         ensure_mako || log "warning: Mako did not restart during rollback"
@@ -337,8 +476,7 @@ activate_quickshell() {
 
     if ! stop_process waybar; then
         log "cannot activate QuickShell: Waybar did not stop"
-        qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
-        if wait_for_quickshell stopped; then
+        if stop_quickshell; then
             run_wallpaper_console restore \
                 || log "warning: Wallpaper Console did not restore during rollback"
         else
@@ -348,7 +486,9 @@ activate_quickshell() {
         notify "Waybar did not stop; QuickShell switch was rolled back"
         return 1
     fi
+    stop_waybar_companions
     stop_swayidle
+    sync_quickshell_idle_owner
     write_state quickshell
     log "activated QuickShell from $quickshell_config"
     notify "QuickShell mode"
@@ -387,6 +527,33 @@ call_quickshell() {
     local function_name="$2"
     quickshell_running || return 1
     qs ipc --path "$quickshell_config" call "$target" "$function_name"
+}
+
+show_switcher() {
+    local switcher_config="$quickshell_config/switcher.qml"
+
+    if qs ipc --path "$switcher_config" call shell-switcher show \
+            >/dev/null 2>&1; then
+        return 0
+    fi
+
+    [[ -f "$switcher_config" ]] || {
+        notify "Desktop mode switcher is unavailable"
+        return 1
+    }
+    start_detached qs --no-duplicate --path "$switcher_config"
+
+    local attempt=0
+    while ((attempt < 30)); do
+        if qs ipc --path "$switcher_config" call shell-switcher show \
+                >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.05
+        attempt=$((attempt + 1))
+    done
+    notify "Desktop mode switcher did not become ready"
+    return 1
 }
 
 mode_label() {
@@ -458,7 +625,7 @@ show_status() {
     [[ -f "$state_file" ]] && read -r configured <"$state_file" || true
     if quickshell_running; then
         active=quickshell
-    elif pgrep -x waybar >/dev/null 2>&1; then
+    elif process_running waybar; then
         active=waybar
     else
         active=none
@@ -519,6 +686,9 @@ case "$action" in
         ;;
     status)
         show_status
+        ;;
+    switcher)
+        show_switcher
         ;;
     launcher)
         call_quickshell launcher toggle || exec fuzzel

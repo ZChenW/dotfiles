@@ -228,6 +228,20 @@
     "on-click": "fuzzel",
     "on-click-right": "waypaper"
   },
+  "custom/desktop-shell": {
+    "format": "󰹑",
+    "tooltip-format": "桌面模式：Waybar\n点击选择 QuickShell 或 Waybar\nMod+Shift+7",
+    "on-click": "desktop-shell switcher"
+  },
+  "custom/idle-control": {
+    "exec": "~/.config/waybar/scripts/idle-control-status.sh",
+    "return-type": "json",
+    "interval": 5,
+    "signal": 8,
+    "format": "{}",
+    "on-click": "~/.config/waybar/scripts/idle-control-toggle.sh",
+    "on-click-right": "idle-control-desktop"
+  },
   //电源菜单
   "group/powermenu": {
     "orientation": "inherit",
@@ -371,17 +385,6 @@
     "tooltip": false,
     "format": "{}",
     "exec": "~/.config/waybar/scripts/cava.sh",
-  },
-  //禁止熄屏
-  "idle_inhibitor": {
-    "format": "{icon}",
-    "format-icons": {
-      "activated": "",
-      "deactivated": "",
-    },
-    "tooltip-format-activated": "自动熄屏已禁止",
-    "tooltip-format-deactivated": "自动熄屏已开启",
-    "on-click-right": "~/.config/waybar/scripts/matugen-select-type.sh"
   },
   //分隔符󰇝 󱋱
   "custom/separator#1": {

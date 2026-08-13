@@ -330,8 +330,8 @@ if rg -q '^spawn-at-startup "(waybar|mako)"$|spawn-at-startup ".*swayidle' "$nir
     echo "Desktop companion services bypass the desktop-shell mode manager" >&2
     exit 1
 fi
-if ! rg -q 'desktop-shell toggle' "$niri_config"; then
-    echo "niri does not expose the Waybar/QuickShell toggle" >&2
+if ! rg -q 'desktop-shell switcher' "$niri_config"; then
+    echo "niri does not expose the Waybar/QuickShell switcher" >&2
     exit 1
 fi
 

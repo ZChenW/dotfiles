@@ -7,10 +7,8 @@ blueberry
 cursor-bin
 darkly-bin
 ddcutil-service
-freetype2-wps
 hyprmag-git
 libffi7
-linuxqq
 maplemono-nf-cn-unhinted
 maplemono-nf-unhinted
 maplemono-ttf
@@ -21,7 +19,6 @@ otf-space-grotesk
 ttf-readex-pro
 ttf-rubik-vf
 ttf-twemoji
-ttf-wps-fonts
 visual-studio-code-bin
 waybar-cava-git
 waybar-module-pacman-updates-git
@@ -30,6 +27,4 @@ waypaper-git
 wechat
 wechat-bin
 wlogout
-wps-office-cn
-wps-office-mui-zh-cn
 zoom

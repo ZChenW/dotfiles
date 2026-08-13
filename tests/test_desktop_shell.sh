@@ -30,6 +30,7 @@ mkdir -p \
     "$fake_state/dotfiles" \
     "$runtime_state"
 touch "$fake_home/.local/share/quickshell/clavis/shell.qml"
+touch "$fake_home/.local/share/quickshell/clavis/switcher.qml"
 printf 'dual\n' >"$fake_state/dotfiles/desktop-shell-profile"
 
 cat >"$fake_bin/setsid" <<'EOF'
@@ -41,17 +42,50 @@ EOF
 cat >"$fake_bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
 [[ "${1:-}" == -x ]] || exit 2
-[[ -e "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}" ]]
+if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}" ]]; then
+    printf '4242\n'
+    exit 0
+fi
+exit 1
+EOF
+
+cat >"$fake_bin/ps" <<'EOF'
+#!/usr/bin/env bash
+[[ "${1:-}" == -C ]] || exec /usr/bin/ps "$@"
+process_name=${2:?}
+[[ -e "$DESKTOP_SHELL_TEST_RUNTIME/$process_name" ]] || exit 1
+if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/$process_name.zombie" ]]; then
+    printf 'Z\n'
+else
+    printf 'S\n'
+fi
 EOF
 
 cat >"$fake_bin/pkill" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
     -x)
-        [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == "${2:-}" ]] && exit 1
-        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/${2:?}"
+        process_name=${2:?}
+        if [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == "$process_name" ]] \
+            || { [[ "${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" == quickshell ]] \
+                && [[ "$process_name" == qs ]]; }; then
+            exit 1
+        fi
+        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/$process_name"
+        if [[ "$process_name" == qs || "$process_name" == quickshell ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
+        fi
         ;;
     -f)
+        if [[ " $* " == *" qs "* || " $* " == *"/qs "* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
+        elif [[ " $* " == *"cava"*"sh"* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava-sh"
+        elif [[ " $* " == *"waybar_cava_config"* ]]; then
+            rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava"
+        fi
         ;;
 esac
 EOF
@@ -60,6 +94,7 @@ for process_name in waybar mako; do
     cat >"$fake_bin/$process_name" <<EOF
 #!/usr/bin/env bash
 touch "\$DESKTOP_SHELL_TEST_RUNTIME/$process_name"
+rm -f "\$DESKTOP_SHELL_TEST_RUNTIME/$process_name.zombie"
 [[ "$process_name" == waybar ]] \
     && printf '%s\n' waybar-start >>"\$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
 EOF
@@ -72,6 +107,15 @@ EOF
 
 cat >"$fake_bin/qs" <<'EOF'
 #!/usr/bin/env bash
+if [[ "$*" == *"switcher.qml"* ]]; then
+    if [[ "$*" == *"call shell-switcher show"* ]]; then
+        [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/switcher" ]]
+    else
+        printf '%s\n' switcher-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
+        touch "$DESKTOP_SHELL_TEST_RUNTIME/switcher"
+    fi
+    exit $?
+fi
 case " $* " in
     *" ipc "*" show "*)
         if [[ -n "${DESKTOP_SHELL_TEST_IPC_DELAY:-}" ]] \
@@ -85,14 +129,25 @@ case " $* " in
         printf '%s\n' qs-kill >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
         [[ "${DESKTOP_SHELL_TEST_QS_KILL_FAIL:-0}" == 1 ]] && exit 1
         rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+        if [[ "${DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL:-0}" == 1 ]]; then
+            (
+                sleep 0.2
+                [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped" ]] \
+                    || touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+            ) &
+        fi
         ;;
     *" ipc "*" call "*)
+        printf '%s\n' "$*" >>"$DESKTOP_SHELL_TEST_RUNTIME/ipc.log"
         [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell" ]]
         ;;
     *)
         printf '%s\n' qs-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
         printf '%s\n' "$QML_IMPORT_PATH" >"$DESKTOP_SHELL_TEST_RUNTIME/qml-import-path"
+        rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
         touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
+        [[ "${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" == 1 ]] \
+            && touch "$DESKTOP_SHELL_TEST_RUNTIME/mako"
         ;;
 esac
 EOF
@@ -114,6 +169,25 @@ cat >"$fake_bin/notify-send" <<'EOF'
 :
 EOF
 
+cat >"$fake_bin/busctl" <<'EOF'
+#!/usr/bin/env bash
+if [[ " $* " == *" StartServiceByName "* ]]; then
+    printf '%s\n' secret-service-start \
+        >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
+    printf '%s\n' "$*" >>"$DESKTOP_SHELL_TEST_RUNTIME/secret-service.log"
+    touch "$DESKTOP_SHELL_TEST_RUNTIME/secret-service"
+elif [[ " $* " == *" org.freedesktop.secrets "* ]]; then
+    [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/secret-service" ]] || exit 1
+    printf '%s\n' Comm=ksecretd
+elif [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/mako" ]]; then
+    printf '%s\n' Comm=mako
+elif [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell" ]]; then
+    printf '%s\n' Comm=qs
+else
+    exit 1
+fi
+EOF
+
 chmod +x "$fake_bin"/* "$fake_home/.config/niri/scripts/swayidle.sh"
 touch "$runtime_state/waybar" "$runtime_state/mako" "$runtime_state/swayidle"
 
@@ -126,7 +200,9 @@ run_shell() {
         DESKTOP_SHELL_TEST_RUNTIME="$runtime_state" \
         DESKTOP_SHELL_TEST_WCR_FAIL="${DESKTOP_SHELL_TEST_WCR_FAIL:-}" \
         DESKTOP_SHELL_TEST_WCR_FORK="${DESKTOP_SHELL_TEST_WCR_FORK:-}" \
+        DESKTOP_SHELL_TEST_MAKO_RACE="${DESKTOP_SHELL_TEST_MAKO_RACE:-0}" \
         DESKTOP_SHELL_TEST_QS_KILL_FAIL="${DESKTOP_SHELL_TEST_QS_KILL_FAIL:-0}" \
+        DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL="${DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL:-0}" \
         DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL="${DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL:-}" \
         "$REPO_ROOT/configs/local-bin/desktop-shell" "$@"
 }
@@ -146,6 +222,14 @@ pretty_status_output="$(DESKTOP_SHELL_STATUS_STYLE=pretty run_shell)"
 plain_status_output="$(DESKTOP_SHELL_STATUS_STYLE=pretty run_shell status --plain)"
 [[ "$plain_status_output" == "$status_output" ]]
 
+# A zombie does not own a usable bar and must not suppress a replacement.
+: >"$runtime_state/lifecycle.log"
+touch "$runtime_state/waybar.zombie"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
+grep -Fxq "waybar-start" "$runtime_state/lifecycle.log"
+[[ ! -e "$runtime_state/waybar.zombie" ]]
+: >"$runtime_state/lifecycle.log"
+
 if run_shell wayvar >"$tmp_dir/invalid.out" 2>&1; then
     echo "Invalid desktop-shell action unexpectedly succeeded" >&2
     exit 1
@@ -158,23 +242,36 @@ if run_shell status --unknown >"$tmp_dir/invalid-status.out" 2>&1; then
 fi
 grep -Fq "desktop-shell status --plain" "$tmp_dir/invalid-status.out"
 
-DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+DESKTOP_SHELL_TEST_MAKO_RACE=1 DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
 [[ -e "$runtime_state/quickshell" ]]
 [[ ! -e "$runtime_state/waybar" ]]
-[[ ! -e "$runtime_state/mako" ]]
+if [[ -e "$runtime_state/mako" ]]; then
+    echo "Mako retained notification ownership after QuickShell became ready" >&2
+    exit 1
+fi
 [[ ! -e "$runtime_state/swayidle" ]]
 [[ "$(cat "$fake_state/dotfiles/desktop-shell")" == quickshell ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
 [[ "$(cat "$runtime_state/qml-import-path")" == "$fake_home/.local/lib/qt6/qml" ]]
 mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
-[[ "${lifecycle_events[*]}" == "qs-start wcr-stop" ]]
+[[ "${lifecycle_events[*]}" == "secret-service-start qs-start wcr-stop" ]]
+grep -Fq "StartServiceByName su org.freedesktop.secrets 0" \
+    "$runtime_state/secret-service.log"
 
 : >"$runtime_state/wcr.log"
+touch "$runtime_state/mako"
+touch "$runtime_state/cava-sh" "$runtime_state/cava"
 DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+[[ ! -e "$runtime_state/mako" ]]
+[[ ! -e "$runtime_state/cava-sh" ]]
+[[ ! -e "$runtime_state/cava" ]]
 grep -Fxq "stop" "$runtime_state/wcr.log"
 
 : >"$runtime_state/lifecycle.log"
-DESKTOP_SHELL_TEST_WCR_FORK=restore DESKTOP_SHELL_FOREGROUND=1 run_shell toggle
+DESKTOP_SHELL_TEST_WCR_FORK=restore \
+    DESKTOP_SHELL_TEST_QS_RESTART_AFTER_KILL=1 \
+    DESKTOP_SHELL_FOREGROUND=1 run_shell toggle
+sleep 0.4
 [[ ! -e "$runtime_state/quickshell" ]]
 [[ -e "$runtime_state/waybar" ]]
 [[ -e "$runtime_state/mako" ]]
@@ -184,6 +281,16 @@ grep -Fxq "restore" "$runtime_state/wcr.log"
 mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "waybar-start wcr-restore qs-kill" ]]
 flock -n "$fake_state/dotfiles/desktop-shell.lock" true
+
+mkdir -p "$fake_state/idle-control"
+touch "$fake_state/idle-control/active"
+rm -f "$runtime_state/swayidle"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
+[[ ! -e "$runtime_state/swayidle" ]]
+DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell
+grep -Fq "call idle setExternalOwner true" "$runtime_state/ipc.log"
+rm -f "$fake_state/idle-control/active"
+DESKTOP_SHELL_FOREGROUND=1 run_shell waybar
 
 status_output="$(run_shell status)"
 [[ "$status_output" == *"configured=waybar"* ]]
@@ -217,7 +324,9 @@ mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
 [[ "${lifecycle_events[*]}" == "waybar-start wcr-restore" ]]
 
 : >"$runtime_state/lifecycle.log"
-if DESKTOP_SHELL_TEST_QS_KILL_FAIL=1 DESKTOP_SHELL_FOREGROUND=1 run_shell waybar; then
+if DESKTOP_SHELL_TEST_QS_KILL_FAIL=1 \
+    DESKTOP_SHELL_TEST_PROCESS_STOP_FAIL=quickshell \
+    DESKTOP_SHELL_FOREGROUND=1 run_shell waybar; then
     echo "Waybar switch unexpectedly succeeded when QuickShell did not stop" >&2
     exit 1
 fi
@@ -290,6 +399,10 @@ for _ in {1..30}; do
 done
 flock -n "$fake_state/dotfiles/desktop-shell.lock" true
 
+DESKTOP_SHELL_FOREGROUND=1 run_shell switcher
+[[ -e "$runtime_state/switcher" ]]
+grep -Fxq "switcher-start" "$runtime_state/lifecycle.log"
+
 printf 'waybar\n' >"$fake_state/dotfiles/desktop-shell-profile"
 if DESKTOP_SHELL_FOREGROUND=1 run_shell quickshell >"$tmp_dir/waybar-profile.out" 2>&1; then
     echo "Waybar-only profile unexpectedly allowed QuickShell" >&2
@@ -306,7 +419,7 @@ grep -Fq "profile is quickshell" "$tmp_dir/quickshell-profile.out"
 
 completion_file="$REPO_ROOT/configs/zsh/site-functions/_desktop-shell"
 grep -Fxq '#compdef desktop-shell' "$completion_file"
-for completion in toggle waybar quickshell status start launcher lock hub tools control-center; do
+for completion in toggle waybar quickshell status switcher start launcher lock hub tools control-center; do
     grep -Fq "'$completion:" "$completion_file"
 done
 grep -Fq -- "'--plain[" "$completion_file"

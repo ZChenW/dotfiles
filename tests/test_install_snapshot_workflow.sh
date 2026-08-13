@@ -21,7 +21,7 @@ mkdir -p \
     "$fake_home/Pictures/wallpapers" \
     "$fake_bin"
 cp -a "$REPO_ROOT" "$fake_repo"
-rm -rf "$fake_repo/.git"
+rm -rf "$fake_repo/.git" "$fake_repo/.jj"
 /usr/bin/git -C "$fake_repo" init -q
 /usr/bin/git -C "$fake_repo" config user.email "test@example.com"
 /usr/bin/git -C "$fake_repo" config user.name "Test User"
