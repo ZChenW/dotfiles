@@ -28,7 +28,7 @@
         "custom/wfrec",
         "custom/screenshot",
         "custom/left_div#2",
-        "idle_inhibitor",
+        "custom/idle-control",
         "custom/colorpicker",
         "power-profiles-daemon",
         "custom/left_div#11",

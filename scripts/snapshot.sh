@@ -144,6 +144,8 @@ SNAPSHOT_SECRET_MARKER_COMMENT_SKIP_FILES=(
 
 SNAPSHOT_RSYNC_EXCLUDES=(
     .codex
+    outputs.kdl.last-good
+    outputs.kdl.lock
     "*.bak"
     "*.bak.*"
     "*.bak-*"

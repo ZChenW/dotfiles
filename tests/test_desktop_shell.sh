@@ -30,6 +30,7 @@ mkdir -p \
     "$fake_state/dotfiles" \
     "$runtime_state"
 touch "$fake_home/.local/share/quickshell/clavis/shell.qml"
+touch "$fake_home/.local/share/quickshell/clavis/switcher.qml"
 printf 'dual\n' >"$fake_state/dotfiles/desktop-shell-profile"
 
 cat >"$fake_bin/setsid" <<'EOF'
@@ -80,7 +81,7 @@ case "${1:-}" in
         if [[ " $* " == *" qs "* || " $* " == *"/qs "* ]]; then
             rm -f "$DESKTOP_SHELL_TEST_RUNTIME/quickshell"
             touch "$DESKTOP_SHELL_TEST_RUNTIME/quickshell-supervisor-stopped"
-        elif [[ " $* " == *"cava.sh"* ]]; then
+        elif [[ " $* " == *"cava"*"sh"* ]]; then
             rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava-sh"
         elif [[ " $* " == *"waybar_cava_config"* ]]; then
             rm -f "$DESKTOP_SHELL_TEST_RUNTIME/cava"
@@ -106,14 +107,13 @@ EOF
 
 cat >"$fake_bin/qs" <<'EOF'
 #!/usr/bin/env bash
-if [[ " $* " == *" switcher.qml "* ]]; then
-    case " $* " in
-        *" ipc "*" call "*) [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/switcher" ]] ;;
-        *)
-            printf '%s\n' switcher-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
-            touch "$DESKTOP_SHELL_TEST_RUNTIME/switcher"
-            ;;
-    esac
+if [[ "$*" == *"switcher.qml"* ]]; then
+    if [[ "$*" == *"call shell-switcher show"* ]]; then
+        [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/switcher" ]]
+    else
+        printf '%s\n' switcher-start >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
+        touch "$DESKTOP_SHELL_TEST_RUNTIME/switcher"
+    fi
     exit $?
 fi
 case " $* " in
@@ -171,7 +171,15 @@ EOF
 
 cat >"$fake_bin/busctl" <<'EOF'
 #!/usr/bin/env bash
-if [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/mako" ]]; then
+if [[ " $* " == *" StartServiceByName "* ]]; then
+    printf '%s\n' secret-service-start \
+        >>"$DESKTOP_SHELL_TEST_RUNTIME/lifecycle.log"
+    printf '%s\n' "$*" >>"$DESKTOP_SHELL_TEST_RUNTIME/secret-service.log"
+    touch "$DESKTOP_SHELL_TEST_RUNTIME/secret-service"
+elif [[ " $* " == *" org.freedesktop.secrets "* ]]; then
+    [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/secret-service" ]] || exit 1
+    printf '%s\n' Comm=ksecretd
+elif [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/mako" ]]; then
     printf '%s\n' Comm=mako
 elif [[ -e "$DESKTOP_SHELL_TEST_RUNTIME/quickshell" ]]; then
     printf '%s\n' Comm=qs
@@ -246,7 +254,9 @@ fi
 grep -Fxq "stop" "$runtime_state/wcr.log"
 [[ "$(cat "$runtime_state/qml-import-path")" == "$fake_home/.local/lib/qt6/qml" ]]
 mapfile -t lifecycle_events <"$runtime_state/lifecycle.log"
-[[ "${lifecycle_events[*]}" == "qs-start wcr-stop" ]]
+[[ "${lifecycle_events[*]}" == "secret-service-start qs-start wcr-stop" ]]
+grep -Fq "StartServiceByName su org.freedesktop.secrets 0" \
+    "$runtime_state/secret-service.log"
 
 : >"$runtime_state/wcr.log"
 touch "$runtime_state/mako"

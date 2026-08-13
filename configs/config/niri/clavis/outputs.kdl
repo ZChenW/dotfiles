@@ -1,0 +1,6 @@
+// Managed by Clavis. Manual edits will be replaced.
+output "eDP-1" {
+    mode "2560x1600@240.000"
+    scale 1.45
+    position x=0 y=0
+}

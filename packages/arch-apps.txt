@@ -9,6 +9,7 @@ corepack
 ctags
 evtest
 ex-vi-compat
+feh
 ffmpegthumbnailer
 firefox
 fzf
@@ -27,6 +28,7 @@ libreoffice-still
 libreoffice-still-zh-cn
 libtiff5
 linuxconsole
+lxqt-powermanagement
 namcap
 neovim
 nodejs

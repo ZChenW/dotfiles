@@ -245,6 +245,40 @@ notification_owner_comm() {
         | sed -n 's/^Comm=//p'
 }
 
+secret_service_running() {
+    command -v busctl >/dev/null 2>&1 || return 1
+    busctl --user status org.freedesktop.secrets >/dev/null 2>&1
+}
+
+ensure_secret_service() {
+    local candidate attempt
+
+    secret_service_running && return 0
+
+    # Ask D-Bus for the standard service first, then KDE's compatibility
+    # provider. This keeps the shell independent of a provider executable and
+    # also works when another implementation owns org.freedesktop.secrets.
+    for candidate in \
+        org.freedesktop.secrets \
+        org.kde.secretservicecompat; do
+        busctl --user call \
+            org.freedesktop.DBus \
+            /org/freedesktop/DBus \
+            org.freedesktop.DBus \
+            StartServiceByName \
+            su "$candidate" 0 >/dev/null 2>&1 || true
+
+        attempt=0
+        while ((attempt < 20)); do
+            secret_service_running && return 0
+            sleep 0.05
+            ((attempt += 1))
+        done
+    done
+
+    return 1
+}
+
 wait_for_quickshell_notification_owner() {
     local attempt=0
     local owner_comm=""
@@ -377,7 +411,13 @@ activate_quickshell() {
         return 1
     fi
 
+    ensure_secret_service \
+        || log "warning: no Secret Service provider is available; weather API keys cannot be read"
+
     if quickshell_running; then
+        qs ipc --path "$quickshell_config" \
+            call weather-map reloadCredentials >/dev/null 2>&1 \
+            || log "warning: weather credentials could not be refreshed"
         stop_process mako || true
         if ! wait_for_quickshell_notification_owner; then
             log "cannot reconcile QuickShell: notification ownership was not acquired"
@@ -510,7 +550,7 @@ show_switcher() {
             return 0
         fi
         sleep 0.05
-        ((attempt += 1))
+        attempt=$((attempt + 1))
     done
     notify "Desktop mode switcher did not become ready"
     return 1

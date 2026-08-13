@@ -355,6 +355,7 @@ window-rule {
     match app-id="nm-connection-editor"
     match app-id="wallpaper-console-gui-rust"
     match app-id="wallpaper-console"
+    match app-id="idle-control-desktop"
     open-floating true
 }
 
@@ -694,3 +695,12 @@ layer-rule {
 // workspace "side" {
 //     open-on-output "Beihai Century Joint Innovation Technology Co.,Ltd P2410R 0000000000000"
 // }
+
+// BEGIN CLAVIS OUTPUTS
+// QuickShell only owns mode, scale, and position in this fragment.
+include optional=true "clavis/outputs.kdl"
+// END CLAVIS OUTPUTS
+
+// BEGIN CLAVIS CURSOR
+include optional=true "clavis/cursor.kdl"
+// END CLAVIS CURSOR

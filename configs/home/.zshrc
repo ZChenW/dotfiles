@@ -207,6 +207,9 @@ alias cs485='conda activate cs485'
 alias torch-cu128='conda activate torch-cu128'
 alias transformers='conda activate transformers'
 
+alias codex-pro='env -u CODEX_HOME codex --profile deepseek-pro'
+alias codex-flash='env -u CODEX_HOME codex --profile deepseek-flash'
+
 # Python venv
 alias uva='source .venv/bin/activate'
 
@@ -453,11 +456,15 @@ source <(COMPLETE=zsh jj)
 
 # --- codex ---
 codex1() {
-    CODEX_HOME="$HOME/.codex-plus1" command codex "$@"
+    CODEX_HOME="$HOME/.codex-plus1" \
+        CODEX_SQLITE_HOME="$HOME/.codex" \
+        command codex "$@"
 }
 
 codex2() {
-    CODEX_HOME="$HOME/.codex-plus2" command codex "$@"
+    CODEX_HOME="$HOME/.codex-plus2" \
+        CODEX_SQLITE_HOME="$HOME/.codex" \
+        command codex "$@"
 }
 # --- cursor / deepseek ---
 # API keys and provider auth belong in ~/.zshrc.local (never commit secrets).

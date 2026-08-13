@@ -131,6 +131,30 @@ if [[ "$(cat "$fake_repo/configs/config/waybar/colors.css")" != stable-seed ]]; 
     exit 1
 fi
 
+echo "==> test 2c: snapshot excludes Clavis runtime state"
+mkdir -p \
+    "$fake_home/.config/niri/clavis" \
+    "$fake_repo/configs/config/niri/clavis"
+printf 'cursor config\n' >"$fake_home/.config/niri/clavis/cursor.kdl"
+printf 'runtime lock\n' >"$fake_home/.config/niri/clavis/outputs.kdl.lock"
+printf 'runtime backup\n' >"$fake_home/.config/niri/clavis/outputs.kdl.last-good"
+printf 'stale lock\n' >"$fake_repo/configs/config/niri/clavis/outputs.kdl.lock"
+printf 'stale backup\n' >"$fake_repo/configs/config/niri/clavis/outputs.kdl.last-good"
+SNAPSHOT_MAPPINGS=(
+    "dir|$HOME/.config/niri|configs/config/niri|required"
+)
+snapshot_capture_configs "$fake_repo" false >/dev/null
+if [[ ! -f "$fake_repo/configs/config/niri/clavis/cursor.kdl" ]]; then
+    echo "Snapshot omitted the managed Clavis cursor config" >&2
+    exit 1
+fi
+for runtime_file in outputs.kdl.lock outputs.kdl.last-good; do
+    if [[ -e "$fake_repo/configs/config/niri/clavis/$runtime_file" ]]; then
+        echo "Snapshot captured Clavis runtime state: $runtime_file" >&2
+        exit 1
+    fi
+done
+
 echo "==> test 3: optional missing source is skipped"
 SNAPSHOT_MAPPINGS=(
     "file|$HOME/.config/missing-optional.json|configs/config/missing-optional.json|optional"

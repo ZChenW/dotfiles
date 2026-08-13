@@ -290,4 +290,192 @@ for excluded in base linux; do
     fi
 done
 
+echo "==> test 7: package manifests use current Maple Mono AUR names"
+obsolete_maplemono_references="$(
+    rg -n \
+        '^(ttf-maplemono|ttf-maplemono-nf-cn-unhinted|ttf-maplemono-nf-unhinted)$' \
+        "$REPO_ROOT/packages" \
+        || true
+)"
+if [[ -n "$obsolete_maplemono_references" ]]; then
+    echo "Package manifests still reference retired Maple Mono AUR names" >&2
+    printf '%s\n' "$obsolete_maplemono_references" >&2
+    exit 1
+fi
+for expected in maplemono-ttf maplemono-nf-cn-unhinted; do
+    if ! grep -Fxq "$expected" "$REPO_ROOT/packages/arch-lightweight.txt"; then
+        echo "Lightweight manifest is missing current package: $expected" >&2
+        exit 1
+    fi
+done
+for expected in maplemono-ttf maplemono-nf-cn-unhinted maplemono-nf-unhinted; do
+    if ! grep -Fxq "$expected" "$REPO_ROOT/packages/arch-aur.txt"; then
+        echo "Standard AUR manifest is missing current package: $expected" >&2
+        exit 1
+    fi
+done
+
+echo "==> test 8: AUR helper output is copied to the install log"
+package_log="$tmp_dir/package-install.log"
+: >"$package_log"
+DOTFILES_LOG_FILE="$package_log"
+export DOTFILES_LOG_FILE
+
+build_installed_package_index() {
+    declare -gA INSTALLED_NAMES=()
+    declare -gA PROVIDES_INDEX=()
+    declare -g INSTALLED_PACKAGE_INDEX_INITIALIZED=true
+}
+_aur_rpc_search() {
+    printf '%s\n' '{"results":[{"Name":"broken-aur-package"}]}'
+}
+_aur_get_provides() {
+    return 1
+}
+failing_aur_helper() {
+    printf 'AUR-HELPER-STDOUT: resolving target\n'
+    printf 'AUR-HELPER-STDERR: target not found\n' >&2
+    return 23
+}
+
+unset INSTALLED_NAMES PROVIDES_INDEX INSTALLED_PACKAGE_INDEX_INITIALIZED
+if package_output="$(
+    install_packages_batch false true failing_aur_helper broken-aur-package 2>&1
+)"; then
+    echo "Expected the fixture AUR helper to fail" >&2
+    exit 1
+fi
+for marker in AUR-HELPER-STDOUT AUR-HELPER-STDERR; do
+    if [[ "$package_output" != *"$marker"* ]]; then
+        echo "AUR helper output disappeared from the terminal stream: $marker" >&2
+        exit 1
+    fi
+    if ! grep -Fq "$marker" "$package_log"; then
+        echo "AUR helper output is missing from the install log: $marker" >&2
+        printf '%s\n' "$package_output" >&2
+        printf '%s\n' "--- install log ---" >&2
+        sed -n '1,80p' "$package_log" >&2
+        exit 1
+    fi
+done
+
+echo "==> test 9: missing AUR packages fail before package writes"
+preflight_repo="$tmp_dir/preflight-repo"
+mkdir -p "$preflight_repo/packages"
+cat >"$preflight_repo/packages/arch-essential.txt" <<'EOF'
+git
+EOF
+for manifest in arch-desktop arch-apps arch-machine-local arch-exclude; do
+    : >"$preflight_repo/packages/$manifest.txt"
+done
+cat >"$preflight_repo/packages/arch-aur.txt" <<'EOF'
+retired-aur-package
+EOF
+
+package_command_log="$tmp_dir/package-commands.log"
+: >"$package_command_log"
+cat >"$fakebin/pacman" <<EOF
+#!/usr/bin/bash
+printf 'pacman %s\n' "\$*" >>"$package_command_log"
+case "\${1:-}" in
+    -Slq) printf '%s\n' git ;;
+    -Qqen|-Qqem) exit 0 ;;
+    *) exit 0 ;;
+esac
+EOF
+cat >"$fakebin/sudo" <<EOF
+#!/usr/bin/bash
+printf 'sudo %s\n' "\$*" >>"$package_command_log"
+exit 0
+EOF
+cat >"$fakebin/paru" <<EOF
+#!/usr/bin/bash
+printf 'paru %s\n' "\$*" >>"$package_command_log"
+exit 1
+EOF
+chmod +x "$fakebin/pacman" "$fakebin/sudo" "$fakebin/paru"
+
+_aur_rpc_info_many() {
+    printf '%s\n' '{"resultcount":0,"results":[],"type":"multiinfo","version":5}'
+}
+unset INSTALLED_NAMES PROVIDES_INDEX INSTALLED_PACKAGE_INDEX_INITIALIZED
+if preflight_output="$(
+    PATH="$fakebin:/usr/bin" \
+        install_package_files false true false true "$preflight_repo" 2>&1
+)"; then
+    echo "Expected an unavailable AUR package to fail pre-install validation" >&2
+    exit 1
+fi
+if [[ "$preflight_output" != *"retired-aur-package"* ]]; then
+    echo "Expected pre-install validation to name the unavailable AUR package" >&2
+    printf '%s\n' "$preflight_output" >&2
+    exit 1
+fi
+if grep -Eq '^(sudo|paru) ' "$package_command_log"; then
+    echo "Package writes started before AUR manifests were validated" >&2
+    cat "$package_command_log" >&2
+    exit 1
+fi
+
+echo "==> test 10: Snapshot exports retired package names canonically"
+migration_repo="$tmp_dir/migration-repo"
+mkdir -p "$migration_repo/packages"
+for manifest in \
+    arch-essential \
+    arch-desktop \
+    arch-apps \
+    arch-aur \
+    arch-machine-local \
+    arch-exclude \
+    arch-lightweight; do
+    printf '# %s\n' "$manifest" >"$migration_repo/packages/$manifest.txt"
+done
+cat >"$fakebin/pacman" <<'EOF'
+#!/usr/bin/bash
+case "${1:-}" in
+    -Qqen)
+        printf '%s\n' \
+            git \
+            ttf-maplemono \
+            ttf-maplemono-nf-cn-unhinted \
+            ttf-maplemono-nf-unhinted
+        ;;
+    -Qqem)
+        printf '%s\n' maplemono-ttf
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+EOF
+chmod +x "$fakebin/pacman"
+
+for profile in standard lightweight; do
+    unset INSTALLED_NAMES PROVIDES_INDEX INSTALLED_PACKAGE_INDEX_INITIALIZED
+    PATH="$fakebin:/usr/bin" \
+        export_package_snapshot "$migration_repo" "$profile" >/dev/null
+
+    if rg -n \
+        '^(ttf-maplemono|ttf-maplemono-nf-cn-unhinted|ttf-maplemono-nf-unhinted)$' \
+        "$migration_repo/packages"; then
+        echo "$profile Snapshot reintroduced a retired Maple Mono name" >&2
+        exit 1
+    fi
+
+    if [[ "$profile" == lightweight ]]; then
+        exported_manifest="$migration_repo/packages/arch-lightweight.txt"
+    else
+        exported_manifest="$migration_repo/packages/arch-aur.txt"
+    fi
+    for expected in \
+        maplemono-ttf \
+        maplemono-nf-cn-unhinted \
+        maplemono-nf-unhinted; do
+        if ! grep -Fxq "$expected" "$exported_manifest"; then
+            echo "$profile Snapshot did not canonicalize package: $expected" >&2
+            exit 1
+        fi
+    done
+done
+
 echo "All package helper tests passed."
