@@ -1,7 +1,38 @@
-# Wallpaper Console → matugen → waybar
 [config]
 version_check = false
 
-[templates.waybar]
-input_path = 'templates/waybar-colors.css'
-output_path = '../waybar/colors.css'
+[templates.btop]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/btop.theme'
+output_path = '/home/chakew/.config/btop/themes/quickshell.theme'
+
+[templates.cava]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/cava.conf'
+output_path = '/home/chakew/.config/cava/config'
+
+[templates.fcitx5-theme]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/fcitx5-theme.conf'
+output_path = '/home/chakew/.local/share/fcitx5/themes/Clavis-Matugen/theme.conf'
+
+[templates.kitty]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/kitty.conf'
+output_path = '/home/chakew/.config/kitty/matugen.conf'
+
+[templates.niri]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/niri.kdl'
+output_path = '/home/chakew/.config/niri/clavis/colors.kdl'
+
+[templates.quickshell-colors]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/quickshell-colors.json'
+output_path = '/home/chakew/.cache/quickshell-dev-colorscheme/colors.json'
+
+[templates.waybar-colors]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/waybar-colors.css'
+output_path = '/home/chakew/.config/waybar/colors.css'
+
+[templates.yazi]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/yazi.toml'
+output_path = '/home/chakew/.config/yazi/theme.toml'
+
+[templates.zsh]
+input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/zsh.zsh'
+output_path = '/home/chakew/.cache/quickshell/colors.zsh'

@@ -1,0 +1,10 @@
+; Matugen — cava 配色（clavis 统一主题管线；其余项沿用 cava 默认）
+[color]
+gradient = 1
+gradient_count = 6
+gradient_color_1 = '#ffb598'
+gradient_color_2 = '#efbc95'
+gradient_color_3 = '#efbe79'
+gradient_color_4 = '#ffb4ab'
+gradient_color_5 = '#7e2c00'
+gradient_color_6 = '#623f20'
