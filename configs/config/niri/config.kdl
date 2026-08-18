@@ -699,6 +699,7 @@ layer-rule {
 // BEGIN CLAVIS OUTPUTS
 // QuickShell only owns mode, scale, and position in this fragment.
 include optional=true "clavis/outputs.kdl"
+include optional=true "clavis/colors.kdl"
 // END CLAVIS OUTPUTS
 
 // BEGIN CLAVIS CURSOR
