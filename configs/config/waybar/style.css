@@ -227,7 +227,10 @@ window#waybar.empty #window {
 }
 #custom-desktop-shell {
   font-size: 1.12em;
-  padding: 0 0.48em 0 0.2em;
+  padding: 0 0.51em 0 0.34em;
+}
+#custom-applauncher {
+  padding: 0 0.39em 0 0.23em;
 }
 #custom-right_div.1,
 #custom-left_div.1 {

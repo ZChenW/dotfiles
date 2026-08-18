@@ -286,10 +286,12 @@
   //内屏亮度
   "backlight/slider": {
     "min": 5,
-    "max": 100,
+    "max": 98,
     "orientation": "horizontal",
+    "device": "amdgpu_bl1",
   },
   "backlight": {
+    "device": "amdgpu_bl1",
     "tooltip": true,
     "tooltip-format": "调节内屏亮度",
     "format": "{icon}",
@@ -304,6 +306,8 @@
       "",
       ""
     ],
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh +5%",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh -5%",
   },
   //调节外接屏幕亮度
   "group/ddcutil": {

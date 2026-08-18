@@ -4,6 +4,7 @@ set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 script="$repo_root/configs/config/niri/scripts/brightness.sh"
+waybar_modules="$repo_root/configs/config/waybar/modules.jsonc"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -121,4 +122,36 @@ if [[ "$commands_after" != "$commands_before" ]]; then
     exit 1
 fi
 
-printf 'QuickShell-compatible brightness mapping test passed\n'
+slider_config="$(awk '
+    /^  "backlight\/slider": \{/ { capture = 1 }
+    capture { print }
+    capture && /^  \},$/ { exit }
+' "$waybar_modules")"
+backlight_config="$(awk '
+    /^  "backlight": \{/ { capture = 1 }
+    capture { print }
+    capture && /^  \},$/ { exit }
+' "$waybar_modules")"
+
+grep -Fq '"device": "amdgpu_bl1"' <<<"$slider_config" || {
+    echo "Waybar slider is not pinned to the integrated panel backlight" >&2
+    exit 1
+}
+grep -Fq '"max": 98' <<<"$slider_config" || {
+    echo "Waybar slider can still cross the calibrated 98% safe ceiling" >&2
+    exit 1
+}
+grep -Fq '"device": "amdgpu_bl1"' <<<"$backlight_config" || {
+    echo "Waybar backlight indicator is not pinned to the integrated panel" >&2
+    exit 1
+}
+grep -Fq 'brightness.sh +5%' <<<"$backlight_config" || {
+    echo "Waybar scroll-up bypasses the calibrated brightness helper" >&2
+    exit 1
+}
+grep -Fq 'brightness.sh -5%' <<<"$backlight_config" || {
+    echo "Waybar scroll-down bypasses the calibrated brightness helper" >&2
+    exit 1
+}
+
+printf 'Waybar and QuickShell-compatible brightness tests passed\n'
