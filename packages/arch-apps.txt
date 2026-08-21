@@ -57,6 +57,8 @@ songrec
 stack
 steam
 stylua
+tesseract-data-chi_sim
+tesseract-data-eng
 texlive-bin
 texlive-binextra
 texlive-fontsextra
