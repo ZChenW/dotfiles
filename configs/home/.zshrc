@@ -185,6 +185,7 @@ alias open="xdg-open"
 alias upd='sudo pacman -Syu'
 alias y='yazi'
 alias zshrc='nvim ~/.zshrc'
+alias codex-launch="codex-switch launch"
 
 # Directory navigation
 alias cd..='cd ..'
