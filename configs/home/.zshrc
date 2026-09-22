@@ -204,9 +204,7 @@ alias gst='git status'
 alias condaa='conda activate'
 alias condac='conda create -n'
 alias condad='conda deactivate'
-alias cs485='conda activate cs485'
-alias torch-cu128='conda activate torch-cu128'
-alias transformers='conda activate transformers'
+alias cs336="conda activate cs336"
 
 alias codex-pro='env -u CODEX_HOME codex --profile deepseek-pro'
 alias codex-flash='env -u CODEX_HOME codex --profile deepseek-flash'
@@ -438,14 +436,14 @@ fi
 # 10. Proxy (Clash)
 # ------------------------------------------------------------------------------
 
-export http_proxy="http://127.0.0.1:7890"
-export https_proxy="http://127.0.0.1:7890"
-export all_proxy="socks5://127.0.0.1:7891"
-
-export HTTP_PROXY="$http_proxy"
-export HTTPS_PROXY="$https_proxy"
-export ALL_PROXY="$all_proxy"
-
+#export http_proxy="http://127.0.0.1:7890"
+#export https_proxy="http://127.0.0.1:7890"
+#export all_proxy="socks5://127.0.0.1:7891"
+#
+#export HTTP_PROXY="$http_proxy"
+#export HTTPS_PROXY="$https_proxy"
+#export ALL_PROXY="$all_proxy"
+#
 # ------------------------------------------------------------------------------
 # 11. Tools & CLI Integrations
 # ------------------------------------------------------------------------------
@@ -492,3 +490,6 @@ export PATH="/home/chakew/.kimi-code/bin:$PATH"
 if [[ -r "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
+
+# Wallpaper Console cached palette variables.
+source "$HOME/Projects/wallpaper-console-rust/examples/theme-focus-follow/zsh-theme.zsh"

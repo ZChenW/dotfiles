@@ -23,7 +23,7 @@ output_path = '/home/chakew/.config/niri/clavis/colors.kdl'
 
 [templates.quickshell-colors]
 input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/quickshell-colors.json'
-output_path = '/home/chakew/.cache/quickshell-dev-colorscheme/colors.json'
+output_path = '/home/chakew/.local/share/clavis/profiles/default/generated/clavis/colors.json'
 
 [templates.waybar-colors]
 input_path = '/home/chakew/.local/share/quickshell/clavis/matugen/templates/waybar-colors.css'

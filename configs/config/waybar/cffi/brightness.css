@@ -1,0 +1,4 @@
+/* Slider trough visible while the native group drawer is open. */
+#backlight-slider.per-output-brightness trough {
+  opacity: 1;
+}

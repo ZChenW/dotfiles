@@ -124,6 +124,16 @@ fork and exact commit in `packages/quickshell-source.conf`, built without root,
 and kept at `${XDG_DATA_HOME:-~/.local/share}/quickshell/clavis`. A dirty or
 unrelated directory at that path is never overwritten.
 
+For the current CMake-based personal Clavis checkout, clone the private
+`git@github.com:ZChenW/clavis-personal.git` repository into
+`~/Projects/clavis-personal` and pass
+`QUICKSHELL_LOCAL_SOURCE="$HOME/Projects/clavis-personal"` when invoking the
+installer. This source mode builds into `<source>/build/qml`, points
+`~/.config/quickshell/clavis` at that checkout, and records the runtime path
+for `desktop-shell`. It preserves local source changes and does not invoke
+the legacy source installer. Keep this checkout at the selected path; no
+separate `clavis-upstream-migration` folder is needed.
+
 ## Config Groups
 
 | Group | Restored paths |

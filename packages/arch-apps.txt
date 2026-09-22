@@ -5,6 +5,7 @@ cabal-install
 capitaine-cursors
 chromium
 clang
+cloud-image-utils
 corepack
 ctags
 evtest
@@ -15,6 +16,7 @@ firefox
 fzf
 gcc-fortran
 ghc
+gnome-keyring
 gst-libav
 gst-plugins-base
 gst-plugins-good
@@ -23,6 +25,8 @@ jq
 jujutsu
 jupyterlab
 kvantum
+kwallet-pam
+kwalletmanager
 less
 libreoffice-still
 libreoffice-still-zh-cn
@@ -45,6 +49,7 @@ python-dbus
 python-ipykernel
 python-pip
 python-scikit-learn
+qemu-base
 qt6-lottie
 qtkeychain-qt6
 quickshell
@@ -79,6 +84,7 @@ vlc
 webkit2gtk-4.1
 webkitgtk-6.0
 wget
+whisper-cpp
 yt-dlp
 zathura
 zathura-pdf-mupdf

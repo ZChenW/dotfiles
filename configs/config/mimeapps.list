@@ -4,3 +4,8 @@ application/x-zerosize=code.desktop;
 [Default Applications]
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
 x-scheme-handler/antigravity=antigravity.desktop
+x-scheme-handler/grokbot=grok-bot.desktop
+x-scheme-handler/sand=grok-bot.desktop
+text/plain=nvim.desktop
+text/markdown=nvim.desktop
+application/json=nvim.desktop

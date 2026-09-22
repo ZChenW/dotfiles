@@ -38,8 +38,8 @@ input {
         tap
         // dwt
         // dwtp
-        // drag false
-        // drag-lock
+        drag true
+        drag-lock
 	//natural-scroll
         // accel-speed 0.2
         // accel-profile "flat"
@@ -111,7 +111,7 @@ input {
     position x=1280 y=0
 }
 
-output "eDP-1" {
+/-output "eDP-1" {
     mode "1920x1200@60.002"
     scale 1.4
     position x=0 y=0
@@ -705,3 +705,15 @@ include optional=true "clavis/colors.kdl"
 // BEGIN CLAVIS CURSOR
 include optional=true "clavis/cursor.kdl"
 // END CLAVIS CURSOR
+
+include "clavis/effects.kdl";
+
+include "clavis/layer-rules.kdl";
+
+// DP-8 is wired to the NVIDIA GPU while eDP-1 is on the AMD iGPU. Rendering on
+// the iGPU forced every external-monitor frame through a cross-GPU copy that
+// capped it at ~22 fps. Render where the external output is attached instead.
+// Revert by deleting this block if the laptop panel regresses.
+debug {
+    render-drm-device "/dev/dri/renderD129"
+}

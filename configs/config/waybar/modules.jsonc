@@ -283,69 +283,8 @@
     "on-scroll-up": "true",
     "on-scroll-down": "true"
   },
-  //内屏亮度
-  "backlight/slider": {
-    "min": 5,
-    "max": 98,
-    "orientation": "horizontal",
-    "device": "amdgpu_bl1",
-  },
-  "backlight": {
-    "device": "amdgpu_bl1",
-    "tooltip": true,
-    "tooltip-format": "调节内屏亮度",
-    "format": "{icon}",
-    "format-icons": [
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ""
-    ],
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh -5%",
-  },
-  //调节外接屏幕亮度
-  "group/ddcutil": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-left-to-right": false,
-    },
-    "modules": [
-      "custom/ddcutil-day",
-      "backlight/slider",
-      "backlight",
-      "custom/separator#1",
-      "custom/ddcutil-sleep",
-      "custom/ddcutil-night",
-    ],
-  },
-  "custom/ddcutil-day": {
-    "tooltip-format": "左键：100%外接屏幕亮度\n右键：切换护眼模式",
-    "format": "󰃠",
-    "on-click": "ddcutil --display 1 setvcp 10 100 ",
-    "on-click-right": "~/.local/bin/toggle-wlsunset",
-    "on-scroll-up": "true",
-    "on-scroll-down": "true"
-  },
-  "custom/ddcutil-night": {
-    "tooltip-format": "左键：65%外接屏幕亮度",
-    "format": "󰃟",
-    "on-click": "ddcutil --display 1 setvcp 10 65 ",
-    "on-scroll-up": "true",
-    "on-scroll-down": "true"
-  },
-  "custom/ddcutil-sleep": {
-    "tooltip-format": "左键：5%外接屏幕亮度",
-    "format": "󰃞",
-    "on-click": "ddcutil --display 1 setvcp 10 5 ",
-    "on-scroll-up": "true",
-    "on-scroll-down": "true"
-  },
+  // 亮度 group/ddcutil 由 brightness-edp.jsonc / brightness-dp.jsonc 率先定义。
+  // Waybar include 合并规则是「先写入的生效」，后文件不能覆盖已有键。
   //swaync通知模块
   "custom/swaync": {
     "tooltip": false,

@@ -137,4 +137,114 @@ if install_desktop_shell_profile "$repo_root" dual false >"$tmp_dir/dirty.out" 2
 fi
 grep -Fq "has local changes" "$tmp_dir/dirty.out"
 
+cmake_fixture="$tmp_dir/cmake-source"
+mkdir -p "$cmake_fixture"
+printf 'qml\n' >"$cmake_fixture/shell.qml"
+printf 'cmake_minimum_required(VERSION 3.21)\nproject(TestClavis)\n' \
+    >"$cmake_fixture/CMakeLists.txt"
+cat >"$cmake_fixture/install.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'forbidden-install-sh %s\n' "$*" >>"$DOTFILES_TEST_COMMAND_LOG"
+echo "upstream install.sh must not run for local CMake source" >&2
+exit 99
+EOF
+chmod +x "$cmake_fixture/install.sh"
+
+cat >"$fake_bin/cmake" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'cmake %s\n' "$*" >>"$DOTFILES_TEST_COMMAND_LOG"
+
+if [[ "${1:-}" == -S && "${3:-}" == -B ]]; then
+    mkdir -p "$4"
+    exit 0
+fi
+if [[ "${1:-}" == --build ]]; then
+    mkdir -p "$2/qml/Clavis"
+    exit 0
+fi
+echo "unexpected cmake invocation: $*" >&2
+exit 2
+EOF
+chmod +x "$fake_bin/cmake"
+
+cat >"$fake_bin/ninja" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'ninja %s\n' "$*" >>"$DOTFILES_TEST_COMMAND_LOG"
+EOF
+chmod +x "$fake_bin/ninja"
+
+cat >"$fake_bin/ctest" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'ctest %s\n' "$*" >>"$DOTFILES_TEST_COMMAND_LOG"
+if [[ -n "${DOTFILES_TEST_CTEST_FAIL:-}" ]]; then
+    echo "simulated ctest failure" >&2
+    exit 1
+fi
+EOF
+chmod +x "$fake_bin/ctest"
+
+printf '#!/usr/bin/env bash\n' >"$fake_bin/key"
+printf '#!/usr/bin/env bash\n' >"$fake_bin/keytop"
+chmod +x "$fake_bin/key" "$fake_bin/keytop"
+mkdir -p "$fake_home/.local/lib/qt6/qml/M3Shapes"
+
+state_dir="$fake_home/.local/state/dotfiles"
+mkdir -p "$state_dir"
+printf '/prior/active/config\n' >"$state_dir/quickshell-config-path"
+printf 'legacy-ref\n' >"$state_dir/quickshell-install-ref"
+
+: >"$command_log"
+export QUICKSHELL_LOCAL_SOURCE="$cmake_fixture"
+export DOTFILES_TEST_CTEST_FAIL=1
+if install_desktop_shell_profile "$repo_root" dual false >"$tmp_dir/local-fail.out" 2>&1; then
+    echo "Local source install succeeded despite ctest failure" >&2
+    exit 1
+fi
+unset DOTFILES_TEST_CTEST_FAIL
+grep -Fq "simulated ctest failure" "$tmp_dir/local-fail.out"
+grep -Fq "ctest " "$command_log"
+[[ "$(cat "$state_dir/quickshell-config-path")" == /prior/active/config ]]
+[[ "$(cat "$state_dir/quickshell-install-ref")" == legacy-ref ]]
+if grep -Fq 'forbidden-install-sh ' "$command_log"; then
+    echo "Local source install invoked upstream install.sh" >&2
+    exit 1
+fi
+if grep -Eq 'git .*fetch|git .*checkout' "$command_log"; then
+    echo "Local source install performed git fetch/checkout" >&2
+    exit 1
+fi
+
+: >"$command_log"
+printf 'legacy-clavis\n' >"$fake_home/.local/lib/qt6/qml/Clavis/sentinel"
+install_desktop_shell_profile "$repo_root" dual false >"$tmp_dir/local-ok.out"
+grep -Fq "cmake -S $cmake_fixture -B $cmake_fixture/build -G Ninja" "$command_log"
+grep -Fq "cmake --build $cmake_fixture/build" "$command_log"
+grep -Fq "ctest --test-dir $cmake_fixture/build" "$command_log"
+if grep -Fq 'forbidden-install-sh ' "$command_log"; then
+    echo "Successful local source install invoked upstream install.sh" >&2
+    exit 1
+fi
+if grep -Eq 'git .*fetch|git .*checkout|git init' "$command_log"; then
+    echo "Successful local source install touched git checkout flow" >&2
+    exit 1
+fi
+[[ "$(cat "$fake_home/.local/lib/qt6/qml/Clavis/sentinel")" == legacy-clavis ]]
+[[ -d "$cmake_fixture/build/qml/Clavis" ]]
+[[ "$(cat "$state_dir/quickshell-config-path")" == "$fake_home/.config/quickshell/clavis" ]]
+[[ "$(readlink -f "$fake_home/.config/quickshell/clavis")" == "$cmake_fixture" ]]
+grep -Eq '^local-source ref=none state=clean manifest=[0-9a-f]{64}$' \
+    "$state_dir/quickshell-install-ref"
+
+QUICKSHELL_LOCAL_SOURCE=relative/path
+if install_desktop_shell_profile "$repo_root" dual false >"$tmp_dir/relative.out" 2>&1; then
+    echo "Relative QUICKSHELL_LOCAL_SOURCE was accepted" >&2
+    exit 1
+fi
+grep -Fq "must be an absolute directory" "$tmp_dir/relative.out"
+[[ "$(cat "$state_dir/quickshell-config-path")" == "$fake_home/.config/quickshell/clavis" ]]
+
 echo "Desktop shell source installation tests passed"

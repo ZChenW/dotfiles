@@ -1,0 +1,9 @@
+// Managed by Clavis.
+layer-rule {
+    match namespace="^clavis-shell-";
+    background-effect { xray false; };
+}
+window-rule {
+    match title="^(clavis-control-center(-[a-z-]+)?|clavis-file-picker)$";
+    background-effect { xray false; };
+}

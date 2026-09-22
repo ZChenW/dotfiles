@@ -46,6 +46,19 @@ Preview first:
 
 ## Notes
 
+The current personal Clavis source is maintained in the private
+[`ZChenW/clavis-personal`](https://github.com/ZChenW/clavis-personal) repository.
+For the CMake-based desktop, clone it once and select it explicitly:
+
+```bash
+git clone git@github.com:ZChenW/clavis-personal.git ~/Projects/clavis-personal
+QUICKSHELL_LOCAL_SOURCE="$HOME/Projects/clavis-personal" ./install.sh --yes --desktop-shell dual
+```
+
+This builds the local source and keeps Waybar/QuickShell switching available.
+Without `QUICKSHELL_LOCAL_SOURCE`, the installer uses the legacy pinned source
+in `packages/quickshell-source.conf`. See [the install guide](docs/INSTALL.md).
+
 - Arch Linux only.
 - Installs real files, not symlinks.
 - Existing files are backed up to `~/.dotfiles-backups/`.

@@ -1,6 +1,12 @@
 // Managed by Clavis. Manual edits will be replaced.
+output "DP-8" {
+    mode "2560x1440@99.946"
+    scale 1
+    position x=-4388 y=0
+}
 output "eDP-1" {
     mode "2560x1600@240.000"
-    scale 1.45
-    position x=0 y=0
+    scale 1.4
+    position x=-1828 y=149
+    variable-refresh-rate
 }

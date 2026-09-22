@@ -14,19 +14,25 @@ if [[ "$action" == --worker ]]; then
 fi
 status_format=auto
 
-quickshell_config="${QUICKSHELL_CONFIG_PATH:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 state_dir="$state_home/dotfiles"
 state_file="$state_dir/desktop-shell"
 profile_file="$state_dir/desktop-shell-profile"
 lock_file="$state_dir/desktop-shell.lock"
 log_file="$state_dir/desktop-shell.log"
+config_path_marker="$state_dir/quickshell-config-path"
 idle_control_marker="$state_home/idle-control/active"
 swayidle_script="${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/swayidle.sh"
 notification_bus_name=org.freedesktop.Notifications
 notify_enabled="${DESKTOP_SHELL_NOTIFY:-1}"
 script_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
+legacy_default_quickshell_config="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis"
 desktop_shell_profile=dual
+desktop_integration_probed=false
+desktop_integration_version=""
+quickshell_prepared_for_waybar=false
+quickshell_wallpaper_retained=false
+
 if [[ -f "$profile_file" ]]; then
     read -r desktop_shell_profile <"$profile_file" || desktop_shell_profile=dual
 fi
@@ -34,13 +40,6 @@ case "$desktop_shell_profile" in
     waybar | quickshell | dual) ;;
     *) desktop_shell_profile=dual ;;
 esac
-
-user_qml_dir="$HOME/.local/lib/qt6/qml"
-case ":${QML_IMPORT_PATH:-}:" in
-    *":$user_qml_dir:"*) ;;
-    *) QML_IMPORT_PATH="$user_qml_dir${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}" ;;
-esac
-export QML_IMPORT_PATH
 
 usage() {
     cat >&2 <<'EOF'
@@ -88,6 +87,105 @@ notify() {
     [[ "$notify_enabled" == 1 ]] || return 0
     command -v notify-send >/dev/null 2>&1 || return 0
     notify-send "Desktop shell" "$1" >/dev/null 2>&1 || true
+}
+
+resolve_quickshell_config() {
+    local candidate=""
+
+    if [[ -n "${QUICKSHELL_CONFIG_PATH:-}" ]]; then
+        printf '%s\n' "$QUICKSHELL_CONFIG_PATH"
+        return 0
+    fi
+
+    if [[ -f "$config_path_marker" ]]; then
+        IFS= read -r candidate <"$config_path_marker" || candidate=""
+        candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+        candidate="${candidate%"${candidate##*[![:space:]]}"}"
+        if [[ "$candidate" == /* && -f "$candidate/shell.qml" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+        log "ignoring invalid quickshell-config-path marker: ${candidate:-<empty>}"
+    fi
+
+    printf '%s\n' "$legacy_default_quickshell_config"
+}
+
+quickshell_config="$(resolve_quickshell_config)"
+
+# Plain path markers, never sourced as shell code. Explicit environment wins.
+if [[ -f "$quickshell_config/AppShell.qml" && ! -f "$quickshell_config/controlcenter.qml" ]]; then
+    if [[ -z "${CLAVIS_KEY:-}" && -f "$state_dir/quickshell-key-path" ]]; then
+        IFS= read -r candidate_key <"$state_dir/quickshell-key-path" || candidate_key=""
+        if [[ "$candidate_key" == /* && -x "$candidate_key" ]]; then
+            export CLAVIS_KEY="$candidate_key"
+        fi
+    fi
+    if [[ -z "${QUICKSHELL_EXTRA_QML_PATH:-}" && -f "$state_dir/quickshell-extra-qml-path" ]]; then
+        IFS= read -r candidate_qml <"$state_dir/quickshell-extra-qml-path" || candidate_qml=""
+        if [[ "$candidate_qml" == /* && -d "$candidate_qml" ]]; then
+            export QUICKSHELL_EXTRA_QML_PATH="$candidate_qml"
+        fi
+    fi
+    # Disable internal idle actions from the first frame, before IPC is ready.
+    export CLAVIS_EXTERNAL_IDLE_OWNER=0
+    [[ ! -f "$idle_control_marker" ]] || export CLAVIS_EXTERNAL_IDLE_OWNER=1
+    # Clavis jemalloc defaults: skip only when the session already set MALLOC_CONF
+    # (including an explicit empty value). Matches docs/development.md.
+    if [[ ! -v MALLOC_CONF ]]; then
+        export MALLOC_CONF='thp:never,narenas:4,dirty_decay_ms:3000'
+    fi
+fi
+
+configure_qml_import_path() {
+    local user_qml_dir="$HOME/.local/lib/qt6/qml"
+    local build_qml="$quickshell_config/build/qml"
+
+    case ":${QML_IMPORT_PATH:-}:" in
+        *":$user_qml_dir:"*) ;;
+        *) QML_IMPORT_PATH="$user_qml_dir${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}" ;;
+    esac
+
+    if [[ -n "${QUICKSHELL_EXTRA_QML_PATH:-}" && -d "$QUICKSHELL_EXTRA_QML_PATH" ]]; then
+        QML_IMPORT_PATH="$QUICKSHELL_EXTRA_QML_PATH${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+        # User-level Qt dependencies can also provide location plugins and
+        # their shared libraries. Keep their lookup scoped to this shell.
+        local dependency_lib dependency_plugins
+        dependency_lib="$(readlink -f -- "$QUICKSHELL_EXTRA_QML_PATH/../..")"
+        dependency_plugins="$(readlink -f -- "$QUICKSHELL_EXTRA_QML_PATH/../plugins")"
+        if [[ "$QUICKSHELL_EXTRA_QML_PATH" == */lib/qt6/qml && -d "$dependency_lib" ]]; then
+            export LD_LIBRARY_PATH="$dependency_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        fi
+        if [[ "$QUICKSHELL_EXTRA_QML_PATH" == */lib/qt6/qml && -d "$dependency_plugins" ]]; then
+            export QT_PLUGIN_PATH="$dependency_plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+        fi
+    fi
+
+    # Upstream build trees must win over an older global Clavis install.
+    if [[ -d "$build_qml" ]]; then
+        QML_IMPORT_PATH="$build_qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+    fi
+
+    export QML_IMPORT_PATH
+}
+
+configure_qml_import_path
+
+# Propagate an absolute key-cli when the session already exported one.
+if [[ -n "${CLAVIS_KEY:-}" ]]; then
+    export CLAVIS_KEY
+fi
+
+reset_desktop_integration_cache() {
+    desktop_integration_probed=false
+    desktop_integration_version=""
+    quickshell_prepared_for_waybar=false
+}
+
+quickshell_is_upstream_tree() {
+    [[ -f "$quickshell_config/shell.qml" ]] \
+        && [[ -f "$quickshell_config/AppShell.qml" ]] \
+        && [[ ! -f "$quickshell_config/controlcenter.qml" ]]
 }
 
 validate_profile_action() {
@@ -174,12 +272,62 @@ process_running() {
     return 1
 }
 
+quickshell_ipc() {
+    qs ipc --path "$quickshell_config" "$@"
+}
+
+quickshell_ipc_call() {
+    quickshell_ipc call "$@"
+}
+
+quickshell_ipc_call_output() {
+    local output=""
+    if command -v timeout >/dev/null 2>&1; then
+        output="$(timeout 1s qs ipc --path "$quickshell_config" call "$@" 2>/dev/null || true)"
+    else
+        output="$(qs ipc --path "$quickshell_config" call "$@" 2>/dev/null || true)"
+    fi
+    output="${output%%$'\n'*}"
+    output="${output//$'\r'/}"
+    output="${output#"${output%%[![:space:]]*}"}"
+    output="${output%"${output##*[![:space:]]}"}"
+    printf '%s\n' "$output"
+}
+
 quickshell_running() {
     command -v qs >/dev/null 2>&1 || return 1
     if command -v timeout >/dev/null 2>&1; then
         timeout 1s qs ipc --path "$quickshell_config" show >/dev/null 2>&1
     else
         qs ipc --path "$quickshell_config" show >/dev/null 2>&1
+    fi
+}
+
+probe_desktop_integration() {
+    local output=""
+
+    [[ "$desktop_integration_probed" == true ]] && return 0
+    desktop_integration_probed=true
+    desktop_integration_version=""
+
+    quickshell_running || return 1
+    output="$(quickshell_ipc_call_output desktop-integration version)"
+    [[ -n "$output" ]] || return 1
+    desktop_integration_version="$output"
+    return 0
+}
+
+has_desktop_integration() {
+    probe_desktop_integration || return 1
+    [[ "$desktop_integration_version" == "1" || "$desktop_integration_version" == "2" ]]
+}
+
+has_idle_ipc() {
+    quickshell_running || return 1
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 1s qs ipc --path "$quickshell_config" call idle owner >/dev/null 2>&1
+    else
+        qs ipc --path "$quickshell_config" call idle owner >/dev/null 2>&1
     fi
 }
 
@@ -198,23 +346,152 @@ wait_for_quickshell() {
     return 1
 }
 
+wait_for_desktop_integration_ready() {
+    local attempt=0
+    local output=""
+
+    if ! has_desktop_integration; then
+        ! quickshell_is_upstream_tree
+        return $?
+    fi
+
+    while ((attempt < 60)); do
+        output="$(quickshell_ipc_call_output desktop-integration ping)"
+        case "$output" in
+            READY)
+                return 0
+                ;;
+            PENDING | "")
+                ;;
+            *)
+                log "QuickShell desktop-integration ping returned: ${output:-<empty>}"
+                return 1
+                ;;
+        esac
+        sleep 0.1
+        ((attempt += 1))
+    done
+    log "QuickShell desktop-integration ping timed out while PENDING"
+    return 1
+}
+
+settle_quickshell_wallpaper() {
+    # Version 2 owns wallpaper handoff itself, including a saved WC backend.
+    # Never fall back to stop when the new protocol is unavailable or pending.
+    if [[ "$desktop_integration_version" != "2" ]]; then
+        run_wallpaper_console stop
+        return $?
+    fi
+    local output="" attempt=0
+    while ((attempt < 100)); do
+        output="$(quickshell_ipc_call_output desktop-integration settleWallpaper)"
+        case "$output" in
+            WC | WC_FALLBACK | LOCAL) return 0 ;;
+            PENDING | "") ;;
+            *) log "wallpaper handoff failed: ${output}"; return 1 ;;
+        esac
+        sleep 0.1
+        ((attempt += 1))
+    done
+    log "wallpaper handoff timed out; preserving renderer ownership"
+    return 1
+}
+
+prepare_quickshell_for_waybar() {
+    local attempt=0
+    local output=""
+
+    quickshell_prepared_for_waybar=false
+    quickshell_wallpaper_retained=false
+    if ! has_desktop_integration; then
+        ! quickshell_is_upstream_tree
+        return $?
+    fi
+
+    # Even PENDING or a lost response may have changed the wallpaper owner.
+    quickshell_prepared_for_waybar=true
+    output="$(quickshell_ipc_call_output desktop-integration prepareWaybar)"
+    case "$output" in
+        READY_WC)
+            [[ "$desktop_integration_version" == "2" ]] || return 1
+            quickshell_wallpaper_retained=true
+            return 0
+            ;;
+        READY)
+            quickshell_prepared_for_waybar=true
+            return 0
+            ;;
+        PENDING) ;;
+        *)
+            log "QuickShell prepareWaybar returned: ${output:-<empty>}"
+            return 1
+            ;;
+    esac
+
+    while ((attempt < 50)); do
+        output="$(quickshell_ipc_call_output desktop-integration prepareWaybar)"
+        case "$output" in
+            READY_WC)
+                [[ "$desktop_integration_version" == "2" ]] || return 1
+                quickshell_wallpaper_retained=true
+                return 0
+                ;;
+            READY)
+                quickshell_prepared_for_waybar=true
+                return 0
+                ;;
+            PENDING) ;;
+            *)
+                log "QuickShell prepareWaybar returned: ${output:-<empty>}"
+                return 1
+                ;;
+        esac
+        sleep 0.1
+        ((attempt += 1))
+    done
+
+    log "QuickShell prepareWaybar timed out while PENDING"
+    return 1
+}
+
+resume_quickshell_after_prepare() {
+    [[ "$quickshell_prepared_for_waybar" == true ]] || return 0
+    quickshell_prepared_for_waybar=false
+    quickshell_running || return 0
+    has_desktop_integration || return 0
+    local output=""
+    output="$(quickshell_ipc_call_output desktop-integration resume)"
+    if [[ "$output" != READY ]]; then
+        log "warning: QuickShell resume returned: ${output:-<empty>}"
+        return 1
+    fi
+    return 0
+}
+
 stop_quickshell() {
     local escaped_config
+    local exact_stop=false
 
-    quickshell_running || return 0
+    # Upstream must not globally pkill quickshell: auxiliary configs such as the
+    # mode switcher share that process name. Stop only the selected main path
+    # and the supervisor that relaunches it.
+    if quickshell_is_upstream_tree || has_desktop_integration; then
+        exact_stop=true
+    fi
 
-    # `qs kill` stops the active config, but the long-lived Quickshell crash
-    # supervisor can immediately launch it again. Stop both layers before
-    # considering the Waybar handoff complete.
     qs kill --path "$quickshell_config" >>"$log_file" 2>&1 || true
     escaped_config="$(printf '%s' "$quickshell_config" \
         | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
-    # Keep auxiliary configs such as switcher.qml alive while stopping only
-    # the supervisor whose --path is exactly the main Clavis directory.
     pkill -f -- "(^|/)qs .*--path $escaped_config($| )" \
         >/dev/null 2>&1 || true
-    pkill -x quickshell >/dev/null 2>&1 || true
-    wait_for_quickshell stopped
+    if [[ "$exact_stop" == false ]]; then
+        pkill -x quickshell >/dev/null 2>&1 || true
+    fi
+    if wait_for_quickshell stopped; then
+        reset_desktop_integration_cache
+        return 0
+    fi
+    return 1
 }
 
 ensure_process() {
@@ -340,12 +617,31 @@ stop_swayidle() {
 }
 
 sync_quickshell_idle_owner() {
-    quickshell_running || return 0
     local external_owner=false
-    [[ -f "$idle_control_marker" ]] && external_owner=true
-    qs ipc --path "$quickshell_config" call idle setExternalOwner "$external_owner" \
-        >>"$log_file" 2>&1 \
-        || log "warning: QuickShell idle ownership could not be synchronized"
+    local require_success=false
+
+    quickshell_running || return 0
+    [[ -f "$idle_control_marker" ]] && external_owner=true && require_success=true
+
+    if qs ipc --path "$quickshell_config" call idle setExternalOwner "$external_owner" \
+            >>"$log_file" 2>&1; then
+        return 0
+    fi
+
+    if [[ "$require_success" == true ]]; then
+        # Upstream (and any shell that advertises idle IPC) must honor the
+        # external-owner marker before Waybar is removed. Legacy trees without
+        # the idle handler may still warn and continue.
+        if quickshell_is_upstream_tree || has_desktop_integration || has_idle_ipc; then
+            log "cannot synchronize QuickShell idle ownership while Idle Control is active"
+            return 1
+        fi
+        log "warning: legacy QuickShell idle ownership capability is unavailable"
+        return 0
+    fi
+
+    log "warning: QuickShell idle ownership could not be synchronized"
+    return 0
 }
 
 run_wallpaper_console() {
@@ -368,6 +664,13 @@ activate_waybar() {
         waybar_was_running=true
     fi
 
+    local brightness_build="${XDG_CONFIG_HOME:-$HOME/.config}/waybar/cffi/build.sh"
+    if [[ -x "$brightness_build" ]] && ! "$brightness_build" >>"$log_file" 2>&1; then
+        log "cannot activate Waybar: brightness module build failed"
+        notify "Waybar brightness module could not be prepared"
+        return 1
+    fi
+
     # Keep the current shell visible until Waybar has successfully appeared.
     if ! ensure_process waybar "$waybar_bin"; then
         log "cannot activate waybar: process did not start"
@@ -375,8 +678,23 @@ activate_waybar() {
         return 1
     fi
 
-    if ! run_wallpaper_console restore; then
+    if quickshell_running; then
+        if ! prepare_quickshell_for_waybar; then
+            log "cannot activate Waybar: QuickShell did not prepare for handoff"
+            resume_quickshell_after_prepare \
+                || log "warning: QuickShell did not resume after prepare failure"
+            if [[ "$waybar_was_running" == false ]]; then
+                stop_process waybar || true
+            fi
+            notify "QuickShell could not prepare for Waybar; QuickShell was kept"
+            return 1
+        fi
+    fi
+
+    if [[ "$quickshell_wallpaper_retained" != true ]] && ! run_wallpaper_console restore; then
         log "cannot activate Waybar: Wallpaper Console did not restore"
+        resume_quickshell_after_prepare \
+            || log "warning: QuickShell did not resume after Wallpaper Console restore failure"
         if quickshell_running || [[ "$waybar_was_running" == false ]]; then
             stop_process waybar || true
         fi
@@ -387,8 +705,12 @@ activate_waybar() {
     if quickshell_running; then
         if ! stop_quickshell; then
             log "cannot activate Waybar: QuickShell did not stop"
-            run_wallpaper_console stop \
-                || log "warning: Wallpaper Console did not stop during rollback"
+            resume_quickshell_after_prepare \
+                || log "warning: QuickShell did not resume during rollback"
+            if [[ "$desktop_integration_version" != "2" ]]; then
+                run_wallpaper_console stop \
+                    || log "warning: Wallpaper Console did not stop during rollback"
+            fi
             stop_process waybar || log "warning: Waybar did not stop during rollback"
             notify "QuickShell did not stop; Waybar switch was rolled back"
             return 1
@@ -415,9 +737,11 @@ activate_quickshell() {
         || log "warning: no Secret Service provider is available; weather API keys cannot be read"
 
     if quickshell_running; then
-        qs ipc --path "$quickshell_config" \
-            call weather-map reloadCredentials >/dev/null 2>&1 \
-            || log "warning: weather credentials could not be refreshed"
+        if ! quickshell_is_upstream_tree; then
+            qs ipc --path "$quickshell_config" \
+                call weather-map reloadCredentials >/dev/null 2>&1 \
+                || log "warning: weather credentials could not be refreshed"
+        fi
         stop_process mako || true
         if ! wait_for_quickshell_notification_owner; then
             log "cannot reconcile QuickShell: notification ownership was not acquired"
@@ -425,9 +749,21 @@ activate_quickshell() {
             notify "QuickShell could not acquire notifications"
             return 1
         fi
-        if ! run_wallpaper_console stop; then
-            log "cannot reconcile QuickShell: Wallpaper Console backends did not stop"
-            notify "Wallpaper renderer could not be stopped"
+        if ! wait_for_desktop_integration_ready; then
+            log "cannot reconcile QuickShell: desktop integration was not ready"
+            ensure_mako || log "warning: Mako did not restart after readiness failure"
+            notify "QuickShell did not become ready"
+            return 1
+        fi
+        if ! sync_quickshell_idle_owner; then
+            log "cannot reconcile QuickShell: idle ownership sync failed"
+            ensure_mako || log "warning: Mako did not restart after idle sync failure"
+            notify "QuickShell idle ownership could not be synchronized"
+            return 1
+        fi
+        if ! settle_quickshell_wallpaper; then
+            log "cannot reconcile QuickShell: wallpaper ownership did not settle"
+            notify "Wallpaper ownership could not be settled"
             return 1
         fi
         if ! stop_process waybar; then
@@ -437,7 +773,6 @@ activate_quickshell() {
         fi
         stop_waybar_companions
         stop_swayidle
-        sync_quickshell_idle_owner
         write_state quickshell
         log "QuickShell was already running; reconciled companion services"
         notify "QuickShell mode"
@@ -447,10 +782,14 @@ activate_quickshell() {
     # QuickShell owns org.freedesktop.Notifications. Stop Mako before launch so
     # the notification server is registered during initial configuration load.
     stop_process mako || true
+    reset_desktop_integration_cache
+    # Prefer a direct Quickshell path launch. key shell is unnecessary when the
+    # selected tree already provides shell.qml; CLAVIS_KEY is left for the shell.
     start_detached "$qs_bin" --no-duplicate --path "$quickshell_config"
 
     if ! wait_for_quickshell running; then
         log "QuickShell failed to become ready; restoring Waybar companions"
+        stop_quickshell || log "warning: QuickShell supervisor did not stop after startup failure"
         ensure_mako || true
         notify "QuickShell failed to start; Waybar was kept"
         return 1
@@ -464,13 +803,29 @@ activate_quickshell() {
         return 1
     fi
 
-    if ! run_wallpaper_console stop; then
-        log "cannot activate QuickShell: Wallpaper Console backends did not stop"
+    if ! wait_for_desktop_integration_ready; then
+        log "QuickShell desktop integration was not ready; restoring Waybar companions"
+        stop_quickshell || log "warning: QuickShell did not stop after readiness failure"
+        ensure_mako || log "warning: Mako did not restart after readiness failure"
+        notify "QuickShell did not become ready; Waybar was kept"
+        return 1
+    fi
+
+    if ! sync_quickshell_idle_owner; then
+        log "cannot activate QuickShell: idle ownership sync failed before removing Waybar"
+        stop_quickshell || log "warning: QuickShell did not stop after idle sync failure"
+        ensure_mako || log "warning: Mako did not restart after idle sync failure"
+        notify "QuickShell idle ownership could not be synchronized; Waybar was kept"
+        return 1
+    fi
+
+    if ! settle_quickshell_wallpaper; then
+        log "cannot activate QuickShell: wallpaper ownership did not settle"
         if ! stop_quickshell; then
             log "warning: QuickShell did not stop cleanly during rollback"
         fi
         ensure_mako || log "warning: Mako did not restart during rollback"
-        notify "Wallpaper renderer could not be stopped; Waybar was kept"
+        notify "Wallpaper ownership could not be settled; Waybar was kept"
         return 1
     fi
 
@@ -488,7 +843,6 @@ activate_quickshell() {
     fi
     stop_waybar_companions
     stop_swayidle
-    sync_quickshell_idle_owner
     write_state quickshell
     log "activated QuickShell from $quickshell_config"
     notify "QuickShell mode"
@@ -525,8 +879,14 @@ start_saved_mode() {
 call_quickshell() {
     local target="$1"
     local function_name="$2"
+    shift 2
     quickshell_running || return 1
-    qs ipc --path "$quickshell_config" call "$target" "$function_name"
+    qs ipc --path "$quickshell_config" call "$target" "$function_name" "$@"
+}
+
+uses_upstream_ipc() {
+    has_desktop_integration && return 0
+    quickshell_is_upstream_tree
 }
 
 show_switcher() {
@@ -568,8 +928,11 @@ mode_label() {
 print_plain_status() {
     local configured="$1"
     local active="$2"
+    local switching=0
+    switch_lock_available || switching=1
     printf 'profile=%s\nconfigured=%s\nactive=%s\nquickshell_config=%s\n' \
         "$desktop_shell_profile" "$configured" "$active" "$quickshell_config"
+    printf 'switching=%s\n' "$switching"
 }
 
 print_pretty_status() {
@@ -691,7 +1054,11 @@ case "$action" in
         show_switcher
         ;;
     launcher)
-        call_quickshell launcher toggle || exec fuzzel
+        if uses_upstream_ipc; then
+            call_quickshell spotlight toggle || exec fuzzel
+        else
+            call_quickshell launcher toggle || exec fuzzel
+        fi
         ;;
     lock)
         call_quickshell lock open || exec swaylock -f
@@ -704,7 +1071,12 @@ case "$action" in
         ;;
     control-center)
         if quickshell_running; then
-            start_detached qs --no-duplicate --path "$quickshell_config/controlcenter.qml"
+            if uses_upstream_ipc; then
+                call_quickshell control-center toggle "" \
+                    || notify "QuickShell control center is unavailable"
+            else
+                start_detached qs --no-duplicate --path "$quickshell_config/controlcenter.qml"
+            fi
         else
             notify "Switch to QuickShell to use its control center"
         fi

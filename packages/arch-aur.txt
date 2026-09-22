@@ -7,6 +7,7 @@ blueberry
 cursor-bin
 darkly-bin
 ddcutil-service
+grok-bot-bin
 hyprmag-git
 libffi7
 maplemono-nf-cn-unhinted

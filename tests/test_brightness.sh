@@ -4,7 +4,6 @@ set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 script="$repo_root/configs/config/niri/scripts/brightness.sh"
-waybar_modules="$repo_root/configs/config/waybar/modules.jsonc"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -122,36 +121,44 @@ if [[ "$commands_after" != "$commands_before" ]]; then
     exit 1
 fi
 
-slider_config="$(awk '
-    /^  "backlight\/slider": \{/ { capture = 1 }
-    capture { print }
-    capture && /^  \},$/ { exit }
-' "$waybar_modules")"
-backlight_config="$(awk '
-    /^  "backlight": \{/ { capture = 1 }
-    capture { print }
-    capture && /^  \},$/ { exit }
-' "$waybar_modules")"
-
-grep -Fq '"device": "amdgpu_bl1"' <<<"$slider_config" || {
-    echo "Waybar slider is not pinned to the integrated panel backlight" >&2
+# Brightness keeps the native group/ddcutil drawer. Waybar include merge is
+# first-write-wins, so brightness-* overlays must be listed before bar-common.
+waybar_config="$repo_root/configs/config/waybar/config.jsonc"
+waybar_common="$repo_root/configs/config/waybar/bar-common.jsonc"
+if grep -Eq '^[[:space:]]*"group/ddcutil"[[:space:]]*:' "$waybar_common"; then
+    echo "group/ddcutil definition must not be in bar-common; it would block per-output overlays" >&2
     exit 1
-}
-grep -Fq '"max": 98' <<<"$slider_config" || {
-    echo "Waybar slider can still cross the calibrated 98% safe ceiling" >&2
+fi
+if grep -Eq '^[[:space:]]*"group/ddcutil"[[:space:]]*:' "$repo_root/configs/config/waybar/modules.jsonc"; then
+    echo "group/ddcutil definition must not be in modules.jsonc; Waybar cannot override it later" >&2
     exit 1
-}
-grep -Fq '"device": "amdgpu_bl1"' <<<"$backlight_config" || {
-    echo "Waybar backlight indicator is not pinned to the integrated panel" >&2
-    exit 1
-}
-grep -Fq 'brightness.sh +5%' <<<"$backlight_config" || {
-    echo "Waybar scroll-up bypasses the calibrated brightness helper" >&2
-    exit 1
-}
-grep -Fq 'brightness.sh -5%' <<<"$backlight_config" || {
-    echo "Waybar scroll-down bypasses the calibrated brightness helper" >&2
-    exit 1
-}
-
+fi
+grep -Fq '"output": "eDP-1"' "$waybar_config"
+grep -Fq '"output": "DP-8"' "$waybar_config"
+grep -Fq 'brightness-edp.jsonc' "$waybar_config"
+grep -Fq 'brightness-dp.jsonc' "$waybar_config"
+grep -Fq '"cffi/brightness"' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
+grep -Fq '"backlight/slider"' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
+grep -Fq -- '--output eDP-1' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
+grep -Fq -- '--output DP-8' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
+python3 - "$repo_root/configs/config/waybar/config.jsonc" <<'PY'
+import json, re, sys, pathlib
+text = pathlib.Path(sys.argv[1]).read_text()
+out = []
+for line in text.splitlines():
+    if "//" in line and "http" not in line:
+        line = line[: line.find("//")]
+    out.append(line)
+cfg = json.loads(re.sub(r"/\*.*?\*/", "", "\n".join(out), flags=re.S))
+for bar in cfg:
+    inc = bar["include"]
+    bright = next(
+        i
+        for i, name in enumerate(inc)
+        if name.startswith("brightness-") and name.endswith(".jsonc") and "module" not in name
+    )
+    common = inc.index("bar-common.jsonc")
+    assert bright < common, (bar.get("output"), inc)
+print("include order ok")
+PY
 printf 'Waybar and QuickShell-compatible brightness tests passed\n'

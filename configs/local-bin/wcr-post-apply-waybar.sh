@@ -20,18 +20,30 @@ if [[ -z "$still" || ! -f "$still" ]]; then
 fi
 
 pipeline="${QUICKSHELL_THEME_PIPELINE:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis/scripts/theme/generate_themes.sh}"
-if [[ -x "$pipeline" ]]; then
+if [[ "${WCR_THEME_PREGENERATED:-0}" == 1 ]]; then
+  : # The combined hook already activated a complete palette under the Clavis lock.
+elif [[ -x "$pipeline" ]]; then
   "$pipeline" --image "$still" \
     || echo "wcr-post-apply-waybar: theme pipeline failed" >&2
 else
   echo "wcr-post-apply-waybar: generate_themes.sh not found at $pipeline" >&2
 fi
 
-# Notify QuickShell (clavis) that an external renderer now owns the background.
-if command -v qs >/dev/null 2>&1; then
-  quickshell_config="${QUICKSHELL_CONFIG_PATH:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis}"
-  qs ipc --path "$quickshell_config" call wallpaper externalApplied \
-    "$still" "${WCR_BACKEND:-}" >/dev/null 2>&1 || true
-fi
+# Notify Clavis / QuickShell that the live palette files changed.
+notify_clavis() {
+  if command -v key >/dev/null 2>&1; then
+    key ipc call wallpaper externalApplied "$still" "${WCR_BACKEND:-}" >/dev/null 2>&1 && return 0
+    key ipc call wallpaper reloadColors >/dev/null 2>&1 && return 0
+  fi
+  if command -v qs >/dev/null 2>&1; then
+    quickshell_config="${QUICKSHELL_CONFIG_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/clavis}"
+    qs ipc --path "$quickshell_config" call wallpaper externalApplied \
+      "$still" "${WCR_BACKEND:-}" >/dev/null 2>&1 && return 0
+    qs ipc --path "$quickshell_config" call wallpaper reloadColors >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
+notify_clavis || true
 
 exit 0

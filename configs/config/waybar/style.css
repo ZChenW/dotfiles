@@ -1,5 +1,12 @@
 @import "colors.css";
+@import "cffi/brightness.css";
 /* @import "/home/shorin/.cache/wal/colors-waybar.css"; */
+
+/* CFFI 只嵌入 group/ddcutil 抽屉，承接与 #backlight 相同的色带，避免整块挤成一坨。 */
+#cffi-brightness {
+  background-color: @surface_container_high;
+  padding: 0;
+}
 
 /* 核心逻辑：全相对单位 (em) 改造
    基准字体大小：18px

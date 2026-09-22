@@ -3,3 +3,6 @@ docs/SNAPSHOT.md
 docs/UPDATE.md
 AGENTS.md
 docs/agents/
+
+# Generated user-specific CFFI loader path
+configs/config/waybar/brightness-module.json

@@ -23,7 +23,6 @@ fcitx5-qt
 fcitx5-rime
 gnome-calendar
 gnome-clocks
-gwenview
 hyprpicker
 kdialog
 kdiskmark
