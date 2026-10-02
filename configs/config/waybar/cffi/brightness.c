@@ -6,8 +6,10 @@
 #include <gtk/gtk.h>
 #include <gtk-layer-shell.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef struct wbcffi_module wbcffi_module;
 typedef struct {
@@ -92,6 +94,8 @@ static void done(GObject *source, GAsyncResult *result, gpointer data) {
     gboolean ok = g_subprocess_communicate_utf8_finish(G_SUBPROCESS(source), result, &out, &err, &error);
     if (ok) ok = g_subprocess_get_successful(G_SUBPROCESS(source));
     g_clear_object(&b->process);
+    /* Refresh the native percentage label (custom/ddcutil-day, "signal": 11). */
+    if (ok) kill(getpid(), SIGRTMIN + 11);
     if (!b->closed) {
         if (!ok) {
             b->ready = FALSE;
@@ -171,8 +175,9 @@ static void set_value(Brightness *b, int value) {
     b->updating = FALSE;
     update_level_icon(b);
     tooltip(b, NULL);
-    if (b->debounce) g_source_remove(b->debounce);
-    b->debounce = g_timeout_add(150, flush, b);
+    /* Bound the wait from the first event. Restarting the timer on every drag
+     * event starves hardware updates until the user releases the slider. */
+    if (!b->debounce) b->debounce = g_timeout_add(150, flush, b);
 }
 
 static void changed(GtkRange *range, gpointer data) {

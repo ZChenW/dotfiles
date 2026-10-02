@@ -1,11 +1,11 @@
 // Matugen — niri 配色（clavis 统一主题管线）
 layout {
     focus-ring {
-        active-color "#a6d700"
-        inactive-color "#333628"
+        active-color "#ffb2bc"
+        inactive-color "#413032"
     }
     border {
-        active-color "#a6d700"
-        inactive-color "#282b1e"
+        active-color "#ffb2bc"
+        inactive-color "#362628"
     }
 }

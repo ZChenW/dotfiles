@@ -133,13 +133,13 @@ if grep -Eq '^[[:space:]]*"group/ddcutil"[[:space:]]*:' "$repo_root/configs/conf
     echo "group/ddcutil definition must not be in modules.jsonc; Waybar cannot override it later" >&2
     exit 1
 fi
-grep -Fq '"output": "eDP-1"' "$waybar_config"
+grep -Fq '"output": ["eDP-1", "eDP-2"]' "$waybar_config"
 grep -Fq '"output": "DP-8"' "$waybar_config"
 grep -Fq 'brightness-edp.jsonc' "$waybar_config"
 grep -Fq 'brightness-dp.jsonc' "$waybar_config"
 grep -Fq '"cffi/brightness"' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
 grep -Fq '"backlight/slider"' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
-grep -Fq -- '--output eDP-1' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
+grep -Fq -- '--output internal' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
 grep -Fq -- '--output DP-8' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
 python3 - "$repo_root/configs/config/waybar/config.jsonc" <<'PY'
 import json, re, sys, pathlib

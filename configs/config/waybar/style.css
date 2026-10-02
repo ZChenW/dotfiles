@@ -147,35 +147,56 @@ window#waybar.empty #window {
   font-size: 1.39em; /* 25px */
 }
 
-#bluetooth {
-  padding: 0px 0.3em 0px 0.5em; /* 7px */
-  font-size: 1.25em; /* 20px */
-  font-family: "Maple Mono NF", "Symbols Nerd Font", "Noto Sans", sans-serif;
-}
-#bluetooth.disabled {
-  padding: 0px 0.22em 0px 0.46em;
+/* 图标格：所有纯图标模块共用同一字号和固定宽度，图标在格内居中，
+   这样相邻图标的中心距恒定。新增纯图标模块时把选择器加到这里即可。 */
+#bluetooth,
+#network,
+#custom-settings,
+#custom-screenshot,
+#custom-wfrec,
+#power-profiles-daemon,
+#custom-colorpicker,
+#custom-displays,
+#custom-idle-control,
+#custom-desktop-shell,
+#custom-applauncher,
+#custom-ddcutil-night,
+#custom-ddcutil-sleep,
+#backlight,
+#custom-wlogout,
+#custom-reboot,
+#custom-lockscreen,
+#custom-logout {
+  /* Maple Mono NF 内嵌的图标字形左右留白不对称，会让图标偏离格子中心，
+     所以图标格优先用 Symbols Nerd Font。 */
+  font-family: "Symbols Nerd Font", "Maple Mono NF", "Noto Sans", sans-serif;
+  font-size: 1.2em; /* 20px */
+  min-width: 1.5em; /* 30px */
+  padding: 0;
+  margin: 0;
 }
 
-#network {
-  padding: 0px 0.34em; /* 7px */
-  font-size: 1.2em; /* 22px */
-  font-family: "Maple Mono NF", "Symbols Nerd Font", "Noto Sans", sans-serif;
-}
-
-#custom-settings {
-  padding: 0px 0.39em; /* 7px */
-  font-size: 1.06em; /* 19px */
-}
-
-#custom-screenshot {
-  padding: 0 0.4em; /* 7px */
-  font-size: 1.28em; /* 22px */
-}
-
-/* wf-recoder脚本 */
-#custom-wfrec {
-  padding: 0 0.3em; /* 7px */
-  font-size: 1.1em;
+/* custom 模块和 CFFI 亮度图标的文字在容器内层的 label 上，而 `*` 规则把
+   label 的字号钉回了基准值、容器的 min-width 也不会让 label 居中，
+   所以让内层 label 继承字号并自己撑满格宽。 */
+#custom-settings label,
+#custom-screenshot label,
+#custom-wfrec label,
+#custom-colorpicker label,
+#custom-displays label,
+#custom-idle-control label,
+#custom-desktop-shell label,
+#custom-applauncher label,
+#custom-ddcutil-night label,
+#custom-ddcutil-sleep label,
+#backlight label,
+#custom-wlogout label,
+#custom-reboot label,
+#custom-lockscreen label,
+#custom-logout label {
+  font-family: inherit;
+  font-size: inherit;
+  min-width: 1.5em; /* 30px */
 }
 
 #custom-wfrec.recording,
@@ -206,17 +227,10 @@ window#waybar.empty #window {
 
 #power-profiles-daemon,
 #custom-colorpicker,
+#custom-displays,
 #custom-idle-control {
   background-color: @primary;
   color: @on_primary;
-  padding: 0px 0.36em; /* 6px */
-}
-#power-profiles-daemon {
-  padding: 0px 0.4em 0em 0.36em;
-}
-#power-profiles-daemon.performance {
-  font-size: 1.28em; /* 23px */
-  padding: 0px 0.32em 0px 0.45em; /* 9px 8px */
 }
 
 /* 菜单 */
@@ -226,18 +240,8 @@ window#waybar.empty #window {
 }
 #custom-applauncher,
 #custom-desktop-shell {
-  font-size: 1.39em; /* 25px */
-  padding: 0px 0.39em; /* 7px */
-  margin: 0px;
   background-color: @primary;
   color: @on_primary;
-}
-#custom-desktop-shell {
-  font-size: 1.12em;
-  padding: 0 0.51em 0 0.34em;
-}
-#custom-applauncher {
-  padding: 0 0.39em 0 0.23em;
 }
 #custom-right_div.1,
 #custom-left_div.1 {
@@ -355,21 +359,42 @@ window#waybar.empty #window {
 #custom-ddcutil-day,
 #custom-ddcutil-night,
 #custom-ddcutil-sleep,
+#backlight,
 #custom-separator.1 {
   background-color: @surface_container_high;
   color: @primary;
-  padding: 0px 0.33em; /* 5px */
 }
 
-#backlight {
-  background-color: @surface_container_high;
-  color: @primary;
-  padding: 0px 0.28em 0px 0px; /* 5px */
+/* 亮度 / 音量 / 麦克风：「图标 百分比」，写法与 cpu / memory 一致。
+   图标优先取 Symbols Nerd Font（字形居中），数字回落到 Maple Mono。 */
+#custom-ddcutil-day,
+#custom-ddcutil-day label,
+#backlight.stat,
+#pulseaudio {
+  font-family: "Symbols Nerd Font", "Maple Mono NF", "Noto Sans", sans-serif;
+}
+#custom-ddcutil-day,
+#backlight.stat,
+#pulseaudio {
+  font-size: 1em;
+  min-width: 0;
+  padding: 0px 0.45em;
+  margin: 0;
+}
+/* 静音时整项变暗；muted 类描述的是扬声器，所以要排除麦克风实例。 */
+#pulseaudio.muted:not(.microphone),
+#pulseaudio.microphone.source-muted {
+  color: @outline;
+}
+
+#custom-separator.1 {
+  padding: 0;
 }
 
 #backlight-slider {
   background-color: @surface_container_high;
-  padding: 0px 0.28em 0px 0px; /* 5px */
+  padding: 0px 0.28em; /* 5px */
+  margin: 0px;
 }
 
 #backlight-slider slider {
@@ -386,12 +411,11 @@ window#waybar.empty #window {
   min-height: 0.56em; /* 10px */
   min-width: 4.44em; /* 80px */
   border-radius: 0.28em; /* 5px */
-  opacity: 0;
-  background-color: @background;
+  background-color: @surface;
 }
 
 #backlight-slider highlight {
-  min-width: 0.56em; /* 10px */
+  min-width: 0px;
   border-radius: 0.28em; /* 5px */
   background-color: @primary;
 }
@@ -406,12 +430,8 @@ window#waybar.empty #window {
   color: @error;
 }
 
-#pulseaudio {
-  padding: 0px 0px 0px 0.28em; /* 5px */
-}
-
 #pulseaudio-slider {
-  padding: 0px 0px 0px 0.56em; /* 10px */
+  padding: 0px 0.28em; /* 5px */
   margin: 0px;
 }
 
@@ -476,18 +496,12 @@ window#waybar.empty #window {
   padding: 0px;
   font-size: 1.39em; /* 25px */
 }
-#custom-wlogout {
-  padding: 0px 0.83em 0px 0.56em; /* 15px 10px */
-  font-size: 1.39em; /* 25px */
-}
-
 #custom-wlogout,
 #custom-reboot,
 #custom-lockscreen,
 #custom-logout {
   background-color: @surface;
   color: @error;
-  padding: 0px 0.56em; /* 10px */
 }
 
 #clock.date {

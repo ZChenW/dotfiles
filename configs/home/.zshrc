@@ -204,7 +204,7 @@ alias gst='git status'
 alias condaa='conda activate'
 alias condac='conda create -n'
 alias condad='conda deactivate'
-alias cs336="conda activate cs336"
+alias 2048llm="conda activate 2048llm"
 
 alias codex-pro='env -u CODEX_HOME codex --profile deepseek-pro'
 alias codex-flash='env -u CODEX_HOME codex --profile deepseek-flash'
@@ -472,11 +472,6 @@ codex2() {
 [ -s "/home/chakew/.bun/_bun" ] && source "/home/chakew/.bun/_bun"
 
 # --- grok ---
-# >>> grok installer >>>
-export PATH="$HOME/.grok/bin:$PATH"
-fpath=(~/.grok/completions/zsh $fpath)
-autoload -Uz compinit && compinit -C
-# <<< grok installer <<<
 
 # kimi-code
 export PATH="/home/chakew/.kimi-code/bin:$PATH"
@@ -493,3 +488,9 @@ fi
 
 # Wallpaper Console cached palette variables.
 source "$HOME/Projects/wallpaper-console-rust/examples/theme-focus-follow/zsh-theme.zsh"
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<

@@ -1,0 +1,112 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -19,7 +19,7 @@
+ futures = "0.3.31"
+ itertools = "0.14.0"
+ linicon = "2.3.0"
+-niri-ipc = ">=25.11.0, <25.12.0"
++niri-ipc = "=26.4.0"
+ regex = "1.12.2"
+ serde = { version = "1.0.228", features = ["derive"] }
+ thiserror = "2.0.17"
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -953,9 +953,9 @@
+ 
+ [[package]]
+ name = "niri-ipc"
+-version = "25.11.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "12bd9eb4e437f5282ce853cf66837658379cb537b4b6bae687da59246005329a"
++version = "26.4.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "6a4adbddf4037ce047854d36a60b5bf80a7990b8db2f0a0b9ede7534b0bae09a"
+ dependencies = [
+  "serde",
+  "serde_json",
+@@ -1370,15 +1370,15 @@
+ 
+ [[package]]
+ name = "serde_json"
+-version = "1.0.145"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
++version = "1.0.151"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+ dependencies = [
+  "itoa",
+  "memchr",
+- "ryu",
+  "serde",
+  "serde_core",
++ "zmij",
+ ]
+ 
+ [[package]]
+@@ -2164,6 +2164,12 @@
+ ]
+ 
+ [[package]]
++name = "zmij"
++version = "1.0.23"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
++
++[[package]]
+ name = "zvariant"
+ version = "5.7.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+--- a/src/button.rs
++++ b/src/button.rs
+@@ -145,6 +145,7 @@
+     #[tracing::instrument(level = "TRACE")]
+     fn connect_size_allocate(&self, icon_path: Option<PathBuf>) {
+         let last_size = RefCell::new(None);
++        let fixed_icon_size = self.state.config().icon_size();
+ 
+         self.button
+             .connect_size_allocate(move |button, allocation| {
+@@ -194,10 +195,15 @@
+                     let margin = context.margin(StateFlags::NORMAL);
+                     let padding = context.padding(StateFlags::NORMAL);
+ 
+-                    let size = allocation.height()
+-                        - border.vertical_size()
+-                        - margin.vertical_size()
+-                        - padding.vertical_size();
++                    // A configured size must not depend on the current allocation:
++                    // a temporarily tall sibling would otherwise enlarge the icon
++                    // and prevent the whole bar from shrinking again.
++                    let size = fixed_icon_size.unwrap_or_else(|| {
++                        allocation.height()
++                            - border.vertical_size()
++                            - margin.vertical_size()
++                            - padding.vertical_size()
++                    });
+ 
+                     // Now we know the size, we can actually load the image.
+                     let image =
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -13,6 +13,8 @@
+     notifications: Notifications,
+     #[serde(default)]
+     show_all_outputs: bool,
++    #[serde(default, rename = "icon-size", alias = "icon_size")]
++    icon_size: Option<i32>,
+ }
+ 
+ #[derive(Debug, Deserialize)]
+@@ -43,6 +45,11 @@
+ }
+ 
+ impl Config {
++    /// A fixed logical icon size avoids retaining a transient bar height.
++    pub fn icon_size(&self) -> Option<i32> {
++        self.icon_size.map(|size| size.clamp(1, 256))
++    }
++
+     /// Returns all possible CSS classes that a particular application might have set.
+     pub fn app_classes(&self, app_id: &str) -> Vec<&str> {
+         self.apps

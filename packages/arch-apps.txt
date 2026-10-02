@@ -8,11 +8,11 @@ clang
 cloud-image-utils
 corepack
 ctags
+discord
 evtest
 ex-vi-compat
 feh
 ffmpegthumbnailer
-firefox
 fzf
 gcc-fortran
 ghc
@@ -40,8 +40,6 @@ npm
 ntfs-3g
 nvm
 nvtop
-openai-codex
-opencode
 pandoc-cli
 plasma-integration
 pnpm
