@@ -206,6 +206,7 @@ window#waybar.empty #window {
 
 #power-profiles-daemon,
 #custom-colorpicker,
+#custom-displays,
 #custom-idle-control {
   background-color: @primary;
   color: @on_primary;

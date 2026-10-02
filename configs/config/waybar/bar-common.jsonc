@@ -7,6 +7,7 @@
     ],
     "layer": "top",
     "position": "top",
+    "height": 36,
     "fixed-center": true,
     "reload_style_on_change": true,
     "modules-left": [
@@ -25,6 +26,7 @@
         "custom/left_div#2",
         "custom/idle-control",
         "custom/colorpicker",
+        "custom/displays",
         "power-profiles-daemon",
         "custom/left_div#11",
         "custom/left_div#1",
@@ -48,6 +50,7 @@
         "group/ddcutil",
         "privacy",
         "group/audio",
+        "pulseaudio#microphone",
         "custom/left_div#8",
         "battery",
         "custom/left_div#5",

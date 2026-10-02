@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: ${0##*/} [--output CONNECTOR|--external] {--get|+PERCENT%|-PERCENT%|PERCENT%-|--set-percent PERCENT}" >&2
+    echo "Usage: ${0##*/} [--output CONNECTOR|--output internal|--external] {--get|+PERCENT%|-PERCENT%|PERCENT%-|--set-percent PERCENT}" >&2
 }
 
 explicit_output=""
@@ -53,6 +53,20 @@ path_is_within() {
     [[ "$candidate" == "$parent" || "$candidate" == "$parent/"* ]]
 }
 
+# The laptop panel is eDP-1 on the iGPU in hybrid mode and eDP-2 on the dGPU
+# in discrete mode; "internal" lets callers avoid hard-coding either.
+if [[ "$explicit_output" == internal ]]; then
+    shopt -s nullglob
+    for entry in "$drm_root"/card*-*; do
+        [[ "$(normalize_connector "$entry")" =~ ^(eDP|LVDS|DSI)- ]] || continue
+        [[ -f "$entry/status" && "$(<"$entry/status")" == connected ]] || continue
+        explicit_output="$(normalize_connector "$entry")"
+        break
+    done
+    shopt -u nullglob
+    [[ "$explicit_output" != internal ]] || { echo "No internal panel is connected" >&2; exit 1; }
+fi
+
 focused_connector="$(normalize_connector "$explicit_output")"
 if [[ -z "$focused_connector" ]]; then
     if focused_output="$(niri msg focused-output 2>/dev/null)" \
@@ -70,8 +84,6 @@ fi
 if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$focused_connector" =~ ^(eDP|LVDS|DSI)- ]]; }; then
     cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/brightness"
     mkdir -p "$cache_root"
-    exec 8>"$cache_root/ddc.lock"
-    flock -w 5 8 || { echo "External brightness control is busy" >&2; exit 1; }
 
     cache_key="${focused_connector//\//_}"
     [[ "$cache_key" =~ ^[A-Za-z0-9._:-]+$ ]] || cache_key="unknown"
@@ -86,6 +98,61 @@ if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$f
         [[ "$selected_bus" =~ ^[0-9]+$ ]] || selected_bus=""
         [[ "$cached_maximum" =~ ^[1-9][0-9]*$ ]] || cached_maximum=""
     fi
+
+    # Scroll bursts spawn one process per wheel step. Each one only records the
+    # newest wanted raw value ("VALUE SEQ") and the first to own the DDC lock
+    # writes it; the rest find their request already applied and exit.
+    target_file="$cache_root/target-$cache_key"
+    applied_file="$cache_root/applied-$cache_key"
+    state_value=""
+    state_seq=0
+    read_state() {
+        local value="" seq=""
+        state_value=""
+        state_seq=0
+        [[ -f "$1" ]] && read -r value seq <"$1" || true
+        [[ "$value" =~ ^[0-9]+$ && "$seq" =~ ^[0-9]+$ ]] || return 1
+        state_value=$((10#$value))
+        state_seq=$((10#$seq))
+    }
+    write_state() {
+        local tmp
+        tmp="$(mktemp "$cache_root/state.XXXXXX")"
+        printf '%s %s\n' "$2" "$3" >"$tmp"
+        mv -f "$tmp" "$1"
+    }
+    # queue_target MAXIMUM [BASE]: without BASE, a relative step builds on the
+    # last requested value, which is only trusted for a minute.
+    queue_target() {
+        local maximum="$1" base="${2:-}" target age
+        exec 9>"$cache_root/target.lock"
+        flock 9
+        read_state "$target_file" || true
+        if [[ -n "$percent" ]]; then
+            target=$(((maximum * percent + 50) / 100))
+        else
+            if [[ -z "$base" && -n "$state_value" ]]; then
+                age=$(($(date +%s) - $(stat -c %Y "$target_file")))
+                ((age < 60)) && base="$state_value"
+            fi
+            [[ -n "$base" ]] || { flock -u 9; return 1; }
+            [[ "$adjustment" =~ ^([+-])([0-9]+)%$ ]]
+            target=$(((maximum * 10#${BASH_REMATCH[2]} + 50) / 100))
+            if [[ "${BASH_REMATCH[1]}" == + ]]; then target=$((base + target)); else target=$((base - target)); fi
+        fi
+        ((target < 0)) && target=0
+        ((target > maximum)) && target="$maximum"
+        write_state "$target_file" "$target" $((state_seq + 1))
+        flock -u 9
+    }
+
+    queued=false
+    if [[ "$get_only" == false && -n "$selected_bus" && -n "$cached_maximum" ]] && queue_target "$cached_maximum"; then
+        queued=true
+    fi
+
+    exec 8>"$cache_root/ddc.lock"
+    flock -w 5 8 || { echo "External brightness control is busy" >&2; exit 1; }
 
     discover_ddc_bus() {
         local detection line bus connector match_count index
@@ -138,7 +205,7 @@ if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$f
 
     read_vcp() {
         local vcp
-        vcp="$(LC_ALL=C ddcutil -b "$selected_bus" getvcp 10 --brief)" || return 1
+        vcp="$(LC_ALL=C ddcutil -b "$selected_bus" --skip-ddc-checks getvcp 10 --brief)" || return 1
         [[ "$vcp" =~ ^VCP[[:space:]]+10[[:space:]]+C[[:space:]]+([0-9]+)[[:space:]]+([0-9]+)[[:space:]]*$ ]] || return 1
         current=$((10#${BASH_REMATCH[1]}))
         maximum=$((10#${BASH_REMATCH[2]}))
@@ -158,8 +225,9 @@ if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$f
 
     current=""
     maximum="$cached_maximum"
-    # Absolute presets only need the bus + known max; skip the slow getvcp round trip.
-    if [[ -n "$percent" && -n "$maximum" ]]; then
+    # A queued request already knows the bus, the max and its base value; skip
+    # the slow getvcp round trip.
+    if [[ "$queued" == true ]]; then
         :
     elif ! read_vcp; then
         rm -f "$bus_cache"
@@ -177,23 +245,32 @@ if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$f
     fi
 
     if [[ "$get_only" == true ]]; then
+        # A real reading is the new base for relative steps unless one is pending.
+        exec 9>"$cache_root/target.lock"
+        flock 9
+        read_state "$target_file" || true
+        pending_seq="$state_seq"
+        if ! read_state "$applied_file" || [[ "$state_seq" == "$pending_seq" ]]; then
+            write_state "$target_file" "$current" "$pending_seq"
+            write_state "$applied_file" "$current" "$pending_seq"
+        fi
+        flock -u 9
         printf '%s,%s,%s,%s,%s\n' "$focused_connector" "$current" "$current" "$(((current * 100 + maximum / 2) / maximum))" "$maximum"
         exit 0
     fi
-    if [[ -n "$percent" ]]; then
-        target=$(((maximum * percent + 50) / 100))
-    else
-        [[ "$adjustment" =~ ^([+-])([0-9]+)%$ ]]
-        sign="${BASH_REMATCH[1]}"
-        delta=$(((maximum * 10#${BASH_REMATCH[2]} + 50) / 100))
-        if [[ "$sign" == + ]]; then target=$((current + delta)); else target=$((current - delta)); fi
+    [[ "$queued" == true ]] || queue_target "$maximum" "$current"
+    read_state "$target_file"
+    target="$state_value"
+    target_seq="$state_seq"
+    if read_state "$applied_file" && [[ "$state_seq" == "$target_seq" ]]; then
+        exit 0
     fi
-    ((target < 0)) && target=0
-    ((target > maximum)) && target="$maximum"
-    if ! LC_ALL=C ddcutil -b "$selected_bus" setvcp 10 "$target"; then
+    # Verification and capability probing triple the DDC round trip.
+    if ! LC_ALL=C ddcutil -b "$selected_bus" --noverify --skip-ddc-checks setvcp 10 "$target"; then
         rm -f "$bus_cache"
         exit 1
     fi
+    write_state "$applied_file" "$target" "$target_seq"
     exit 0
 fi
 

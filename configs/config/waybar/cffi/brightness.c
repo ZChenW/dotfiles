@@ -171,8 +171,9 @@ static void set_value(Brightness *b, int value) {
     b->updating = FALSE;
     update_level_icon(b);
     tooltip(b, NULL);
-    if (b->debounce) g_source_remove(b->debounce);
-    b->debounce = g_timeout_add(150, flush, b);
+    /* Bound the wait from the first event. Restarting the timer on every drag
+     * event starves hardware updates until the user releases the slider. */
+    if (!b->debounce) b->debounce = g_timeout_add(150, flush, b);
 }
 
 static void changed(GtkRange *range, gpointer data) {

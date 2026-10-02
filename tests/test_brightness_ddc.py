@@ -52,7 +52,7 @@ Display 3
             'ddcutil': '''case " $* " in
  *" detect "*) printf '%s\\n' "$TEST_DETECT"; exit "${TEST_DETECT_EXIT:-0}" ;;
  *" getvcp "*) printf '%s\\n' "$TEST_VCP"; exit "${TEST_READ_EXIT:-0}" ;;
- *" setvcp "*) printf 'DDC %s\\n' "$*" >> "$TEST_LOG"; exit "${TEST_WRITE_EXIT:-0}" ;;
+ *" setvcp "*) sleep "${TEST_WRITE_SLEEP:-0}"; printf 'DDC %s\\n' "$*" >> "$TEST_LOG"; exit "${TEST_WRITE_EXIT:-0}" ;;
  *) exit 2 ;;
 esac''',
         }
@@ -68,7 +68,7 @@ esac''',
     def test_external_focus_uses_ddc_not_gpu_backlight(self):
         result = self.run_script('-5%')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 70\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 70\n')
 
     def test_missing_ddc_never_falls_back_to_gpu(self):
         self.env['TEST_DETECT'] = ''
@@ -89,7 +89,7 @@ esac''',
         self.env['TEST_FOCUS'] = 'eDP-1'
         result = self.run_script('--external', '--set-percent', '65')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 130\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 130\n')
 
     def test_multiple_external_displays_require_focus(self):
         self.env['TEST_FOCUS'] = 'eDP-1'
@@ -101,7 +101,7 @@ esac''',
         self.env['TEST_FOCUS'] = 'eDP-1'
         result = self.run_script('--output', 'DP-8', '-5%')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 70\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 70\n')
 
     def test_explicit_external_read(self):
         self.env['TEST_FOCUS'] = 'eDP-1'
@@ -147,12 +147,12 @@ esac''',
         panel.rmdir()
         result = self.run_script('-5%')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 70\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 70\n')
 
     def test_clamps_to_monitor_maximum(self):
         result = self.run_script('+100%')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 200\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 200\n')
 
     def test_failed_ddc_write_is_reported(self):
         self.env['TEST_WRITE_EXIT'] = '1'
@@ -172,7 +172,29 @@ esac''',
         self.env['TEST_READ_EXIT'] = '1'
         result = self.run_script('--output', 'DP-8', '--set-percent', '65')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.log.read_text(), 'DDC -b 24 setvcp 10 130\n')
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 130\n')
+
+    def test_scroll_burst_coalesces_into_latest_target(self):
+        primed = self.run_script('--output', 'DP-8', '--get')
+        self.assertEqual(primed.returncode, 0, primed.stderr)
+        self.env['TEST_READ_EXIT'] = '1'
+        self.env['TEST_WRITE_SLEEP'] = '0.3'
+        burst = [subprocess.Popen([str(SCRIPT), '--output', 'DP-8', '+5%'], env=self.env)
+                 for _ in range(6)]
+        self.assertEqual([process.wait() for process in burst], [0] * 6)
+        writes = self.log.read_text().splitlines()
+        self.assertLess(len(writes), 6)
+        self.assertEqual(writes[-1], 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 140')
+
+    def test_stale_target_is_reread_before_relative_step(self):
+        primed = self.run_script('--output', 'DP-8', '--get')
+        self.assertEqual(primed.returncode, 0, primed.stderr)
+        target = Path(self.env['XDG_CACHE_HOME']) / 'dotfiles/brightness/target-DP-8'
+        os.utime(target, (0, 0))
+        self.env['TEST_VCP'] = 'VCP 10 C 120 200'
+        result = self.run_script('--output', 'DP-8', '+5%')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 130\n')
 
 if __name__ == '__main__':
     unittest.main()

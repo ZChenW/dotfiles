@@ -166,12 +166,10 @@
     ],
   },
   "pulseaudio": {
-    "tooltip-format": "左键：静音\n右键：关闭麦克风\n中键：打开面板",
-    "format": "{icon} {format_source} ",
-    "format-bluetooth": " {format_source} ",
-    "format-source": "{volume}%",
-    "format-source-muted": "",
-    "format-muted": " {format_source} ",
+    "tooltip-format": "扬声器：{volume}%\n左键：切换扬声器静音\n滚轮：调整音量\n右键 / 中键：打开输出面板",
+    "format": "{icon}",
+    "format-bluetooth": "",
+    "format-muted": "",
     "format-icons": {
       "headphone": "",
       "bluetooth": "",
@@ -183,8 +181,22 @@
       ],
     },
     "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+    "on-click-right": "pavucontrol --tab=3",
     "on-click-middle": "pavucontrol --tab=3",
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-",
+  },
+  "pulseaudio#microphone": {
+    "target": "source",
+    "tooltip-format": "麦克风：{source_desc}\n输入音量：{source_volume}%\n左键 / 右键：切换麦克风静音\n滚轮：调整输入音量\n中键：打开输入面板",
+    "format": "{format_source} ",
+    "format-bluetooth": "{format_source} ",
+    "format-muted": "{format_source} ",
+    "format-source": "{volume}%",
+    "format-source-muted": "",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+    "on-click-middle": "pavucontrol --tab=4",
     "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%+",
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%-",
   },
@@ -323,6 +335,11 @@
     "on-click": "hyprpicker | wl-copy",
     "tooltip-format": "左键：提取颜色",
   },
+  "custom/displays": {
+    "format": "󰍹",
+    "tooltip-format": "左键：显示器设置",
+    "on-click": "~/.config/waybar/scripts/display-settings.py"
+  },
   //音频可视化
   "custom/cava": {
     "tooltip": false,
@@ -363,7 +380,7 @@
     // module_path
     "module_path": "/home/chakew/.config/waybar/libniri_taskbar.so",
     "show_all_outputs": true,
-    "icon-size": 18,
+    "icon-size": 30,
     "use_desktop_entry": true,
     "use_fuzzy_matching": true,
     "on-click": "activate",

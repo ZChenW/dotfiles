@@ -21,8 +21,8 @@
       "",
       ""
     ],
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output eDP-1 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output eDP-1 -5%"
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output internal +5%",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output internal -5%"
   },
   "group/ddcutil": {
     "orientation": "inherit",
@@ -41,23 +41,23 @@
   "custom/ddcutil-day": {
     "tooltip-format": "左键：100%此屏幕亮度\n滚轮：±5%\n右键：切换护眼模式",
     "format": "󰃠",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output eDP-1 --set-percent 100",
+    "on-click": "~/.config/niri/scripts/brightness.sh --output internal --set-percent 100",
     "on-click-right": "~/.local/bin/toggle-wlsunset",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output eDP-1 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output eDP-1 -5%"
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output internal +5%",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output internal -5%"
   },
   "custom/ddcutil-night": {
     "tooltip-format": "左键：65%此屏幕亮度\n滚轮：±5%",
     "format": "󰃟",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output eDP-1 --set-percent 65",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output eDP-1 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output eDP-1 -5%"
+    "on-click": "~/.config/niri/scripts/brightness.sh --output internal --set-percent 65",
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output internal +5%",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output internal -5%"
   },
   "custom/ddcutil-sleep": {
     "tooltip-format": "左键：5%此屏幕亮度\n滚轮：±5%",
     "format": "󰃞",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output eDP-1 --set-percent 5",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output eDP-1 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output eDP-1 -5%"
+    "on-click": "~/.config/niri/scripts/brightness.sh --output internal --set-percent 5",
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output internal +5%",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output internal -5%"
   }
 }
