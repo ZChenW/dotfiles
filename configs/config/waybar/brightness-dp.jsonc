@@ -13,25 +13,29 @@
     ]
   },
   "custom/ddcutil-day": {
-    "tooltip-format": "左键：100%此屏幕亮度\n滚轮：±5%\n右键：切换护眼模式",
-    "format": "󰃠",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 100",
+    // 百分比由 brightness.sh 读取；CFFI 滑块写入完成后会发 RTMIN+11 触发刷新。
+    "exec": "~/.config/niri/scripts/brightness.sh --output DP-8 --get | cut -d, -f4",
+    "interval": 30,
+    "signal": 11,
+    "tooltip-format": "此屏幕亮度：{}%\n左键：100%\n滚轮：±5%\n右键：切换护眼模式",
+    "format": "󰃠 {}%",
+    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 100; pkill -RTMIN+11 -x waybar",
     "on-click-right": "~/.local/bin/toggle-wlsunset",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%"
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%; pkill -RTMIN+11 -x waybar",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%; pkill -RTMIN+11 -x waybar"
   },
   "custom/ddcutil-night": {
     "tooltip-format": "左键：65%此屏幕亮度\n滚轮：±5%",
     "format": "󰃟",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 65",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%"
+    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 65; pkill -RTMIN+11 -x waybar",
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%; pkill -RTMIN+11 -x waybar",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%; pkill -RTMIN+11 -x waybar"
   },
   "custom/ddcutil-sleep": {
     "tooltip-format": "左键：5%此屏幕亮度\n滚轮：±5%",
     "format": "󰃞",
-    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 5",
-    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%",
-    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%"
+    "on-click": "~/.config/niri/scripts/brightness.sh --output DP-8 --set-percent 5; pkill -RTMIN+11 -x waybar",
+    "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output DP-8 +5%; pkill -RTMIN+11 -x waybar",
+    "on-scroll-down": "~/.config/niri/scripts/brightness.sh --output DP-8 -5%; pkill -RTMIN+11 -x waybar"
   }
 }

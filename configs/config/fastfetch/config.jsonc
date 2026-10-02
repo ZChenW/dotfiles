@@ -97,6 +97,11 @@
             "keyColor": "red"
         },
         {
+            "type": "uptime",
+            "key": "  󰥔 Uptime",
+            "keyColor": "red"
+        },
+        {
             "type": "command",
             "key": "  🕒 New_York",
             "keyColor": "cyan",

@@ -28,6 +28,8 @@ static gboolean drag(gpointer unused) {
 }
 int main(int argc, char **argv) {
     gtk_init(&argc, &argv);
+    /* Waybar owns RTMIN+11; the module raises it after each successful write. */
+    signal(SIGRTMIN + 11, SIG_IGN);
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_layer_init_for_window(GTK_WINDOW(window));
     gtk_layer_set_namespace(GTK_WINDOW(window), "brightness-latency-test");

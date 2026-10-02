@@ -30,7 +30,7 @@
       "transition-left-to-right": false
     },
     "modules": [
-      "custom/ddcutil-day",
+      "backlight#stat",
       "backlight/slider",
       "backlight",
       "custom/separator#1",
@@ -38,9 +38,10 @@
       "custom/ddcutil-night"
     ]
   },
-  "custom/ddcutil-day": {
-    "tooltip-format": "左键：100%此屏幕亮度\n滚轮：±5%\n右键：切换护眼模式",
-    "format": "󰃠",
+  "backlight#stat": {
+    "device": "amdgpu_bl1",
+    "tooltip-format": "此屏幕亮度：{percent}%\n左键：100%\n滚轮：±5%\n右键：切换护眼模式",
+    "format": "󰃠 {percent}%",
     "on-click": "~/.config/niri/scripts/brightness.sh --output internal --set-percent 100",
     "on-click-right": "~/.local/bin/toggle-wlsunset",
     "on-scroll-up": "~/.config/niri/scripts/brightness.sh --output internal +5%",

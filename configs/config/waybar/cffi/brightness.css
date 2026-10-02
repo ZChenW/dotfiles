@@ -1,4 +1,1 @@
-/* Slider trough visible while the native group drawer is open. */
-#backlight-slider.per-output-brightness trough {
-  opacity: 1;
-}
+/* Slider trough styling lives in style.css (shared with the volume / mic sliders). */

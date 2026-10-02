@@ -43,7 +43,7 @@ class AudioControlsTest(unittest.TestCase):
     def microphone(self):
         for name in self.visible_modules():
             config = self.config.get(name, {})
-            if '' in config.get('format-source', '') or '' in config.get('format', ''):
+            if 'format-source' in config:
                 return name, config
         self.fail('No microphone control visible with drawers closed')
 

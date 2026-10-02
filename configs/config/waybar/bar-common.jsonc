@@ -50,7 +50,7 @@
         "group/ddcutil",
         "privacy",
         "group/audio",
-        "pulseaudio#microphone",
+        "group/microphone",
         "custom/left_div#8",
         "battery",
         "custom/left_div#5",

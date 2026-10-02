@@ -167,38 +167,45 @@
   },
   "pulseaudio": {
     "tooltip-format": "扬声器：{volume}%\n左键：切换扬声器静音\n滚轮：调整音量\n右键 / 中键：打开输出面板",
-    "format": "{icon}",
-    "format-bluetooth": "",
-    "format-muted": "",
-    "format-icons": {
-      "headphone": "",
-      "bluetooth": "",
-      // "speaker":"󰓃"
-      "speaker": [
-        "",
-        "",
-        ""
-      ],
-    },
+    "format": "󰕾 {volume}%",
+    "format-bluetooth": "󰋋 {volume}%",
+    "format-headphone": "󰋋 {volume}%",
+    "format-muted": "󰖁 {volume}%",
     "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
     "on-click-right": "pavucontrol --tab=3",
     "on-click-middle": "pavucontrol --tab=3",
     "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+",
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-",
   },
+  //麦克风模块
+  "group/microphone": {
+    "orientation": "inherit",
+    "drawer": {
+      "transition-left-to-right": false,
+    },
+    "modules": [
+      "pulseaudio#microphone",
+      "pulseaudio/slider#microphone"
+    ],
+  },
   "pulseaudio#microphone": {
-    "target": "source",
-    "tooltip-format": "麦克风：{source_desc}\n输入音量：{source_volume}%\n左键 / 右键：切换麦克风静音\n滚轮：调整输入音量\n中键：打开输入面板",
-    "format": "{format_source} ",
-    "format-bluetooth": "{format_source} ",
-    "format-muted": "{format_source} ",
-    "format-source": "{volume}%",
-    "format-source-muted": "",
+    "tooltip-format": "麦克风：{source_desc}\n输入音量：{source_volume}%\n左键：切换麦克风静音\n滚轮：调整输入音量\n右键 / 中键：打开输入面板",
+    "format": "{format_source}",
+    "format-bluetooth": "{format_source}",
+    "format-muted": "{format_source}",
+    "format-source": "󰍬 {volume}%",
+    "format-source-muted": "󰍭 {volume}%",
     "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
-    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+    "on-click-right": "pavucontrol --tab=4",
     "on-click-middle": "pavucontrol --tab=4",
     "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%+",
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%-",
+  },
+  "pulseaudio/slider#microphone": {
+    "target": "source",
+    "min": 0,
+    "max": 100,
+    "orientation": "horizontal",
   },
   "pulseaudio/slider": {
     "min": 0,

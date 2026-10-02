@@ -6,8 +6,10 @@
 #include <gtk/gtk.h>
 #include <gtk-layer-shell.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef struct wbcffi_module wbcffi_module;
 typedef struct {
@@ -92,6 +94,8 @@ static void done(GObject *source, GAsyncResult *result, gpointer data) {
     gboolean ok = g_subprocess_communicate_utf8_finish(G_SUBPROCESS(source), result, &out, &err, &error);
     if (ok) ok = g_subprocess_get_successful(G_SUBPROCESS(source));
     g_clear_object(&b->process);
+    /* Refresh the native percentage label (custom/ddcutil-day, "signal": 11). */
+    if (ok) kill(getpid(), SIGRTMIN + 11);
     if (!b->closed) {
         if (!ok) {
             b->ready = FALSE;
