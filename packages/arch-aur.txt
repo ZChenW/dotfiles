@@ -8,6 +8,7 @@ cursor-bin
 darkly-bin
 ddcutil-service
 grok-bot-bin
+herdcat-git
 hyprmag-git
 libffi7
 maplemono-nf-cn-unhinted
