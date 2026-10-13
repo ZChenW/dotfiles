@@ -157,7 +157,6 @@ verify_installation() {
     fi
     if group_selected apps "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.config/waypaper"
             "$HOME/.config/mimeapps.list"
             "$HOME/.config/user-dirs.dirs"
             "$HOME/.config/git/ignore"

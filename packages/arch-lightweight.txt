@@ -59,7 +59,6 @@ shellcheck
 slurp
 stylua
 swayidle
-swaybg
 swaylock-effects
 nautilus
 tree
@@ -70,7 +69,6 @@ uv
 vim
 visual-studio-code-bin
 waybar
-waypaper-git
 wget
 wf-recorder
 wl-clipboard

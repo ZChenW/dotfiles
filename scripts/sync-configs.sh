@@ -287,7 +287,6 @@ build_sync_mappings() {
         "terminal|$config_root/kitty|$HOME/.config/kitty|dir|required"
         "terminal|$config_root/fastfetch|$HOME/.config/fastfetch|dir|required"
         "terminal|$config_root/cava|$HOME/.config/cava|dir|required"
-        "apps|$config_root/waypaper|$HOME/.config/waypaper|dir|required"
         "apps|$config_root/mimeapps.list|$HOME/.config/mimeapps.list|644|required"
         "apps|$config_root/user-dirs.dirs|$HOME/.config/user-dirs.dirs|644|required"
         "apps|$config_root/git/ignore|$HOME/.config/git/ignore|644|required"

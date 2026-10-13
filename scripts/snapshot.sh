@@ -19,7 +19,6 @@ build_snapshot_mappings() {
     "file|$HOME/.config/idle-control/config.toml|configs/config/idle-control/config.toml|optional"
     "dir|$HOME/.config/kitty|configs/config/kitty|required"
     "dir|$HOME/.config/fastfetch|configs/config/fastfetch|required"
-    "dir|$HOME/.config/waypaper|configs/config/waypaper|required"
     "dir|$HOME/.config/fcitx5|configs/config/fcitx5|required"
     "dir|$HOME/.config/mako|configs/config/mako|required"
     "dir|$HOME/.config/environment.d|configs/config/environment.d|required"

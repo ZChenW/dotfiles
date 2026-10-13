@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Requires a live Wayland session with two outputs. Never writes real hardware.
+# Needs a live Wayland session with two active outputs and skips without them.
+# Never writes real hardware.
 set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp_dir="$(mktemp -d)"
@@ -27,5 +28,8 @@ else
 fi
 HELPER
 chmod +x "$tmp_dir/config/niri/scripts/brightness.sh"
-XDG_CONFIG_HOME="$tmp_dir/config" timeout 20s "$tmp_dir/probe"
+status=0
+XDG_CONFIG_HOME="$tmp_dir/config" timeout 20s "$tmp_dir/probe" || status=$?
+((status == 77)) && exit 0
+((status == 0))
 [[ "$(wc -l <"$tmp_dir/config/writes.log")" == 4 ]]

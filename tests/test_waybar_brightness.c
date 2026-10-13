@@ -49,7 +49,10 @@ static gboolean step(gpointer data) {
 int main(int argc, char **argv) {
     gtk_init(&argc, &argv);
     GdkDisplay *display = gdk_display_get_default();
-    check(gdk_display_get_n_monitors(display) >= 2, "two real monitors required");
+    if (gdk_display_get_n_monitors(display) < 2) {
+        g_printerr("SKIP: two active displays required\n");
+        return 77;
+    }
     for (int i = 0; i < 2; i++) {
         windows[i] = gtk_window_new(GTK_WINDOW_TOPLEVEL);
         gtk_layer_init_for_window(GTK_WINDOW(windows[i]));

@@ -1,8 +1,8 @@
 # Install Guide
 
 This repository restores an Arch Linux desktop setup with zsh, niri, Waybar,
-a wlogout power menu, wallpaper-driven colours, kitty, fastfetch, waypaper, and
-local launcher scripts.
+a wlogout power menu, wallpaper-driven colours, kitty, fastfetch, and local
+launcher scripts.
 
 ## Supported OS
 
@@ -137,7 +137,7 @@ Two pieces are installed separately and only referenced here:
 | `shell` | `~/.zshrc`, `~/.zshrc.local` |
 | `desktop` | `~/.config/niri`, Waybar, wlogout, `waywallen-theme`, the `waywallen-theme-sync` user service, the IdleFlow policy, fcitx5, mako, environment.d, qt5ct, qt6ct |
 | `terminal` | `~/.config/kitty`, fastfetch, cava |
-| `apps` | waypaper, mimeapps.list, user-dirs.dirs, git/ignore |
+| `apps` | mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
 | `local-bin` | `toggle-wlsunset`, `power-menu`, `waywallen-theme-sync` |
 | `media` | `~/Pictures/wallpapers` |

@@ -22,7 +22,7 @@ case "${1:-}" in
     -Slq)
         sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' \
             "$DOTFILES_TEST_REPO/packages/arch-lightweight.txt" |
-            grep -Ev '^(rime-ice-pinyin-git|visual-studio-code-bin|waypaper-git)$'
+            grep -Ev '^(rime-ice-pinyin-git|visual-studio-code-bin)$'
         ;;
     -Qq)
         printf '%s\n' git firefox
@@ -52,11 +52,6 @@ output="$(
 if [[ "$output" != *"Installation profile"*"Lightweight"* ]]; then
     echo "Expected dry-run plan to identify the Lightweight installation profile" >&2
     printf '%s\n' "$output" >&2
-    exit 1
-fi
-if ! grep -Fq 'folder = ~/Pictures/wallpapers' \
-    "$REPO_ROOT/configs/config/waypaper/config.ini"; then
-    echo "Expected the installed Waypaper config to use the managed wallpaper directory" >&2
     exit 1
 fi
 

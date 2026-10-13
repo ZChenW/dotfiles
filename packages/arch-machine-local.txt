@@ -12,7 +12,6 @@ intel-ucode
 lib32-vulkan-radeon
 linux
 linux-firmware
-linux-wallpaperengine-git
 networkmanager
 nvidia-open
 nvidia-prime

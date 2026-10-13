@@ -245,7 +245,7 @@
     "tooltip-format": "左键：软件启动菜单\n右键：切换壁纸",
     "format": "󰣇",
     "on-click": "fuzzel",
-    "on-click-right": "waypaper"
+    "on-click-right": "waywallen"
   },
   "custom/idle-control": {
     "exec": "~/.config/waybar/scripts/idle-control-status.sh",

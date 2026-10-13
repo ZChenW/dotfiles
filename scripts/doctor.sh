@@ -127,7 +127,6 @@ doctor_check_runtime_deps() {
         "$HOME/.local/bin/toggle-wlsunset"
         "$HOME/.local/bin/power-menu"
         "$HOME/.local/bin/waywallen-theme-sync"
-        "$HOME/.config/waybar/scripts/matugen-select-type.sh"
     )
     for cmd in brightnessctl swayidle swaylock idlectl wlogout matugen clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
         if command -v "$cmd" >/dev/null 2>&1; then

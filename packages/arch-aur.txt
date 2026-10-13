@@ -17,7 +17,6 @@ maplemono-nf-cn-unhinted
 maplemono-nf-unhinted
 maplemono-ttf
 microsoft-edge-beta-bin
-mpvpaper
 obsidian-bin
 otf-space-grotesk
 swaylock-effects
@@ -28,7 +27,6 @@ visual-studio-code-bin
 waybar-cava-git
 waybar-module-pacman-updates-git
 waybar-niri-taskbar-git
-waypaper-git
 wechat
 wechat-bin
 wlogout

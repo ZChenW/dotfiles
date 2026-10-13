@@ -33,7 +33,6 @@ mkdir -p \
     "$fake_home/.config/waybar" \
     "$fake_home/.config/kitty" \
     "$fake_home/.config/fastfetch" \
-    "$fake_home/.config/waypaper" \
     "$fake_home/.config/wlogout" \
     "$fake_home/.config/waywallen-theme/templates" \
     "$fake_home/.config/systemd/user" \
@@ -51,7 +50,6 @@ printf 'test\n' >"$fake_home/.config/niri/config.kdl"
 printf 'test\n' >"$fake_home/.config/waybar/config"
 printf 'test\n' >"$fake_home/.config/kitty/kitty.conf"
 printf 'test\n' >"$fake_home/.config/fastfetch/config.jsonc"
-printf 'test\n' >"$fake_home/.config/waypaper/config.ini"
 printf 'test\n' >"$fake_home/.config/wlogout/layout"
 printf 'test\n' >"$fake_home/.config/waywallen-theme/config.toml"
 printf 'test\n' >"$fake_home/.config/systemd/user/waywallen-theme-sync.service"
@@ -126,7 +124,8 @@ assert_contains() {
 
 assert_count "Dotfiles Installer" 1
 assert_count "  Log" 1
-assert_count "Result" 1
+# The printed snapshot diff can contain the bare word, so match the panel title.
+assert_count "─ Result ─" 1
 assert_contains "snapshot"
 assert_contains "1/5 Snapshot"
 assert_contains "2/5 Package manifests"

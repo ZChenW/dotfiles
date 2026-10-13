@@ -578,7 +578,7 @@ run_interactive_customize() {
             echo "  1) shell      .zshrc and private local config"
             echo "  2) desktop    niri, Waybar, power menu, theming, input and notifications"
             echo "  3) terminal   kitty, fastfetch and cava"
-            echo "  4) apps       waypaper and desktop defaults"
+            echo "  4) apps       desktop defaults"
             echo "  5) editors    Code and Cursor preferences"
             echo "  6) local-bin  local helpers"
             echo "  7) media      Pictures/wallpapers"

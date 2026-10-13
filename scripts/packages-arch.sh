@@ -361,7 +361,7 @@ is_desktop_pkg() {
     [[ "$pkg" =~ ^(ttf-|noto-fonts|wqy-|adobe-source-) ]] && return 0
     [[ "$pkg" =~ ^fcitx5- ]] && return 0
     [[ "$pkg" =~ ^(blueman|bluez-utils|bluetui)$ ]] && return 0
-    [[ "$pkg" =~ ^(cava|chafa|swappy|hyprpicker|awww|swaybg|swaylock|wlsunset)$ ]] && return 0
+    [[ "$pkg" =~ ^(cava|chafa|swappy|hyprpicker|swaylock|wlsunset)$ ]] && return 0
     [[ "$pkg" =~ ^(thunar|dolphin|gwenview|ark|mission-center|pavucontrol|btop)$ ]] && return 0
     [[ "$pkg" =~ ^(gnome-clocks|gnome-calendar|ddcutil)$ ]] && return 0
     [[ "$pkg" =~ ^power-profiles ]] && return 0

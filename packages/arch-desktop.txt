@@ -3,7 +3,6 @@ adobe-source-han-serif-cn-fonts
 alacritty
 appstream-qt
 ark
-awww
 blueman
 bluetui
 bluez-utils
@@ -41,7 +40,6 @@ qdiskinfo
 qt5-wayland
 qt6-wayland
 swappy
-swaybg
 ttf-dejavu
 ttf-jetbrains-mono-nerd
 ttf-material-symbols-variable
