@@ -34,14 +34,15 @@ mkdir -p \
     "$fake_home/.config/kitty" \
     "$fake_home/.config/fastfetch" \
     "$fake_home/.config/waypaper" \
-    "$fake_home/.config/matugen" \
+    "$fake_home/.config/wlogout" \
+    "$fake_home/.config/waywallen-theme/templates" \
+    "$fake_home/.config/systemd/user" \
     "$fake_home/.config/fcitx5" \
     "$fake_home/.config/mako" \
     "$fake_home/.config/environment.d" \
     "$fake_home/.config/qt5ct" \
     "$fake_home/.config/qt6ct" \
     "$fake_home/.config/cava" \
-    "$fake_home/.config/Thunar" \
     "$fake_home/.config/git" \
     "$fake_home/.config/Code/User/snippets" \
     "$fake_home/.config/Cursor/User/snippets"
@@ -51,14 +52,15 @@ printf 'test\n' >"$fake_home/.config/waybar/config"
 printf 'test\n' >"$fake_home/.config/kitty/kitty.conf"
 printf 'test\n' >"$fake_home/.config/fastfetch/config.jsonc"
 printf 'test\n' >"$fake_home/.config/waypaper/config.ini"
-printf 'test\n' >"$fake_home/.config/matugen/config.toml"
+printf 'test\n' >"$fake_home/.config/wlogout/layout"
+printf 'test\n' >"$fake_home/.config/waywallen-theme/config.toml"
+printf 'test\n' >"$fake_home/.config/systemd/user/waywallen-theme-sync.service"
 printf 'test\n' >"$fake_home/.config/fcitx5/profile"
 printf 'test\n' >"$fake_home/.config/mako/config"
 printf 'test\n' >"$fake_home/.config/environment.d/env.conf"
 printf 'test\n' >"$fake_home/.config/qt5ct/qt5ct.conf"
 printf 'test\n' >"$fake_home/.config/qt6ct/qt6ct.conf"
 printf 'test\n' >"$fake_home/.config/cava/config"
-printf 'test\n' >"$fake_home/.config/Thunar/uca.xml"
 printf 'test\n' >"$fake_home/.zshrc"
 printf 'test\n' >"$fake_home/.config/git/ignore"
 printf 'test\n' >"$fake_home/.config/mimeapps.list"
@@ -68,9 +70,8 @@ printf '[]\n' >"$fake_home/.config/Code/User/keybindings.json"
 printf '{}\n' >"$fake_home/.config/Cursor/User/settings.json"
 printf '[]\n' >"$fake_home/.config/Cursor/User/keybindings.json"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/toggle-wlsunset"
-printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/wcr-post-apply-waybar.sh"
-printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/desktop-shell"
-printf '#compdef desktop-shell\n' >"$fake_home/.local/share/zsh/site-functions/_desktop-shell"
+printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/power-menu"
+printf '#!/usr/bin/env python3\n' >"$fake_home/.local/bin/waywallen-theme-sync"
 printf 'wallpaper\n' >"$fake_home/Pictures/wallpapers/test-wallpaper.txt"
 
 cat >"$fake_bin/pacman" <<'EOF'

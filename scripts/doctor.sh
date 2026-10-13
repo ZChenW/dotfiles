@@ -110,14 +110,7 @@ doctor_check_memory() {
 
 doctor_check_desktop_tools() {
     local cmd
-    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-waybar}"
-    local -a commands=(zsh niri kitty fastfetch)
-    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
-        commands+=(waybar)
-    fi
-    if [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
-        commands+=(quickshell)
-    fi
+    local -a commands=(zsh niri kitty fastfetch waybar)
 
     for cmd in "${commands[@]}"; do
         if command -v "$cmd" >/dev/null 2>&1; then
@@ -130,26 +123,19 @@ doctor_check_desktop_tools() {
 
 doctor_check_runtime_deps() {
     local cmd path
-    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-waybar}"
     local -a runtime_paths=(
-        "$HOME/.config/niri/scripts/swayidle.sh"
         "$HOME/.local/bin/toggle-wlsunset"
-        "$HOME/.local/bin/desktop-shell"
+        "$HOME/.local/bin/power-menu"
+        "$HOME/.local/bin/waywallen-theme-sync"
+        "$HOME/.config/waybar/scripts/matugen-select-type.sh"
     )
-    for cmd in brightnessctl swayidle clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
+    for cmd in brightnessctl swayidle swaylock idlectl wlogout matugen clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
         if command -v "$cmd" >/dev/null 2>&1; then
             doctor_ok "Runtime dep" "$cmd"
         else
             doctor_warn "Runtime dep" "$cmd missing (referenced by niri/desktop)"
         fi
     done
-
-    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
-        runtime_paths+=(
-            "$HOME/.config/waybar/scripts/matugen-select-type.sh"
-            "$HOME/.local/bin/wcr-post-apply-waybar.sh"
-        )
-    fi
 
     for path in "${runtime_paths[@]}"
     do

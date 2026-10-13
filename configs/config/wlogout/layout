@@ -1,0 +1,35 @@
+{
+    "label" : "lock",
+    "action" : "idlectl lock",
+    "text" : "锁屏",
+    "keybind" : "l",
+    "height" : 0.82
+}
+{
+    "label" : "logout",
+    "action" : "niri msg action quit --skip-confirmation",
+    "text" : "注销",
+    "keybind" : "e",
+    "height" : 0.82
+}
+{
+    "label" : "shutdown",
+    "action" : "systemctl poweroff",
+    "text" : "关机",
+    "keybind" : "s",
+    "height" : 0.82
+}
+{
+    "label" : "hibernate",
+    "action" : "systemctl hibernate",
+    "text" : "休眠",
+    "keybind" : "h",
+    "height" : 0.82
+}
+{
+    "label" : "reboot",
+    "action" : "systemctl reboot",
+    "text" : "重启",
+    "keybind" : "r",
+    "height" : 0.82
+}

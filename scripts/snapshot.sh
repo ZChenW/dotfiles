@@ -10,20 +10,22 @@ source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 source "$DOTFILES_UI_SCRIPT_DIR/repo-sync.sh"
 
 build_snapshot_mappings() {
-    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-dual}"
     SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/niri|configs/config/niri|required"
+    "dir|$HOME/.config/waybar|configs/config/waybar|required"
+    "dir|$HOME/.config/wlogout|configs/config/wlogout|required"
+    "dir|$HOME/.config/waywallen-theme|configs/config/waywallen-theme|required"
+    "file|$HOME/.config/systemd/user/waywallen-theme-sync.service|configs/config/systemd/user/waywallen-theme-sync.service|required"
+    "file|$HOME/.config/idle-control/config.toml|configs/config/idle-control/config.toml|optional"
     "dir|$HOME/.config/kitty|configs/config/kitty|required"
     "dir|$HOME/.config/fastfetch|configs/config/fastfetch|required"
     "dir|$HOME/.config/waypaper|configs/config/waypaper|required"
-    "dir|$HOME/.config/matugen|configs/config/matugen|required"
     "dir|$HOME/.config/fcitx5|configs/config/fcitx5|required"
     "dir|$HOME/.config/mako|configs/config/mako|required"
     "dir|$HOME/.config/environment.d|configs/config/environment.d|required"
     "dir|$HOME/.config/qt5ct|configs/config/qt5ct|required"
     "dir|$HOME/.config/qt6ct|configs/config/qt6ct|required"
     "dir|$HOME/.config/cava|configs/config/cava|required"
-    "dir|$HOME/.config/Thunar|configs/config/Thunar|required"
     "file|$HOME/.zshrc|configs/home/.zshrc|required"
     "file|$HOME/.config/git/ignore|configs/config/git/ignore|required"
     "file|$HOME/.config/mimeapps.list|configs/config/mimeapps.list|required"
@@ -35,17 +37,10 @@ build_snapshot_mappings() {
     "file|$HOME/.config/Cursor/User/keybindings.json|configs/config/Cursor/User/keybindings.json|optional"
     "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
     "file|$HOME/.local/bin/toggle-wlsunset|configs/local-bin/toggle-wlsunset|required"
-    "file|$HOME/.local/bin/desktop-shell|configs/local-bin/desktop-shell|required"
-    "file|$HOME/.local/share/zsh/site-functions/_desktop-shell|configs/zsh/site-functions/_desktop-shell|required"
+    "file|$HOME/.local/bin/power-menu|configs/local-bin/power-menu|required"
+    "file|$HOME/.local/bin/waywallen-theme-sync|configs/local-bin/waywallen-theme-sync|required"
     "dir|$HOME/Pictures/wallpapers|configs/Pictures/wallpapers|optional"
     )
-
-    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
-        SNAPSHOT_MAPPINGS+=(
-            "dir|$HOME/.config/waybar|configs/config/waybar|required"
-            "file|$HOME/.local/bin/wcr-post-apply-waybar.sh|configs/local-bin/wcr-post-apply-waybar.sh|required"
-        )
-    fi
 }
 
 build_snapshot_mappings
@@ -144,13 +139,13 @@ SNAPSHOT_SECRET_MARKER_COMMENT_SKIP_FILES=(
 
 SNAPSHOT_RSYNC_EXCLUDES=(
     .codex
-    outputs.kdl.last-good
-    outputs.kdl.lock
+    __pycache__
     "*.bak"
     "*.bak.*"
     "*.bak-*"
     "*.backup"
     "*backup*"
+    "*.before-*"
 )
 
 snapshot_managed_paths() {
@@ -294,19 +289,24 @@ snapshot_capture_configs() {
             for exclude in "${SNAPSHOT_RSYNC_EXCLUDES[@]}"; do
                 rsync_args+=(--exclude="$exclude")
             done
-            if [[ "$dest" == configs/config/waybar ]]; then
-                # colors.css is runtime output from the wallpaper hook. Keep
-                # the committed seed file stable instead of snapshotting the
-                # currently selected wallpaper palette.
-                rsync_args+=(--filter="P /colors.css" --exclude=/colors.css)
-            fi
+            case "$dest" in
+                configs/config/waybar | configs/config/wlogout)
+                    # colors.css is runtime output of waywallen-theme-sync. Keep
+                    # the committed seed file stable instead of snapshotting the
+                    # currently selected wallpaper palette.
+                    rsync_args+=(--filter="P /colors.css" --exclude=/colors.css)
+                    ;;
+                configs/config/niri)
+                    rsync_args+=(--exclude=/theme-colors.kdl)
+                    ;;
+            esac
             rsync "${rsync_args[@]}" -- "$src/" "$repo_root/$dest/"
         else
             install -Dm644 -- "$src" "$repo_root/$dest"
         fi
 
         case "$dest" in
-            configs/local-bin/toggle-wlsunset | configs/local-bin/wcr-post-apply-waybar.sh | configs/local-bin/desktop-shell)
+            configs/local-bin/toggle-wlsunset | configs/local-bin/power-menu | configs/local-bin/waywallen-theme-sync)
                 chmod +x "$repo_root/$dest"
                 ;;
         esac

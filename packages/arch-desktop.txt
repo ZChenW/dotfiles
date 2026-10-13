@@ -13,7 +13,6 @@ chafa
 cliphist
 ddcutil
 dialog
-dolphin
 fcitx5-anthy
 fcitx5-chinese-addons
 fcitx5-configtool
@@ -43,8 +42,6 @@ qt5-wayland
 qt6-wayland
 swappy
 swaybg
-swaylock
-thunar
 ttf-dejavu
 ttf-jetbrains-mono-nerd
 ttf-material-symbols-variable

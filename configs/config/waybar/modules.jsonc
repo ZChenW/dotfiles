@@ -247,11 +247,6 @@
     "on-click": "fuzzel",
     "on-click-right": "waypaper"
   },
-  "custom/desktop-shell": {
-    "format": "󰹑",
-    "tooltip-format": "桌面模式：Waybar\n点击选择 QuickShell 或 Waybar\nMod+Shift+7",
-    "on-click": "desktop-shell switcher"
-  },
   "custom/idle-control": {
     "exec": "~/.config/waybar/scripts/idle-control-status.sh",
     "return-type": "json",
@@ -277,14 +272,14 @@
   "custom/wlogout": {
     "tooltip": false,
     "format": "󰐥",
-    "on-click": "wlogout",
+    "on-click": "power-menu",
     "on-scroll-up": "true",
     "on-scroll-down": "true"
   },
   "custom/lockscreen": {
     "tooltip": false,
     "format": "",
-    "on-click": "swaylock || hyprlock",
+    "on-click": "idlectl lock",
     "on-scroll-up": "true",
     "on-scroll-down": "true"
   },

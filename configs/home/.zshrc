@@ -45,6 +45,8 @@ compinit -d "$HOME/.zcompdump"
 # Keep native zsh completion, but allow case-insensitive directory prefix matching.
 # Example: `cd down<Tab>` can complete to `cd Downloads`.
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+# Discover newly installed commands without restarting the current shell.
+zstyle ':completion:*' rehash true
 zmodload zsh/complist
 zstyle ':completion:*' menu select
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
@@ -486,11 +488,12 @@ if [[ -r "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
 
-# Wallpaper Console cached palette variables.
-source "$HOME/Projects/wallpaper-console-rust/examples/theme-focus-follow/zsh-theme.zsh"
-
 # >>> grok installer >>>
 export PATH="$HOME/.grok/bin:$PATH"
 fpath=(~/.grok/completions/zsh $fpath)
 autoload -Uz compinit && compinit -C
 # <<< grok installer <<<
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/chakew/.local/bin:$PATH"

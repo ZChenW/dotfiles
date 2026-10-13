@@ -344,7 +344,7 @@ else
     exit 1
 fi
 
-brightness_helper="${BRIGHTNESS_HELPER:-${QUICKSHELL_CONFIG_PATH:-${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/clavis}/scripts/system/brightness.sh}"
+brightness_helper="${BRIGHTNESS_HELPER:-$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/brightness-helper.sh}"
 if [[ -x "$brightness_helper" ]]; then
     if [[ "$get_only" == true ]]; then
         exec "$brightness_helper" --device "$selected" --get

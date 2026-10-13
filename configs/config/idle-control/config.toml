@@ -1,0 +1,12 @@
+enabled = true
+respect_inhibitors = true
+
+[battery]
+lock_after_seconds = 600
+display_off_after_seconds = 900
+suspend_after_seconds = 1800
+
+[ac]
+lock_after_seconds = 18000
+display_off_after_seconds = 21600
+suspend_after_seconds = 25200

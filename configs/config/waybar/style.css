@@ -158,7 +158,6 @@ window#waybar.empty #window {
 #custom-colorpicker,
 #custom-displays,
 #custom-idle-control,
-#custom-desktop-shell,
 #custom-applauncher,
 #custom-ddcutil-night,
 #custom-ddcutil-sleep,
@@ -185,7 +184,6 @@ window#waybar.empty #window {
 #custom-colorpicker label,
 #custom-displays label,
 #custom-idle-control label,
-#custom-desktop-shell label,
 #custom-applauncher label,
 #custom-ddcutil-night label,
 #custom-ddcutil-sleep label,
@@ -238,8 +236,7 @@ window#waybar.empty #window {
   background-color: @primary;
   color: @surface_container;
 }
-#custom-applauncher,
-#custom-desktop-shell {
+#custom-applauncher {
   background-color: @primary;
   color: @on_primary;
 }

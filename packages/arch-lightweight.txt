@@ -60,8 +60,8 @@ slurp
 stylua
 swayidle
 swaybg
-swaylock
-thunar
+swaylock-effects
+nautilus
 tree
 tree-sitter-cli
 ttf-material-symbols-variable

@@ -12,8 +12,6 @@ fi
 
 # shellcheck source=scripts/ui.sh
 source "$REPO_ROOT/scripts/ui.sh"
-# shellcheck source=scripts/desktop-shell-profile.sh
-source "$REPO_ROOT/scripts/desktop-shell-profile.sh"
 # shellcheck source=scripts/install-profile.sh
 source "$REPO_ROOT/scripts/install-profile.sh"
 
@@ -42,7 +40,6 @@ DEBUG=0
 NO_COLOR_FLAG=false
 ASCII_FLAG=false
 SHOW_MENU=false
-DESKTOP_SHELL_PROFILE=""
 INSTALL_PROFILE=""
 MODE_LABEL=""
 BACKUP_ROOT=""
@@ -98,8 +95,6 @@ Options:
   --restore-only     Skip packages and optional service actions
   --install-profile PROFILE
                      Installation profile: standard or lightweight
-  --desktop-shell PROFILE
-                     Desktop shell profile: waybar, quickshell, or dual
   --snapshot         Refresh package manifests and managed configs from this machine
   --no-commit        With --snapshot: update files only, do not ask to commit
   --commit           With --snapshot: commit after checks, do not push
@@ -162,14 +157,6 @@ while [[ $# -gt 0 ]]; do
                 exit 2
             fi
             INSTALL_PROFILE="${2,,}"
-            shift
-            ;;
-        --desktop-shell)
-            if (($# < 2)); then
-                ui_error "--desktop-shell requires waybar, quickshell, or dual"
-                exit 2
-            fi
-            DESKTOP_SHELL_PROFILE="${2,,}"
             shift
             ;;
         --snapshot)
@@ -237,14 +224,6 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-case "$DESKTOP_SHELL_PROFILE" in
-    "" | waybar | quickshell | dual) ;;
-    *)
-        ui_error "--desktop-shell must be waybar, quickshell, or dual"
-        exit 2
-        ;;
-esac
-
 if ! INSTALL_PROFILE="$(resolve_install_profile "$INSTALL_PROFILE")"; then
     ui_error "--install-profile must be standard or lightweight"
     exit 2
@@ -255,11 +234,6 @@ if [[ "$INSTALL_PROFILE" == lightweight ]]; then
         ui_error "Lightweight installation profile cannot include machine-local packages (--full-packages)."
         exit 2
     fi
-    if [[ -n "$DESKTOP_SHELL_PROFILE" && "$DESKTOP_SHELL_PROFILE" != waybar ]]; then
-        ui_error "Lightweight installation profile requires the Waybar desktop shell."
-        exit 2
-    fi
-    DESKTOP_SHELL_PROFILE=waybar
 fi
 
 UI_VERBOSE="$VERBOSE"
@@ -495,7 +469,6 @@ print_plan_summary() {
         "Mode|$(mode_label)" \
         "Installation profile|$(install_profile_label "$INSTALL_PROFILE")" \
         "Saved profile|$saved_profile_label" \
-        "Desktop shell|$DESKTOP_SHELL_PROFILE" \
         "Packages|$packages_label" \
         "AUR|$aur_label" \
         "Machine packages|$machine_label" \
@@ -544,7 +517,7 @@ run_interactive_customize() {
         [[ "$SKIP_PACKAGES" == true ]] && mode_default=3
         [[ "$DRY_RUN" == true ]] && mode_default=4
 
-        ui_stage 1 6 "Installation mode"
+        ui_stage 1 5 "Installation mode"
         ui_menu "Select" "$mode_default" \
             "Full install|Packages and configurations" \
             "Packages only|Do not modify configurations" \
@@ -573,7 +546,7 @@ run_interactive_customize() {
                 ;;
         esac
 
-        ui_stage 2 6 "Software scope"
+        ui_stage 2 5 "Software scope"
         if [[ "$SKIP_PACKAGES" != true ]]; then
             if [[ "$PACKAGES_ONLY" != true ]] && ! prompt_yes_no "Install packages?" y; then
                 SKIP_PACKAGES=true
@@ -600,22 +573,14 @@ run_interactive_customize() {
             ui_warn "Package installation" "skipped"
         fi
 
-        if [[ "$INSTALL_PROFILE" == lightweight ]]; then
-            DESKTOP_SHELL_PROFILE=waybar
-            ui_stage 3 6 "Desktop shell"
-            ui_ok "Waybar" "required by Lightweight"
-        else
-            prompt_desktop_shell_profile 3 6
-        fi
-
-        ui_stage 4 6 "Configuration groups"
+        ui_stage 3 5 "Configuration groups"
         if [[ "$PACKAGES_ONLY" != true ]]; then
             echo "  1) shell      .zshrc and private local config"
-            echo "  2) desktop    niri, desktop shell, input and notifications"
+            echo "  2) desktop    niri, Waybar, power menu, theming, input and notifications"
             echo "  3) terminal   kitty, fastfetch and cava"
-            echo "  4) apps       waypaper, matugen, Thunar and desktop defaults"
+            echo "  4) apps       waypaper and desktop defaults"
             echo "  5) editors    Code and Cursor preferences"
-            echo "  6) local-bin  desktop-shell and local helpers"
+            echo "  6) local-bin  local helpers"
             echo "  7) media      Pictures/wallpapers"
             read -r -p "$(ui_prompt "Groups (names/numbers, comma separated)" "all")" group_input
             resolve_config_groups "${group_input:-all}"
@@ -623,7 +588,7 @@ run_interactive_customize() {
             ui_warn "Configuration groups" "skipped (packages only)"
         fi
 
-        ui_stage 5 6 "Private configuration"
+        ui_stage 4 5 "Private configuration"
         if [[ "$PACKAGES_ONLY" == true ]]; then
             ui_warn "Private config" "$HOME/.zshrc.local not touched (packages only)"
         else
@@ -632,7 +597,7 @@ run_interactive_customize() {
             ui_note "Existing symlinks are archived before replacement."
         fi
 
-        ui_stage 6 6 "Review"
+        ui_stage 5 5 "Review"
         print_plan_summary
         ui_menu "Action" 1 \
             "Install now|Apply the plan shown above" \
@@ -664,11 +629,6 @@ run_interactive_automatic() {
     fi
     SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
 
-    if [[ "$INSTALL_PROFILE" == lightweight ]]; then
-        DESKTOP_SHELL_PROFILE=waybar
-    elif [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
-        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
-    fi
 
     ui_section "Review Automatic installation"
     print_plan_summary
@@ -711,7 +671,6 @@ run_interactive_setup() {
                 ui_error "Lightweight cannot include machine-local packages."
                 return 1
             fi
-            DESKTOP_SHELL_PROFILE=waybar
         fi
 
         ui_stage 2 2 "Setup style"
@@ -803,9 +762,6 @@ apply_non_interactive_defaults() {
         SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
     fi
 
-    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
-        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
-    fi
 }
 
 init_log_once() {
@@ -862,7 +818,7 @@ run_safety_check() {
 plan_packages() {
     install_package_files \
         true "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
-        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$INSTALL_PROFILE"
+        "$REPO_ROOT" "$INSTALL_PROFILE"
 }
 
 print_package_plan_summary() {
@@ -902,9 +858,6 @@ run_snapshot_workflow() {
     # Capture mutates the repo; home stays untouched. Plan steps still run dry.
     MODE_LABEL="snapshot"
     SELECTED_GROUPS=("${ALL_CONFIG_GROUPS[@]}")
-    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
-        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
-    fi
 
     init_log_once
     print_intro_once
@@ -984,9 +937,6 @@ run_snapshot_workflow() {
 
 run_doctor_workflow() {
     MODE_LABEL="doctor"
-    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
-        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
-    fi
     init_log_once
     print_intro_once
 
@@ -1001,9 +951,6 @@ run_doctor_workflow() {
 
 run_uninstall_workflow() {
     MODE_LABEL="uninstall ($UNINSTALL_MODE)"
-    if [[ -z "$DESKTOP_SHELL_PROFILE" ]]; then
-        DESKTOP_SHELL_PROFILE="$(load_saved_desktop_shell_profile || printf 'waybar\n')"
-    fi
     init_log_once
     print_intro_once
 
@@ -1051,8 +998,7 @@ run_install_workflow() {
         # shellcheck source=scripts/update.sh
         source "$REPO_ROOT/scripts/update.sh"
         run_update \
-            "$REPO_ROOT" "$DRY_RUN" "$INSTALL_PROFILE" \
-            "$DESKTOP_SHELL_PROFILE"
+            "$REPO_ROOT" "$DRY_RUN" "$INSTALL_PROFILE"
         return 0
     fi
 
@@ -1082,18 +1028,18 @@ run_install_workflow() {
                 ui_stage 1 1 "Installing packages"
             fi
         elif [[ "$DRY_RUN" == true ]]; then
-            ui_stage 1 4 "Package plan"
+            ui_stage 1 3 "Package plan"
         else
-            ui_stage 1 4 "Installing packages"
+            ui_stage 1 3 "Installing packages"
         fi
         if ! install_package_files \
             "$DRY_RUN" "$ASSUME_YES" "$FULL_PACKAGES" "$INCLUDE_AUR" \
-            "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$INSTALL_PROFILE"; then
+            "$REPO_ROOT" "$INSTALL_PROFILE"; then
             report_install_failure "Package installation failed"
             return 1
         fi
     else
-        ui_stage 1 4 "Packages"
+        ui_stage 1 3 "Packages"
         ui_warn "Package installation skipped"
     fi
 
@@ -1114,17 +1060,6 @@ run_install_workflow() {
         return 0
     fi
 
-    if [[ "$DRY_RUN" == true ]]; then
-        ui_stage 2 4 "Desktop shell plan"
-    else
-        ui_stage 2 4 "Desktop shell"
-    fi
-    if ! install_desktop_shell_profile \
-        "$REPO_ROOT" "$DESKTOP_SHELL_PROFILE" "$DRY_RUN"; then
-        report_install_failure "Desktop shell installation failed"
-        return 1
-    fi
-
     # shellcheck source=scripts/backup.sh
     source "$REPO_ROOT/scripts/backup.sh"
     # shellcheck source=scripts/sync-configs.sh
@@ -1141,30 +1076,22 @@ run_install_workflow() {
     fi
 
     if [[ "$DRY_RUN" == true ]]; then
-        ui_stage 3 4 "Configuration plan"
+        ui_stage 2 3 "Configuration plan"
     else
-        ui_stage 3 4 "Synchronizing configurations"
+        ui_stage 2 3 "Synchronizing configurations"
     fi
     if ! sync_configs "$REPO_ROOT" "$BACKUP_ROOT" "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
         report_install_failure "Configuration synchronization failed"
         return 1
     fi
 
-    if group_selected apps "${SELECTED_GROUPS[@]}" \
-            || group_selected local-bin "${SELECTED_GROUPS[@]}" \
-            || group_selected desktop "${SELECTED_GROUPS[@]}"; then
-        if [[ "$DESKTOP_SHELL_PROFILE" == quickshell ]]; then
-            disable_wallpaper_console_theme_hook "$DRY_RUN"
-        else
-            configure_wallpaper_console_theme_hook "$DRY_RUN"
-        fi
-    fi
-
     if [[ "$RESTORE_ONLY" == true ]]; then
         verbose_log "restore-only mode: skipping optional service actions"
+    elif group_selected desktop "${SELECTED_GROUPS[@]}"; then
+        enable_desktop_services "$DRY_RUN"
     fi
 
-    ui_stage 4 4 "Verification"
+    ui_stage 3 3 "Verification"
     if ! verify_installation "$DRY_RUN" "${SELECTED_GROUPS[@]}"; then
         report_install_failure "Verification failed; backup preserved"
         return 1
@@ -1176,17 +1103,11 @@ run_install_workflow() {
             "ok:No changes were made" \
             "ok:Rollback path planned"
     else
-        save_desktop_shell_profile "$DESKTOP_SHELL_PROFILE"
         save_install_profile "$INSTALL_PROFILE"
         ui_result_box "Installation complete" \
             "ok:Installation profile: $(install_profile_label "$INSTALL_PROFILE")" \
-            "ok:Desktop profile: $DESKTOP_SHELL_PROFILE" \
             "ok:Configurations verified" \
             "ok:Backup and rollback ready"
-        if [[ "$DESKTOP_SHELL_PROFILE" == dual ]]; then
-            ui_note "Next: desktop-shell toggle"
-            ui_note "Status: desktop-shell status"
-        fi
         ui_note "Rollback: $BACKUP_ROOT/rollback.sh"
     fi
     ui_note "Log: $LOG_FILE"

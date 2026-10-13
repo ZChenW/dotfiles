@@ -226,11 +226,11 @@ if [[ "$no_aur_output" != *"Unavailable without AUR"* \
     exit 1
 fi
 
-echo "==> Lightweight rejects incompatible package and desktop-shell choices"
+echo "==> Lightweight rejects machine-local packages, and the desktop-shell option is gone"
 invalid_combinations=(
     "--install-profile lightweight --full-packages"
-    "--install-profile lightweight --desktop-shell quickshell"
-    "--install-profile lightweight --desktop-shell dual"
+    "--install-profile lightweight --desktop-shell waybar"
+    "--desktop-shell dual"
 )
 for flags in "${invalid_combinations[@]}"; do
     # shellcheck disable=SC2086

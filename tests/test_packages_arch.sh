@@ -155,16 +155,13 @@ if grep -q '^-Si ' "$pacman_log"; then
     exit 1
 fi
 
-echo "==> test 4: desktop shell profiles filter package manifests"
+echo "==> test 4: the standard profile installs every manifest entry, with no shell filtering"
 cat >"$packages_dir/arch-essential.txt" <<'EOF'
 git
 waybar
 EOF
 cat >"$packages_dir/arch-apps.txt" <<'EOF'
-quickshell
-EOF
-cat >"$packages_dir/quickshell-build.txt" <<'EOF'
-cmake
+wlogout
 EOF
 cat >"$packages_dir/arch-aur.txt" <<'EOF'
 waybar-cava-git
@@ -173,7 +170,7 @@ cat >"$fakebin/pacman" <<'EOF'
 #!/usr/bin/bash
 case "${1:-}" in
     -Slq)
-        printf '%s\n' git waybar quickshell cmake
+        printf '%s\n' git waybar wlogout
         ;;
     -Si)
         exit 1
@@ -192,29 +189,15 @@ build_installed_package_index() {
 }
 
 unset OFFICIAL_PACKAGE_LIST OFFICIAL_PACKAGE_INDEX_READY OFFICIAL_PACKAGE_INDEX_INITIALIZED
-quickshell_output="$(
+standard_output="$(
     PATH="$fakebin:/usr/bin" UI_DEBUG=1 UI_VERBOSE=1 \
-        install_package_files true true false true "$tmp_dir/repo" quickshell
+        install_package_files true true false true "$tmp_dir/repo" standard
 )"
-if [[ "$quickshell_output" != *"pacman -S --needed"*"quickshell"* \
-    || "$quickshell_output" != *"pacman -S --needed"*"cmake"* \
-    || "$quickshell_output" == *"pacman -S --needed"*"waybar"* \
-    || "$quickshell_output" == *"waybar-cava-git"* ]]; then
-    echo "QuickShell profile package filter is incorrect" >&2
-    printf '%s\n' "$quickshell_output" >&2
-    exit 1
-fi
-
-unset OFFICIAL_PACKAGE_LIST OFFICIAL_PACKAGE_INDEX_READY OFFICIAL_PACKAGE_INDEX_INITIALIZED
-waybar_output="$(
-    PATH="$fakebin:/usr/bin" UI_DEBUG=1 UI_VERBOSE=1 \
-        install_package_files true true false true "$tmp_dir/repo" waybar
-)"
-if [[ "$waybar_output" != *"pacman -S --needed"*"waybar"* \
-    || "$waybar_output" == *"quickshell"* \
-    || "$waybar_output" == *"cmake"* ]]; then
-    echo "Waybar profile package filter is incorrect" >&2
-    printf '%s\n' "$waybar_output" >&2
+if [[ "$standard_output" != *"pacman -S --needed"*"waybar"* \
+    || "$standard_output" != *"pacman -S --needed"*"wlogout"* \
+    || "$standard_output" != *"waybar-cava-git"* ]]; then
+    echo "Standard profile did not plan every manifest entry" >&2
+    printf '%s\n' "$standard_output" >&2
     exit 1
 fi
 

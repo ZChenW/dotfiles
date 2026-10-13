@@ -282,7 +282,6 @@ count_standard_packages_excluded_by_lightweight() {
         "$packages_dir/arch-aur.txt"
     read_package_file "$packages_dir/arch-exclude.txt" exclude_packages
     filter_excluded_packages standard_packages exclude_packages
-    filter_desktop_shell_packages standard_packages waybar
 
     for pkg in "${_lightweight_packages_ref[@]}"; do
         lightweight_set["$pkg"]=1
@@ -293,27 +292,6 @@ count_standard_packages_excluded_by_lightweight() {
     done
 
     printf '%s\n' "$excluded_count"
-}
-
-filter_desktop_shell_packages() {
-    local -n _packages_ref="$1"
-    local profile="$2"
-    local -a filtered=()
-    local pkg
-
-    for pkg in "${_packages_ref[@]}"; do
-        case "$profile:$pkg" in
-            quickshell:waybar | quickshell:waybar-*)
-                continue
-                ;;
-            waybar:quickshell | waybar:quickshell-*)
-                continue
-                ;;
-        esac
-        filtered+=("$pkg")
-    done
-
-    _packages_ref=("${filtered[@]}")
 }
 
 split_official_and_aur() {
@@ -407,7 +385,7 @@ is_app_pkg() {
     [[ "$pkg" =~ ^(nvtop|tokei|tree|fzf|jq|wget|yt-dlp|uv|scratch|tree-sitter-cli) ]] && return 0
     [[ "$pkg" =~ ^(r$|ghc|cabal|stack|happy|alex|namcap) ]] && return 0
     [[ "$pkg" =~ ^(openai-codex|opencode) ]] && return 0
-    [[ "$pkg" =~ ^(quickshell|webkit) ]] && return 0
+    [[ "$pkg" =~ ^webkit ]] && return 0
     [[ "$pkg" =~ ^(python-|gcc-fortran|clang|shellcheck|stylua|unzip) ]] && return 0
     return 1
 }
@@ -807,8 +785,7 @@ install_package_files() {
     local include_machine_local="$3"
     local include_aur="$4"
     local repo_root="$5"
-    local desktop_shell_profile="${6:-dual}"
-    local install_profile="${7:-standard}"
+    local install_profile="${6:-standard}"
     local packages_dir="$repo_root/packages"
 
     local -a package_files=()
@@ -819,7 +796,6 @@ install_package_files() {
         fi
         package_files=("$packages_dir/arch-lightweight.txt")
         include_machine_local=false
-        desktop_shell_profile=waybar
     else
         package_files=(
             "$packages_dir/arch-essential.txt"
@@ -831,10 +807,6 @@ install_package_files() {
 
     local -a machine_local_packages=()
     read_package_file "$packages_dir/arch-machine-local.txt" machine_local_packages
-
-    if [[ "$desktop_shell_profile" == quickshell || "$desktop_shell_profile" == dual ]]; then
-        package_files+=("$packages_dir/quickshell-build.txt")
-    fi
 
     if [[ "$include_machine_local" == true ]]; then
         package_files+=("$packages_dir/arch-machine-local.txt")
@@ -848,7 +820,6 @@ install_package_files() {
     read_package_file "$packages_dir/arch-exclude.txt" exclude_packages
     collect_packages_from_files all_packages "${package_files[@]}"
     filter_excluded_packages all_packages exclude_packages
-    filter_desktop_shell_packages all_packages "$desktop_shell_profile"
     split_official_and_aur official_packages aur_packages "${all_packages[@]}"
 
     if [[ "$dry_run" != true && "$include_aur" == true ]] \
@@ -868,7 +839,7 @@ install_package_files() {
                     "$repo_root" all_packages
             )"
             ui_note "Lightweight excludes $lightweight_excluded_count Standard packages."
-            ui_note "Lightweight exclusions: QuickShell, games, Office, duplicate browsers, communication clients, KDE apps, heavyweight media and specialist toolchains."
+            ui_note "Lightweight exclusions: games, Office, duplicate browsers, communication clients, KDE apps, heavyweight media and specialist toolchains."
         fi
         if [[ "$include_machine_local" != true && ${#machine_local_packages[@]} -gt 0 ]]; then
             ui_warn "Machine-local skipped" "use --full-packages"
@@ -1109,7 +1080,6 @@ install_packages_arch() {
     local include_machine_local="${3:-false}"
     local include_aur="${4:-true}"
     local repo_root="${5:-}"
-    local desktop_shell_profile="${6:-dual}"
 
     if [[ -z "$repo_root" ]]; then
         repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -1117,5 +1087,5 @@ install_packages_arch() {
 
     install_package_files \
         "$dry_run" "$assume_yes" "$include_machine_local" "$include_aur" \
-        "$repo_root" "$desktop_shell_profile"
+        "$repo_root"
 }

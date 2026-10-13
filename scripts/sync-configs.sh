@@ -85,11 +85,9 @@ sync_mapping_entry() {
         if [[ "$mode" == dir ]]; then
             ((++SYNC_DIR_COUNT))
             verbose_log "rsync    $(sync_display_path "$dest")/"
-            if sync_preserves_runtime_waybar_colors "$dest"; then
-                debug_log "[dry-run] rsync -a --exclude=/colors.css $src/ -> $dest/"
-            else
-                debug_log "[dry-run] rsync -a $src/ -> $dest/"
-            fi
+            local runtime_excludes
+            runtime_excludes="$(sync_runtime_excludes "$dest" | sed 's/^/--exclude=/' | tr '\n' ' ')"
+            debug_log "[dry-run] rsync -a ${runtime_excludes}$src/ -> $dest/"
         else
             ((++SYNC_FILE_COUNT))
             verbose_log "install  $(sync_display_path "$dest")"
@@ -103,9 +101,10 @@ sync_mapping_entry() {
         ((++SYNC_DIR_COUNT))
         mkdir -p "$dest"
         local -a rsync_args=(-a --delete)
-        if sync_preserves_runtime_waybar_colors "$dest"; then
-            rsync_args+=(--exclude=/colors.css)
-        fi
+        local runtime_file
+        while IFS= read -r runtime_file; do
+            rsync_args+=(--exclude="$runtime_file")
+        done < <(sync_runtime_excludes "$dest")
         rsync "${rsync_args[@]}" -- "$src/" "$dest/"
         verbose_log "rsync    $(sync_display_path "$dest")/"
         debug_log "rsync ${rsync_args[*]} $src/ -> $dest/"
@@ -117,9 +116,15 @@ sync_mapping_entry() {
     fi
 }
 
-sync_preserves_runtime_waybar_colors() {
+# Files the running desktop regenerates from the wallpaper (waywallen-theme-sync).
+# A restore never overwrites or deletes them; a snapshot never captures them.
+sync_runtime_excludes() {
     local dest="$1"
-    [[ "$dest" == "${XDG_CONFIG_HOME:-$HOME/.config}/waybar" ]]
+    local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    case "$dest" in
+        "$config_home/waybar" | "$config_home/wlogout") printf '%s\n' /colors.css ;;
+        "$config_home/niri") printf '%s\n' /theme-colors.kdl ;;
+    esac
 }
 
 sync_mapping_is_current() {
@@ -132,9 +137,10 @@ sync_mapping_is_current() {
     if [[ "$mode" == dir ]]; then
         [[ -d "$dest" ]] || return 1
         local -a rsync_args=(-ani --delete --omit-dir-times)
-        if sync_preserves_runtime_waybar_colors "$dest"; then
-            rsync_args+=(--exclude=/colors.css)
-        fi
+        local runtime_file
+        while IFS= read -r runtime_file; do
+            rsync_args+=(--exclude="$runtime_file")
+        done < <(sync_runtime_excludes "$dest")
         [[ -z "$(rsync "${rsync_args[@]}" -- "$src/" "$dest/")" ]]
         return
     fi
@@ -144,26 +150,32 @@ sync_mapping_is_current() {
     [[ "$(stat -c '%a' "$dest")" == "$mode" ]]
 }
 
+# Generated colour files need an initial copy so the bar and the power menu
+# have colours before the first wallpaper change.
 sync_waybar_seed_if_missing() {
     local repo_root="$1"
     local dry_run="$2"
     local manifest="$3"
-    local src="$repo_root/configs/config/waybar/colors.css"
-    local dest="${XDG_CONFIG_HOME:-$HOME/.config}/waybar/colors.css"
+    local name src dest
 
-    [[ -e "$dest" ]] && return 0
-    [[ -f "$src" ]] || return 0
+    for name in waybar wlogout; do
+        src="$repo_root/configs/config/$name/colors.css"
+        dest="${XDG_CONFIG_HOME:-$HOME/.config}/$name/colors.css"
 
-    ((++SYNC_FILE_COUNT))
-    if [[ "$dry_run" == true ]]; then
+        [[ -e "$dest" ]] && continue
+        [[ -f "$src" ]] || continue
+
+        ((++SYNC_FILE_COUNT))
+        if [[ "$dry_run" == true ]]; then
+            verbose_log "seed     $(sync_display_path "$dest")"
+            debug_log "[dry-run] install -Dm644 $src -> $dest (initial colors only)"
+            continue
+        fi
+
+        install -Dm644 -- "$src" "$dest"
+        record_manifest_entry "$manifest" "$dest" false
         verbose_log "seed     $(sync_display_path "$dest")"
-        debug_log "[dry-run] install -Dm644 $src -> $dest (initial colors only)"
-        return 0
-    fi
-
-    install -Dm644 -- "$src" "$dest"
-    record_manifest_entry "$manifest" "$dest" false
-    verbose_log "seed     $(sync_display_path "$dest")"
+    done
 }
 
 group_selected() {
@@ -229,6 +241,9 @@ remove_retired_desktop_shell_paths() {
     local -a retired_paths=(
         "$HOME/.local/bin/inir"
         "$HOME/.local/bin/toggle-niri-shell"
+        "$HOME/.local/bin/desktop-shell"
+        "$HOME/.local/share/zsh/site-functions/_desktop-shell"
+        "$HOME/.local/bin/wcr-post-apply-waybar.sh"
     )
 
     for path in "${retired_paths[@]}"; do
@@ -256,10 +271,14 @@ remove_retired_desktop_shell_paths() {
 build_sync_mappings() {
     local repo_root="$1"
     local config_root="$repo_root/configs/config"
-    local desktop_shell_profile="${DESKTOP_SHELL_PROFILE:-dual}"
     SYNC_MAPPINGS=(
         "shell|$repo_root/configs/home/.zshrc|$HOME/.zshrc|644|required"
         "desktop|$config_root/niri|$HOME/.config/niri|dir|required"
+        "desktop|$config_root/waybar|$HOME/.config/waybar|dir|required"
+        "desktop|$config_root/wlogout|$HOME/.config/wlogout|dir|required"
+        "desktop|$config_root/waywallen-theme|$HOME/.config/waywallen-theme|dir|required"
+        "desktop|$config_root/systemd/user/waywallen-theme-sync.service|$HOME/.config/systemd/user/waywallen-theme-sync.service|644|required"
+        "desktop|$config_root/idle-control/config.toml|$HOME/.config/idle-control/config.toml|644|optional"
         "desktop|$config_root/fcitx5|$HOME/.config/fcitx5|dir|required"
         "desktop|$config_root/mako|$HOME/.config/mako|dir|required"
         "desktop|$config_root/environment.d|$HOME/.config/environment.d|dir|required"
@@ -269,8 +288,6 @@ build_sync_mappings() {
         "terminal|$config_root/fastfetch|$HOME/.config/fastfetch|dir|required"
         "terminal|$config_root/cava|$HOME/.config/cava|dir|required"
         "apps|$config_root/waypaper|$HOME/.config/waypaper|dir|required"
-        "apps|$config_root/matugen|$HOME/.config/matugen|dir|required"
-        "apps|$config_root/Thunar|$HOME/.config/Thunar|dir|required"
         "apps|$config_root/mimeapps.list|$HOME/.config/mimeapps.list|644|required"
         "apps|$config_root/user-dirs.dirs|$HOME/.config/user-dirs.dirs|644|required"
         "apps|$config_root/git/ignore|$HOME/.config/git/ignore|644|required"
@@ -281,17 +298,10 @@ build_sync_mappings() {
         "editors|$config_root/Cursor/User/keybindings.json|$HOME/.config/Cursor/User/keybindings.json|644|required"
         "editors|$config_root/Cursor/User/snippets|$HOME/.config/Cursor/User/snippets|dir|optional"
         "local-bin|$repo_root/configs/local-bin/toggle-wlsunset|$HOME/.local/bin/toggle-wlsunset|755|required"
-        "local-bin|$repo_root/configs/local-bin/desktop-shell|$HOME/.local/bin/desktop-shell|755|required"
-        "local-bin|$repo_root/configs/zsh/site-functions/_desktop-shell|$HOME/.local/share/zsh/site-functions/_desktop-shell|644|required"
+        "local-bin|$repo_root/configs/local-bin/power-menu|$HOME/.local/bin/power-menu|755|required"
+        "local-bin|$repo_root/configs/local-bin/waywallen-theme-sync|$HOME/.local/bin/waywallen-theme-sync|755|required"
         "media|$repo_root/configs/Pictures/wallpapers|$HOME/Pictures/wallpapers|dir|required"
     )
-
-    if [[ "$desktop_shell_profile" == waybar || "$desktop_shell_profile" == dual ]]; then
-        SYNC_MAPPINGS+=(
-            "desktop|$config_root/waybar|$HOME/.config/waybar|dir|required"
-            "local-bin|$repo_root/configs/local-bin/wcr-post-apply-waybar.sh|$HOME/.local/bin/wcr-post-apply-waybar.sh|755|required"
-        )
-    fi
 }
 
 # Print managed destination paths (one per line), optionally filtered by groups.
@@ -351,8 +361,7 @@ sync_configs() {
         fi
     done
 
-    if group_selected desktop "${selected_groups[@]}" \
-        && [[ "${DESKTOP_SHELL_PROFILE:-dual}" != quickshell ]]; then
+    if group_selected desktop "${selected_groups[@]}"; then
         sync_waybar_seed_if_missing "$repo_root" "$dry_run" "$manifest"
     fi
 
@@ -365,11 +374,9 @@ sync_configs() {
             "$backup_root" "$dry_run" "$manifest"
         local -a executable_paths=(
             "$HOME/.local/bin/toggle-wlsunset"
-            "$HOME/.local/bin/desktop-shell"
+            "$HOME/.local/bin/power-menu"
+            "$HOME/.local/bin/waywallen-theme-sync"
         )
-        if [[ "${DESKTOP_SHELL_PROFILE:-dual}" != quickshell ]]; then
-            executable_paths+=("$HOME/.local/bin/wcr-post-apply-waybar.sh")
-        fi
         if [[ "$dry_run" == true ]]; then
             debug_log "[dry-run] chmod +x ${executable_paths[*]}"
         else
@@ -388,96 +395,26 @@ sync_configs() {
     ui_ok "Rollback script planned"
 }
 
-configure_wallpaper_console_theme_hook() {
+# Desktop colours follow the wallpaper through a user service that ships with
+# the desktop group. Idle and lock are owned by IdleFlow, installed separately.
+enable_desktop_services() {
     local dry_run="${1:-false}"
-    local wcr_bin=""
-    local hook_path="$HOME/.local/bin/wcr-post-apply-waybar.sh"
-    local matugen_config="${XDG_CONFIG_HOME:-$HOME/.config}/matugen/config.toml"
+    local unit="waywallen-theme-sync.service"
 
-    if [[ -x "$HOME/.local/bin/wallpaper-console-rust" ]]; then
-        wcr_bin="$HOME/.local/bin/wallpaper-console-rust"
-    elif command -v wallpaper-console-rust >/dev/null 2>&1; then
-        wcr_bin="$(command -v wallpaper-console-rust)"
-    fi
-
-    if [[ -z "$wcr_bin" ]]; then
-        ui_warn "Wallpaper Console hook" "binary not installed; configure after installing Wallpaper Console"
+    if [[ ! -f "$HOME/.config/systemd/user/$unit" ]]; then
+        ui_warn "Theme sync service" "unit file is not installed"
         return 0
     fi
-    if [[ ! -x "$hook_path" || ! -f "$matugen_config" ]]; then
-        ui_warn "Wallpaper Console hook" "helper or matugen config is missing"
-        return 0
-    fi
-
     if [[ "$dry_run" == true ]]; then
-        debug_log "[dry-run] $wcr_bin config-set post_apply_enabled on"
-        debug_log "[dry-run] $wcr_bin config-set post_apply_command $hook_path"
-        debug_log "[dry-run] $wcr_bin config-set restore_on_login on"
-        ui_ok "Wallpaper Console hook" "configuration planned"
+        debug_log "[dry-run] systemctl --user enable --now $unit"
+        ui_ok "Theme sync service" "would be enabled"
         return 0
     fi
-
-    local changed=0 key expected current
-    while IFS='|' read -r key expected; do
-        current="$("$wcr_bin" config-get "$key" 2>/dev/null || true)"
-        if [[ "$current" == "$expected" ]]; then
-            continue
-        fi
-        "$wcr_bin" config-set "$key" "$expected"
-        ((++changed))
-    done <<EOF
-post_apply_enabled|on
-post_apply_command|$hook_path
-restore_on_login|on
-EOF
-
-    if ((changed == 0)); then
-        ui_ok "Wallpaper Console hook" "already current"
-    else
-        ui_ok "Wallpaper Console hook" "enabled with synchronized Waybar helper"
-    fi
-}
-
-disable_wallpaper_console_theme_hook() {
-    local dry_run="${1:-false}"
-    local wcr_bin=""
-
-    if [[ -x "$HOME/.local/bin/wallpaper-console-rust" ]]; then
-        wcr_bin="$HOME/.local/bin/wallpaper-console-rust"
-    elif command -v wallpaper-console-rust >/dev/null 2>&1; then
-        wcr_bin="$(command -v wallpaper-console-rust)"
-    fi
-
-    if [[ -z "$wcr_bin" ]]; then
-        ui_warn "Wallpaper Console ownership" "binary not installed; nothing to disable"
+    if ! command -v systemctl >/dev/null 2>&1 \
+        || ! systemctl --user daemon-reload >/dev/null 2>&1 \
+        || ! systemctl --user enable --now "$unit" >/dev/null 2>&1; then
+        ui_warn "Theme sync service" "could not be enabled; run: systemctl --user enable --now $unit"
         return 0
     fi
-
-    if [[ "$dry_run" == true ]]; then
-        debug_log "[dry-run] $wcr_bin config-set post_apply_enabled off"
-        debug_log "[dry-run] $wcr_bin config-set post_apply_command ''"
-        debug_log "[dry-run] $wcr_bin config-set restore_on_login off"
-        ui_ok "Wallpaper Console ownership" "disable planned"
-        return 0
-    fi
-
-    local changed=0 key expected current
-    while IFS='|' read -r key expected; do
-        current="$("$wcr_bin" config-get "$key" 2>/dev/null || true)"
-        if [[ "$current" == "$expected" ]]; then
-            continue
-        fi
-        "$wcr_bin" config-set "$key" "$expected"
-        ((++changed))
-    done <<'EOF'
-post_apply_enabled|off
-post_apply_command|
-restore_on_login|off
-EOF
-
-    if ((changed == 0)); then
-        ui_ok "Wallpaper Console ownership" "already disabled"
-    else
-        ui_ok "Wallpaper Console ownership" "disabled for QuickShell-only profile"
-    fi
+    ui_ok "Theme sync service" "enabled"
 }

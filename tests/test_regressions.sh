@@ -94,255 +94,110 @@ if [[ "$menu_output" != *"Choose an operation"* || "$menu_output" != *"Exit"* ]]
     exit 1
 fi
 
-echo "==> test 2b: installer exposes desktop shell profiles"
+echo "==> test 2b: the desktop shell option is gone"
 if HOME="$fake_home" "$REPO_ROOT/install.sh" \
-    --yes --skip-packages --dry-run --desktop-shell invalid \
-    >"$tmp_dir/invalid-profile.out" 2>&1; then
-    echo "Invalid desktop shell profile unexpectedly succeeded" >&2
+    --yes --skip-packages --dry-run --desktop-shell waybar \
+    >"$tmp_dir/removed-option.out" 2>&1; then
+    echo "Expected the removed --desktop-shell option to be rejected" >&2
+    cat "$tmp_dir/removed-option.out" >&2
     exit 1
 fi
-grep -Fq "waybar, quickshell, or dual" "$tmp_dir/invalid-profile.out"
+if "$REPO_ROOT/install.sh" --help 2>&1 | grep -qi -e 'desktop-shell' -e 'quickshell'; then
+    echo "Installer help still mentions desktop shell profiles" >&2
+    exit 1
+fi
 
-dual_plan="$(
-    HOME="$fake_home" \
-        "$REPO_ROOT/install.sh" \
-        --yes --skip-packages --dry-run --desktop-shell dual \
-        2>&1
+echo "==> test 3: wallpaper-generated colour files survive a restore, and missing ones are seeded"
+seed_home="$tmp_dir/seed-home"
+seed_repo="$tmp_dir/seed-repo"
+seed_backup="$tmp_dir/seed-backup"
+mkdir -p "$seed_home/.config/wlogout" "$seed_home/.config/niri" \
+    "$seed_repo/configs/config/wlogout" "$seed_repo/configs/config/niri" \
+    "$seed_repo/configs/config/waybar" "$seed_backup"
+printf 'generated\n' >"$seed_home/.config/wlogout/colors.css"
+printf 'generated ring\n' >"$seed_home/.config/niri/theme-colors.kdl"
+printf 'seed\n' >"$seed_repo/configs/config/wlogout/colors.css"
+printf 'seed\n' >"$seed_repo/configs/config/waybar/colors.css"
+printf 'style\n' >"$seed_repo/configs/config/wlogout/style.css"
+printf 'config\n' >"$seed_repo/configs/config/niri/config.kdl"
+(
+    HOME="$seed_home"
+    unset XDG_CONFIG_HOME
+    sync_mapping_entry "$seed_backup" false "$seed_backup/.restore-manifest" \
+        "desktop|$seed_repo/configs/config/wlogout|$seed_home/.config/wlogout|dir|required"
+    sync_mapping_entry "$seed_backup" false "$seed_backup/.restore-manifest" \
+        "desktop|$seed_repo/configs/config/niri|$seed_home/.config/niri|dir|required"
+    sync_waybar_seed_if_missing "$seed_repo" false "$seed_backup/.restore-manifest"
+) >/dev/null
+if [[ "$(cat "$seed_home/.config/wlogout/colors.css")" != generated \
+    || "$(cat "$seed_home/.config/niri/theme-colors.kdl")" != "generated ring" ]]; then
+    echo "Restore overwrote or deleted wallpaper-generated colour files" >&2
+    exit 1
+fi
+if [[ "$(cat "$seed_home/.config/wlogout/style.css")" != style \
+    || "$(cat "$seed_home/.config/niri/config.kdl")" != config ]]; then
+    echo "Restore did not install the managed power menu or niri files" >&2
+    exit 1
+fi
+if [[ "$(cat "$seed_home/.config/waybar/colors.css" 2>/dev/null)" != seed ]]; then
+    echo "Missing Waybar colours were not seeded" >&2
+    exit 1
+fi
+
+echo "==> test 4: a dry-run restore of a directory runs cleanly and changes nothing"
+dry_output="$(
+    HOME="$seed_home"
+    unset XDG_CONFIG_HOME
+    sync_mapping_entry "$seed_backup" true "$seed_backup/.restore-manifest" \
+        "desktop|$seed_repo/configs/config/waybar|$seed_home/.config/waybar-dry|dir|required" 2>&1
 )"
-if [[ "$dual_plan" != *"Desktop shell"*"dual"* ]]; then
-    echo "Dual desktop shell profile is missing from the installation plan" >&2
-    printf '%s\n' "$dual_plan" >&2
+if [[ -n "$dry_output" && "$dry_output" == *"command not found"* ]]; then
+    echo "Dry-run directory restore called a missing function" >&2
+    printf '%s\n' "$dry_output" >&2
     exit 1
 fi
-if [[ "$dual_plan" != *"waybar available"* || "$dual_plan" != *"QuickShell source checkout"* ]]; then
-    echo "Dual profile verification does not cover both desktop shells" >&2
-    printf '%s\n' "$dual_plan" >&2
-    exit 1
-fi
-if [[ "$dual_plan" != *"QuickShell source: https://github.com/ZChenW/quickshell.git"* \
-    || "$dual_plan" != *"QuickShell destination: $fake_home/.local/share/quickshell/clavis"* ]]; then
-    echo "Dual profile does not plan the pinned QuickShell source" >&2
-    printf '%s\n' "$dual_plan" >&2
+if [[ -e "$seed_home/.config/waybar-dry" ]]; then
+    echo "Dry-run restore created the destination" >&2
     exit 1
 fi
 
-waybar_plan="$(
-    HOME="$fake_home" \
-        "$REPO_ROOT/install.sh" \
-        --yes --skip-packages --dry-run --desktop-shell waybar \
-        2>&1
-)"
-if [[ "$waybar_plan" != *"QuickShell"* || "$waybar_plan" != *"skipped (Waybar profile)"* ]]; then
-    echo "Waybar profile does not skip QuickShell source installation" >&2
-    printf '%s\n' "$waybar_plan" >&2
-    exit 1
-fi
-if [[ "$waybar_plan" != *"waybar available"* || "$waybar_plan" == *"QuickShell source checkout"* ]]; then
-    echo "Waybar profile verification is not profile-aware" >&2
-    printf '%s\n' "$waybar_plan" >&2
-    exit 1
-fi
-
-mkdir -p "$fake_home/.local/state/dotfiles"
-printf 'dual\n' >"$fake_home/.local/state/dotfiles/desktop-shell-profile"
-saved_plan="$(
-    HOME="$fake_home" \
-        "$REPO_ROOT/install.sh" \
-        --yes --skip-packages --dry-run \
-        2>&1
-)"
-if [[ "$saved_plan" != *"Desktop shell"*"dual"* ]]; then
-    echo "Installer did not reuse the saved desktop shell profile" >&2
-    printf '%s\n' "$saved_plan" >&2
-    exit 1
-fi
-
-# shellcheck source=scripts/desktop-shell-profile.sh
-source "$REPO_ROOT/scripts/desktop-shell-profile.sh"
-DESKTOP_SHELL_PROFILE=""
-prompt_desktop_shell_profile <<<"2" >"$tmp_dir/profile-menu.out"
-if [[ "$DESKTOP_SHELL_PROFILE" != quickshell ]]; then
-    echo "Interactive desktop shell menu did not select QuickShell" >&2
-    cat "$tmp_dir/profile-menu.out" >&2
-    exit 1
-fi
-grep -Fq "Waybar + QuickShell" "$tmp_dir/profile-menu.out"
-
-DESKTOP_SHELL_PROFILE=quickshell
-build_sync_mappings "$REPO_ROOT"
-if printf '%s\n' "${SYNC_MAPPINGS[@]}" \
-    | grep -F -e '/waybar|' -e 'wcr-post-apply-waybar' >/dev/null; then
-    echo "QuickShell-only profile still manages Waybar configuration" >&2
-    exit 1
-fi
-DESKTOP_SHELL_PROFILE=dual
-
-echo "==> test 3: Wallpaper Console hook is configured during sync"
-fake_bin="$tmp_dir/bin"
-mkdir -p "$fake_bin" "$fake_home/.local/bin" "$fake_home/.config/matugen"
-printf 'config\n' >"$fake_home/.config/matugen/config.toml"
-wcr_log="$tmp_dir/wcr.log"
-cat >"$fake_home/.local/bin/wallpaper-console-rust" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"$wcr_log"
-EOF
-chmod +x "$fake_home/.local/bin/wallpaper-console-rust"
-printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/wcr-post-apply-waybar.sh"
-chmod +x "$fake_home/.local/bin/wcr-post-apply-waybar.sh"
-
-configure_wallpaper_console_theme_hook false
-if ! grep -Fxq "config-set post_apply_enabled on" "$wcr_log"; then
-    echo "Wallpaper Console hook was not enabled" >&2
-    cat "$wcr_log" >&2
-    exit 1
-fi
-if ! grep -Fxq "config-set post_apply_command $fake_home/.local/bin/wcr-post-apply-waybar.sh" "$wcr_log"; then
-    echo "Wallpaper Console hook command was not synchronized with an absolute path" >&2
-    cat "$wcr_log" >&2
-    exit 1
-fi
-
-quickshell_hook_plan="$(
-    HOME="$fake_home" \
-        "$REPO_ROOT/install.sh" \
-        --yes --skip-packages --dry-run --desktop-shell quickshell \
-        2>&1
-)"
-if [[ "$quickshell_hook_plan" != *"Wallpaper Console ownership"* \
-    || "$quickshell_hook_plan" != *"disable planned"* ]]; then
-    echo "QuickShell-only profile does not disable stale Waybar wallpaper ownership" >&2
-    printf '%s\n' "$quickshell_hook_plan" >&2
-    exit 1
-fi
-if [[ "$quickshell_hook_plan" != *"QuickShell source checkout"* \
-    || "$quickshell_hook_plan" != *"QuickShell QML modules"* \
-    || "$quickshell_hook_plan" == *"waybar available"* ]]; then
-    echo "QuickShell profile verification is not profile-aware" >&2
-    printf '%s\n' "$quickshell_hook_plan" >&2
-    exit 1
-fi
-
-cat >"$fake_home/.local/bin/wallpaper-console-rust" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"$wcr_log"
-case "\${1:-}:\${2:-}" in
-    config-get:post_apply_enabled) printf 'on\n' ;;
-    config-get:post_apply_command) printf '%s\n' "$fake_home/.local/bin/wcr-post-apply-waybar.sh" ;;
-    config-get:restore_on_login) printf 'on\n' ;;
-esac
-EOF
-chmod +x "$fake_home/.local/bin/wallpaper-console-rust"
-: >"$wcr_log"
-configure_wallpaper_console_theme_hook false
-if grep -q '^config-set ' "$wcr_log"; then
-    echo "Already-current Wallpaper Console settings were rewritten" >&2
-    cat "$wcr_log" >&2
-    exit 1
-fi
-
-: >"$wcr_log"
-disable_wallpaper_console_theme_hook false
-grep -Fxq "config-set post_apply_enabled off" "$wcr_log"
-grep -Fq "config-set post_apply_command" "$wcr_log"
-grep -Fxq "config-set restore_on_login off" "$wcr_log"
-
-echo "==> test 4: hook honors XDG config paths"
-xdg_config="$tmp_dir/xdg-config"
-mkdir -p "$xdg_config/matugen/templates" "$xdg_config/waybar" "$fake_bin"
-printf 'config\n' >"$xdg_config/matugen/config.toml"
-printf 'template\n' >"$xdg_config/matugen/templates/waybar-colors.css"
-printf 'wallpaper\n' >"$tmp_dir/wall.png"
-matugen_log="$tmp_dir/matugen.log"
-cat >"$fake_bin/matugen" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >"$matugen_log"
-printf 'generated\n' >"$xdg_config/waybar/colors.css"
-EOF
-cat >"$fake_bin/pgrep" <<'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-chmod +x "$fake_bin/matugen" "$fake_bin/pgrep"
-
-HOME="$fake_home" XDG_CONFIG_HOME="$xdg_config" PATH="$fake_bin:/usr/bin" \
-    WCR_STILL="$tmp_dir/wall.png" \
-    "$REPO_ROOT/configs/local-bin/wcr-post-apply-waybar.sh"
-if ! grep -Fq -- "--config $xdg_config/matugen/config.toml" "$matugen_log"; then
-    echo "Hook did not pass the synchronized matugen config explicitly" >&2
-    cat "$matugen_log" >&2
-    exit 1
-fi
-if ! grep -Fq -- "--type scheme-content" "$matugen_log" \
-    || ! grep -Fq -- "--prefer saturation" "$matugen_log"; then
-    echo "Hook did not request content-oriented saturated colors" >&2
-    cat "$matugen_log" >&2
-    exit 1
-fi
-if [[ ! -s "$xdg_config/waybar/colors.css" ]]; then
-    echo "Hook did not generate Waybar colors" >&2
-    exit 1
-fi
-if [[ ! -e "$xdg_config/waybar/style.css" ]]; then
-    echo "Hook did not trigger a CSS-only Waybar refresh" >&2
-    exit 1
-fi
-
-echo "==> test 4b: theme refresh does not restart Waybar"
-waybar_control_log="$tmp_dir/waybar-control.log"
-cat >"$fake_bin/pgrep" <<EOF
-#!/usr/bin/env bash
-printf 'pgrep %s\n' "\$*" >>"$waybar_control_log"
-EOF
-cat >"$fake_bin/pkill" <<EOF
-#!/usr/bin/env bash
-printf 'pkill %s\n' "\$*" >>"$waybar_control_log"
-EOF
-cat >"$fake_bin/setsid" <<EOF
-#!/usr/bin/env bash
-printf 'setsid %s\n' "\$*" >>"$waybar_control_log"
-EOF
-cat >"$fake_bin/waybar" <<EOF
-#!/usr/bin/env bash
-printf 'waybar %s\n' "\$*" >>"$waybar_control_log"
-EOF
-chmod +x "$fake_bin/pgrep" "$fake_bin/pkill" "$fake_bin/setsid" "$fake_bin/waybar"
-HOME="$fake_home" XDG_CONFIG_HOME="$xdg_config" PATH="$fake_bin:/usr/bin" \
-    WCR_STILL="$tmp_dir/wall.png" \
-    "$REPO_ROOT/configs/local-bin/wcr-post-apply-waybar.sh"
-if [[ -s "$waybar_control_log" ]]; then
-    echo "Theme refresh unexpectedly invoked a Waybar lifecycle command" >&2
-    cat "$waybar_control_log" >&2
-    exit 1
-fi
-
-echo "==> test 5: niri startup delegates desktop mode restoration once"
+echo "==> test 5: niri starts the bar and notifications itself, and locks through IdleFlow"
 niri_config="$REPO_ROOT/configs/config/niri/config.kdl"
-if rg -n '/home/[^/]+/.local/bin/wallpaper-console-rust' "$niri_config"; then
-    echo "niri config contains a machine-specific Wallpaper Console path" >&2
+if rg -n -i 'desktop-shell|quickshell|clavis|wallpaper-console' "$niri_config"; then
+    echo "niri config still references a retired component" >&2
     exit 1
 fi
-desktop_shell_start_count="$(rg -c 'desktop-shell start' "$niri_config" || true)"
-if [[ "$desktop_shell_start_count" != 1 ]]; then
-    echo "Expected niri to restore the selected desktop shell exactly once, found $desktop_shell_start_count entries" >&2
+if ! rg -q 'spawn-sh-at-startup ".*exec waybar"' "$niri_config" \
+    || ! rg -q '^spawn-at-startup "mako"$' "$niri_config"; then
+    echo "niri no longer starts Waybar and mako at login" >&2
     exit 1
 fi
-if rg -q '^spawn-at-startup "(waybar|mako)"$|spawn-at-startup ".*swayidle' "$niri_config"; then
-    echo "Desktop companion services bypass the desktop-shell mode manager" >&2
+if rg -q 'spawn-at-startup ".*swayidle|swaylock' "$niri_config"; then
+    echo "niri runs its own idle or lock command beside IdleFlow" >&2
     exit 1
 fi
-if ! rg -q 'desktop-shell switcher' "$niri_config"; then
-    echo "niri does not expose the Waybar/QuickShell switcher" >&2
+if ! rg -q 'idlectl" "lock"' "$niri_config"; then
+    echo "The lock key does not go through IdleFlow" >&2
     exit 1
 fi
 
-echo "==> test 6: retired shell integrations are removed without removing niri or QuickShell"
-mkdir -p "$fake_home/.local/bin"
+echo "==> test 6: retired shell integrations are removed without removing niri"
+mkdir -p "$fake_home/.local/bin" "$fake_home/.local/share/zsh/site-functions"
 printf 'legacy\n' >"$fake_home/.local/bin/inir"
 printf 'legacy\n' >"$fake_home/.local/bin/toggle-niri-shell"
+printf 'legacy\n' >"$fake_home/.local/bin/desktop-shell"
+printf 'legacy\n' >"$fake_home/.local/bin/wcr-post-apply-waybar.sh"
+printf 'legacy\n' >"$fake_home/.local/share/zsh/site-functions/_desktop-shell"
 printf 'keep\n' >"$fake_home/.local/bin/niri"
 remove_retired_desktop_shell_paths "$backup_root" false "$backup_root/.restore-manifest"
-if [[ -e "$fake_home/.local/bin/inir" || -e "$fake_home/.local/bin/toggle-niri-shell" ]]; then
-    echo "Retired iNiR launchers survived config sync" >&2
+for retired in inir toggle-niri-shell desktop-shell wcr-post-apply-waybar.sh; do
+    if [[ -e "$fake_home/.local/bin/$retired" ]]; then
+        echo "Retired launcher survived config sync: $retired" >&2
+        exit 1
+    fi
+done
+if [[ -e "$fake_home/.local/share/zsh/site-functions/_desktop-shell" ]]; then
+    echo "Retired desktop-shell completion survived config sync" >&2
     exit 1
 fi
 if [[ "$(cat "$fake_home/.local/bin/niri")" != keep ]]; then
@@ -351,14 +206,14 @@ if [[ "$(cat "$fake_home/.local/bin/niri")" != keep ]]; then
 fi
 
 retired_references="$(
-    rg -n -i 'i[n]ir|cae[l]estia|bar-shell-switch' \
+    rg -n -i 'i[n]ir|cae[l]estia|bar-shell-switch|quick[s]hell|desktop-[s]hell' \
     "$REPO_ROOT/install.sh" \
     "$REPO_ROOT/scripts" \
     "$REPO_ROOT/configs" \
     "$REPO_ROOT/packages" \
-    "$REPO_ROOT/docs" \
     "$REPO_ROOT/README.md" \
         | grep -vF "$REPO_ROOT/scripts/sync-configs.sh:" \
+        | grep -vF "$REPO_ROOT/scripts/uninstall.sh:" \
         || true
 )"
 if [[ -n "$retired_references" ]]; then
@@ -368,10 +223,6 @@ if [[ -n "$retired_references" ]]; then
 fi
 if ! grep -Fxq niri "$REPO_ROOT/packages/arch-essential.txt"; then
     echo "niri itself must remain in the essential package manifest" >&2
-    exit 1
-fi
-if ! grep -Fxq quickshell "$REPO_ROOT/packages/arch-apps.txt"; then
-    echo "QuickShell must remain available for custom shell development" >&2
     exit 1
 fi
 

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Power menu: wlogout as one centred row of five buttons on the focused display.
+# Running it again while it is open closes it.
+set -euo pipefail
+
+if pkill -x wlogout; then
+    exit 0
+fi
+
+read -r x y width height < <(niri msg --json focused-output 2>/dev/null \
+    | jq -r '.logical | "\(.x) \(.y) \(.width) \(.height)"' 2>/dev/null) || true
+width=${width:-1920}
+height=${height:-1080}
+
+# wlogout picks its display by GDK monitor index; find the one at the focused output's position.
+monitor=$(python3 -I - "${x:-0}" "${y:-0}" 2>/dev/null <<'PY' || true
+import sys
+import gi
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk
+display = Gdk.Display.get_default()
+for index in range(display.get_n_monitors()):
+    geometry = display.get_monitor(index).get_geometry()
+    if (geometry.x, geometry.y) == (int(sys.argv[1]), int(sys.argv[2])):
+        print(index)
+        break
+PY
+)
+
+gap=16
+button=$(((width - 112 - gap * 4) / 5))
+((button > 128)) && button=128
+((button < 72)) && button=72
+side=$(((width - button * 5 - gap * 4) / 2))
+top=$(((height - button) / 2))
+
+exec wlogout --protocol layer-shell --primary-monitor "${monitor:-0}" --buttons-per-row 5 \
+    --column-spacing "$gap" --margin-left "$side" --margin-right "$side" \
+    --margin-top "$top" --margin-bottom "$top"

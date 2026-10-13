@@ -4,11 +4,13 @@ antigravity
 anydesk-bin
 appimagelauncher
 blueberry
+cli-proxy-api-bin
 cursor-bin
 darkly-bin
 ddcutil-service
 grok-bot-bin
 herdcat-git
+herdcat-git-debug
 hyprmag-git
 libffi7
 maplemono-nf-cn-unhinted
@@ -18,6 +20,7 @@ microsoft-edge-beta-bin
 mpvpaper
 obsidian-bin
 otf-space-grotesk
+swaylock-effects
 ttf-readex-pro
 ttf-rubik-vf
 ttf-twemoji

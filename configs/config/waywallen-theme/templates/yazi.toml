@@ -1,0 +1,13 @@
+# Matugen — yazi 主题（waywallen-theme-sync）
+[manager]
+cwd = { fg = "{{colors.primary.default.hex}}" }
+hovered = { fg = "{{colors.on_primary.default.hex}}", bg = "{{colors.primary.default.hex}}" }
+preview_hovered = { bg = "{{colors.surface_container_low.default.hex}}" }
+find_keyword = { fg = "{{colors.tertiary.default.hex}}" }
+
+[status]
+separator_open = "{{colors.primary.default.hex}}"
+separator_close = "{{colors.primary.default.hex}}"
+
+[input]
+border = { fg = "{{colors.primary.default.hex}}" }

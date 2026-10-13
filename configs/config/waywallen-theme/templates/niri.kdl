@@ -1,0 +1,11 @@
+// Matugen — niri 配色（waywallen-theme-sync）
+layout {
+    focus-ring {
+        active-color "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface_container_highest.default.hex}}"
+    }
+    border {
+        active-color "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface_container_high.default.hex}}"
+    }
+}

@@ -1,8 +1,8 @@
 # Install Guide
 
-This repository restores an Arch Linux desktop setup with zsh, niri, a
-Waybar/QuickShell desktop shell, kitty, fastfetch, waypaper, and local launcher
-scripts.
+This repository restores an Arch Linux desktop setup with zsh, niri, Waybar,
+a wlogout power menu, wallpaper-driven colours, kitty, fastfetch, waypaper, and
+local launcher scripts.
 
 ## Supported OS
 
@@ -43,16 +43,16 @@ After choosing Install, choose an installation profile first:
 
 - **Standard** is the default complete portable software scope.
 - **Lightweight** is the X230-friendly daily development scope. It keeps
-  Firefox, Thunar, VS Code, Neovim, Vim, Codex, Kitty, Zsh, the Node/Python
+  Firefox, Nautilus, VS Code, Neovim, Vim, Codex, Kitty, Zsh, the Node/Python
   toolchain, Chinese input, fonts, Waybar, and every managed configuration
-  group including wallpapers. It excludes QuickShell, games, Office, duplicate
+  group including wallpapers. It excludes games, Office, duplicate
   browsers, communication clients, KDE applications, heavyweight media tools,
   and specialist toolchains.
 
 Then choose **Automatic** (recommended) or **Customize**. Automatic applies the
 profile defaults and presents one final review. Customize exposes the existing
-package, desktop-shell, and configuration-group controls. Lightweight always
-uses Waybar and never offers QuickShell, dual-shell, or machine-local packages.
+package and configuration-group controls. Lightweight never offers
+machine-local packages.
 
 Interactive menus support Up/Down, Enter, and number shortcuts. The final
 review can start the install, return to the first step, or cancel without
@@ -78,9 +78,6 @@ operations or `--debug` for raw commands.
 | `./install.sh --skip-packages` | Restore configs only |
 | `./install.sh --full-packages` | Include `packages/arch-machine-local.txt` |
 | `./install.sh --no-aur` | Skip AUR packages |
-| `./install.sh --desktop-shell waybar` | Install Waybar only |
-| `./install.sh --desktop-shell quickshell` | Install QuickShell only |
-| `./install.sh --desktop-shell dual` | Install both and enable switching |
 | `./install.sh --export-packages` | Regenerate `packages/*.txt` from this machine |
 | `./install.sh --doctor` | Diagnostics only (tools, configs, backups, validation) |
 | `./install.sh --uninstall` | Safe uninstall: archive then remove managed configs |
@@ -117,33 +114,32 @@ successful real install. An explicit `--install-profile` wins over saved state;
 saved state wins over the Standard default. Dry runs, cancellations, and
 failures never update it.
 
-The selected desktop shell profile is stored under
-`${XDG_STATE_HOME:-~/.local/state}/dotfiles/desktop-shell-profile` and reused by
-later non-interactive installs and updates. QuickShell is checked out from the
-fork and exact commit in `packages/quickshell-source.conf`, built without root,
-and kept at `${XDG_DATA_HOME:-~/.local/share}/quickshell/clavis`. A dirty or
-unrelated directory at that path is never overwritten.
+There is one desktop: niri with Waybar. The earlier Waybar/QuickShell switcher
+(`desktop-shell`) is retired; an install or update removes its launcher,
+completion and the old Wallpaper Console theme hook from `~/.local`.
 
-For the current CMake-based personal Clavis checkout, clone the private
-`git@github.com:ZChenW/clavis-personal.git` repository into
-`~/Projects/clavis-personal` and pass
-`QUICKSHELL_LOCAL_SOURCE="$HOME/Projects/clavis-personal"` when invoking the
-installer. This source mode builds into `<source>/build/qml`, points
-`~/.config/quickshell/clavis` at that checkout, and records the runtime path
-for `desktop-shell`. It preserves local source changes and does not invoke
-the legacy source installer. Keep this checkout at the selected path; no
-separate `clavis-upstream-migration` folder is needed.
+Two pieces are installed separately and only referenced here:
+
+- **IdleFlow** owns idle timeouts, locking and the idle hibernate. niri, Waybar
+  and the power menu lock through `idlectl lock`; nothing else may run its own
+  idle timers or locker. The lock screen is `swaylock-effects`.
+- **Suspend is not used.** This laptop only has suspend-to-idle, and it does
+  not resume while the NVIDIA GPU drives the displays. The power menu has no
+  suspend button, IdleFlow hibernates instead, and
+  `/etc/systemd/sleep.conf.d/10-no-suspend.conf` (not managed here) turns the
+  suspend verbs off system-wide.
+- **waywallen** draws the wallpaper. `waywallen-theme-sync` follows it.
 
 ## Config Groups
 
 | Group | Restored paths |
 |-------|----------------|
 | `shell` | `~/.zshrc`, `~/.zshrc.local` |
-| `desktop` | `~/.config/niri`, profile-selected Waybar config, fcitx5, mako, environment.d, qt5ct, qt6ct |
+| `desktop` | `~/.config/niri`, Waybar, wlogout, `waywallen-theme`, the `waywallen-theme-sync` user service, the IdleFlow policy, fcitx5, mako, environment.d, qt5ct, qt6ct |
 | `terminal` | `~/.config/kitty`, fastfetch, cava |
-| `apps` | waypaper, matugen, Thunar, mimeapps.list, user-dirs.dirs, git/ignore |
+| `apps` | waypaper, mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
-| `local-bin` | `desktop-shell` and its zsh completion, `toggle-wlsunset`, profile-selected Waybar theme hook |
+| `local-bin` | `toggle-wlsunset`, `power-menu`, `waywallen-theme-sync` |
 | `media` | `~/Pictures/wallpapers` |
 
 `~/.zshrc.local` is handled only when the `shell` group is selected:
@@ -154,14 +150,17 @@ separate `clavis-upstream-migration` folder is needed.
 
 `chmod +x` on local-bin scripts runs only when the `local-bin` group is selected.
 
-With the Waybar or dual profile, when Wallpaper Console Rust is installed,
-syncing the desktop/apps/local-bin
-groups enables its post-apply hook, stores the synchronized helper as an
-absolute command path, and enables login restore. The helper passes the XDG
-matugen config explicitly, verifies `waybar/colors.css` was generated, and
-restarts Waybar only when it was already running. The generated
-`waybar/colors.css` is preserved during update and snapshot; the committed copy
-is used only as a first-install seed.
+Syncing the desktop group enables `waywallen-theme-sync.service` (skipped
+with `--restore-only`). It renders every template in
+`~/.config/waywallen-theme/templates` to the path listed for it in
+`~/.config/waywallen-theme/config.toml`, which also holds the scheme and mode,
+and rewrites `~/.config/matugen/config.toml` on each run.
+
+Files it generates are preserved during update and never captured by a
+snapshot: `waybar/colors.css`, `wlogout/colors.css` and
+`niri/theme-colors.kdl`. The committed `colors.css` copies are used only as
+first-install seeds. `~/.config/swaylock/config` is generated too and uses
+`swaylock-effects` options, so plain `swaylock` cannot read it.
 
 ## Package Manifests
 
@@ -176,8 +175,6 @@ Software is managed through files in `packages/`:
 | `arch-lightweight.txt` | Lightweight official and AUR allowlist | Lightweight only |
 | `arch-machine-local.txt` | Kernel, firmware, boot, GPU, audio stack | no |
 | `arch-exclude.txt` | Packages excluded from automation | never |
-| `quickshell-build.txt` | QuickShell build/runtime dependencies | QuickShell or dual profile |
-| `quickshell-source.conf` | Pinned QuickShell fork and commit | source lock, not a package list |
 
 Standard restores the existing portable software set. Lightweight reads only
 `arch-lightweight.txt`. Machine-local packages are skipped unless Standard is
@@ -331,9 +328,8 @@ Remove managed configs without touching OS packages or `~/.zshrc.local`:
 ```
 
 `--dry-run` works with uninstall modes and only prints planned removals.
-Safe uninstall also removes the saved shell profile and a clean managed
-QuickShell checkout. A checkout with local changes or a different origin is
-kept and reported.
+Safe uninstall also removes state files left by the retired desktop shell
+switcher.
 
 ## Verification
 
@@ -341,8 +337,7 @@ After syncing, the installer runs checks for the selected config groups:
 
 - `zsh -n ~/.zshrc` (shell group)
 - `niri validate -c ~/.config/niri/config.kdl` (desktop group)
-- `fastfetch --version`, `kitty --version`, and the selected shell binaries
-- QuickShell source, `key`, and user-level QML modules for QuickShell/dual
+- `fastfetch --version`, `kitty --version`, `waybar --version`
 - Checks that restored paths are real files/directories, not symlinks
 
 Missing tools are reported as `SKIP` when packages were not installed.

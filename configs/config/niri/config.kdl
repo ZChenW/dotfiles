@@ -285,8 +285,9 @@ layout {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// Restore the last selected Waybar/QuickShell desktop mode.
-spawn-sh-at-startup "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell start"
+// The bar (its brightness module is rebuilt first if needed) and notifications.
+spawn-sh-at-startup "$HOME/.config/waybar/cffi/build.sh; exec waybar"
+spawn-at-startup "mako"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 spawn-at-startup "fcitx5"
 spawn-at-startup "herdcat" "-w"
@@ -354,9 +355,9 @@ window-rule {
     match app-id="bluetui"
     match app-id="nmtui"
     match app-id="nm-connection-editor"
-    match app-id="wallpaper-console-gui-rust"
-    match app-id="wallpaper-console"
+    match app-id=r#"^org\.waywallen\.waywallen$"#
     match app-id="idle-control-desktop"
+    match app-id="herdr-keys"
     open-floating true
 }
 
@@ -402,9 +403,12 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
-    Mod+T hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
-    Mod+D hotkey-overlay-title="Application Launcher" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell launcher"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell lock"; }
+    Mod+T hotkey-overlay-title="Open Kitty (switch: kitty-mode)" { spawn "/home/chakew/.local/bin/kitty-mode" "launch"; }
+    Mod+Shift+T repeat=false hotkey-overlay-title="Herdr 快捷键速查" { spawn "/home/chakew/.local/bin/herdr-keys"; }
+    Mod+Alt+V repeat=false hotkey-overlay-title="Voxtype: start/stop voice typing" { spawn "/home/chakew/.local/bin/voxtype" "record" "toggle"; }
+    Mod+Alt+C repeat=false hotkey-overlay-title="Voxtype: cancel voice typing" { spawn "/home/chakew/.local/bin/voxtype" "record" "cancel"; }
+    Mod+D hotkey-overlay-title="Application Launcher" { spawn "fuzzel"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "/home/chakew/.local/bin/idlectl" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
@@ -659,26 +663,27 @@ binds {
     // moving the mouse or pressing any other key.
     Mod+Shift+P { power-off-monitors; }
 
-    Mod+Shift+0 hotkey-overlay-title="Open Wallpaper Console Rust" {
-        spawn "/home/chakew/.local/bin/wallpaper-console-gui-rust"
+    Mod+Shift+0 hotkey-overlay-title="Open Waywallen" {
+        spawn "/home/chakew/.local/bin/waywallen"
     }
 
-
-//    Mod+Shift+9 hotkey-overlay-title="Open Wallpaper Console" {
-//    spawn "kitty" "--class=wallpaper-console" "-e" "/home/chakew/.local/bin/wallpaper-console"
-//}
 
     Mod+Shift+9 { spawn-sh "pkill fcitx5 || fcitx5"; }
 
     Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
 
-    Mod+Shift+7 hotkey-overlay-title="Choose Waybar or QuickShell" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell switcher"; }
-    Mod+Shift+Space hotkey-overlay-title="QuickShell Keystone Hub" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell hub"; }
-    Mod+Shift+S hotkey-overlay-title="QuickShell Keystone Tools" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell tools"; }
-    Mod+Shift+C hotkey-overlay-title="QuickShell Control Center" { spawn-sh "PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH\" desktop-shell control-center"; }
 
 }
 
+
+// Power menu (wlogout): blur what is behind it.
+layer-rule {
+    match namespace="^logout_dialog$"
+    background-effect {
+        blur true
+        xray false
+    }
+}
 
 layer-rule {
     match namespace="^launcher$"
@@ -697,19 +702,15 @@ layer-rule {
 //     open-on-output "Beihai Century Joint Innovation Technology Co.,Ltd P2410R 0000000000000"
 // }
 
-// BEGIN CLAVIS OUTPUTS
-// QuickShell only owns mode, scale, and position in this fragment.
-include optional=true "clavis/outputs.kdl"
-include optional=true "clavis/colors.kdl"
-// END CLAVIS OUTPUTS
+include optional=true "outputs.kdl"
 
-// BEGIN CLAVIS CURSOR
-include optional=true "clavis/cursor.kdl"
-// END CLAVIS CURSOR
+// Focus ring and border colours, regenerated from the wallpaper by waywallen-theme-sync.
+include optional=true "theme-colors.kdl"
 
-include "clavis/effects.kdl";
-
-include "clavis/layer-rules.kdl";
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 26
+}
 
 // DP-8 is wired to the NVIDIA GPU while eDP-1 is on the AMD iGPU. Rendering on
 // the iGPU forced every external-monitor frame through a cross-GPU copy that

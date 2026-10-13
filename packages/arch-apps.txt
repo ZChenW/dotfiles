@@ -6,6 +6,7 @@ capitaine-cursors
 chromium
 clang
 cloud-image-utils
+cloudflared
 corepack
 ctags
 discord
@@ -16,11 +17,13 @@ ffmpegthumbnailer
 fzf
 gcc-fortran
 ghc
+ghostty
 gnome-keyring
 gst-libav
 gst-plugins-base
 gst-plugins-good
 happy
+hyprland
 jq
 jujutsu
 jupyterlab
@@ -32,7 +35,6 @@ libreoffice-still
 libreoffice-still-zh-cn
 libtiff5
 linuxconsole
-lxqt-powermanagement
 namcap
 neovim
 nodejs
@@ -51,7 +53,6 @@ python-scikit-learn
 qemu-base
 qt6-lottie
 qtkeychain-qt6
-quickshell
 r
 rime-ice-pinyin-git
 satty
@@ -61,6 +62,7 @@ songrec
 stack
 steam
 stylua
+sway
 tesseract-data-chi_sim
 tesseract-data-eng
 texlive-bin
@@ -72,6 +74,7 @@ texlive-mathscience
 texlive-meta
 texlive-plaingeneric
 texstudio
+tmux
 tokei
 translate-shell
 tree
@@ -82,8 +85,10 @@ vim
 vlc
 webkit2gtk-4.1
 webkitgtk-6.0
+wezterm
 wget
 whisper-cpp
 yt-dlp
 zathura
 zathura-pdf-mupdf
+zotero-bin

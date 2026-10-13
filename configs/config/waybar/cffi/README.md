@@ -7,7 +7,7 @@ swaps only the slider + moon-phase icon for a small CFFI widget that talks to
 modules with per-output commands from `brightness-edp.jsonc` /
 `brightness-dp.jsonc`.
 
-`desktop-shell` runs `cffi/build.sh` before starting Waybar. The script compiles
+niri's startup line runs `cffi/build.sh` before starting Waybar. The script compiles
 only after a source change, stores the library under the user cache, and writes
 an absolute runtime-only path into `waybar/brightness-module.json` (included by
 the DP-8 bar only). Waybar merges includes with first-write-wins semantics, so

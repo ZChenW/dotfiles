@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Waybar display controls using Clavis's guarded Niri preview transactions."""
+"""Waybar display controls using guarded Niri preview transactions (backend in ./display-backend)."""
 import copy
 import json
 import math
@@ -201,15 +201,10 @@ def decode_response(code, stdout, stderr):
 
 
 def backend_directory():
-    config_home = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config')))
-    candidates = []
-    if os.environ.get('QUICKSHELL_CONFIG_PATH'):
-        candidates.append(Path(os.environ['QUICKSHELL_CONFIG_PATH']) / 'scripts/system')
-    candidates.append(config_home / 'quickshell/clavis/scripts/system')
-    for path in candidates:
-        if all((path / name).is_file() for name in ('niri_config.py', 'niri_outputs.py', 'display_preview.py')):
-            return path
-    raise RuntimeError('找不到 Clavis 显示预览后端。请检查 QuickShell 配置路径。')
+    path = Path(__file__).resolve().parent / 'display-backend'
+    if all((path / name).is_file() for name in ('niri_config.py', 'niri_outputs.py', 'display_preview.py')):
+        return path
+    raise RuntimeError(f'找不到显示预览后端：{path}')
 
 
 def run_json(argv):
@@ -587,7 +582,7 @@ def create_application():
                 (idle and ready and not self.stale and not error and bool(patches(self.rows)))))
             message = self.notice or error
             if not ready and self.saved:
-                message = '请先在 Clavis 设置里连接 outputs 片段'
+                message = '请先在 niri 配置里 include "outputs.kdl"'
             if self.stale:
                 message = '显示器已变化，请重置后再应用'
             self.message.set_text(message or '应用后有 10 秒确认时间；未确认会自动还原')

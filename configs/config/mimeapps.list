@@ -9,3 +9,4 @@ x-scheme-handler/sand=grok-bot.desktop
 text/plain=nvim.desktop
 text/markdown=nvim.desktop
 application/json=nvim.desktop
+inode/directory=org.gnome.Nautilus.desktop

@@ -68,10 +68,10 @@ if [[ "$apply_profile_output" != *"install.sh --yes --install-profile lightweigh
     exit 1
 fi
 
-echo "==> test 6: dry-run apply forwards a compatible desktop shell profile"
-apply_shell_output="$(update_apply "$fake_repo" true standard quickshell)"
-if [[ "$apply_shell_output" != *"--desktop-shell quickshell"* ]]; then
-    echo "Expected update apply to forward the desktop shell profile" >&2
+echo "==> test 6: dry-run apply no longer passes a desktop shell profile"
+apply_shell_output="$(update_apply "$fake_repo" true standard)"
+if [[ "$apply_shell_output" == *"--desktop-shell"* ]]; then
+    echo "Update apply must not pass the removed --desktop-shell option" >&2
     printf '%s\n' "$apply_shell_output" >&2
     exit 1
 fi

@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""Desktop colours follow the wallpaper on the focused display.
+
+    waywallen-theme-sync          watch waywallen and niri, recolour on change
+    waywallen-theme-sync --once   recolour for the focused display and exit
+
+waywallen has no post-apply hook. Its daemon serves a local control websocket
+that pushes which wallpaper each display shows; niri's event stream says which
+display has focus. Whenever the wallpaper under the focus changes, a still is
+picked (the image itself, a frame of a video, the preview of a scene or web
+wallpaper) and matugen renders every template in
+~/.config/waywallen-theme/templates to the file listed for it in
+~/.config/waywallen-theme/config.toml, which also holds the scheme and mode.
+
+Every generated palette is kept in ~/.cache/waywallen-theme/palettes, so
+moving focus back to a display whose wallpaper was seen before only copies
+files. Delete that folder after changing templates.
+"""
+import base64
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import sqlite3
+import struct
+import subprocess
+import sys
+import threading
+import time
+import tomllib
+from pathlib import Path
+
+HOME = Path.home()
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME') or HOME / '.config')
+DATA = Path(os.environ.get('XDG_DATA_HOME') or HOME / '.local/share')
+CACHE = HOME / '.cache/waywallen-theme'
+DB = Path(os.environ.get('WAYWALLEN_DB') or DATA / 'waywallen/waywallen-v2.db')
+SETTINGS = CONFIG / 'waywallen-theme/config.toml'
+TEMPLATES = CONFIG / 'waywallen-theme/templates'
+MATUGEN_CONFIG = CONFIG / 'matugen/config.toml'  # rewritten on every run from SETTINGS
+BUS = ['org.waywallen.waywallen.Daemon', '/org/waywallen/waywallen/Daemon', 'org.waywallen.waywallen.Daemon1']
+STOPPED = 4  # WallpaperPresentationState
+KEPT_PALETTES = 60
+
+
+def log(message):
+    print(f'waywallen-theme-sync: {message}', file=sys.stderr, flush=True)
+
+
+def daemon_property(name):
+    try:
+        out = subprocess.run(['busctl', '--user', 'get-property', *BUS, name],
+                             check=True, capture_output=True, text=True, timeout=3).stdout.split(None, 1)
+        return out[1].strip().strip('"') if len(out) == 2 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+# --- waywallen control websocket: protobuf frames, read-only --------------------------------
+
+def read_varint(data, at):
+    value = shift = 0
+    while True:
+        byte = data[at]
+        at += 1
+        value |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            return value, at
+        shift += 7
+
+
+def fields(data):
+    """Yields (field number, value) for one protobuf message; bytes for length-delimited fields."""
+    at = 0
+    while at < len(data):
+        key, at = read_varint(data, at)
+        wire = key & 7
+        if wire == 0:
+            value, at = read_varint(data, at)
+        elif wire == 2:
+            size, at = read_varint(data, at)
+            value = data[at:at + size]
+            at += size
+        elif wire == 1:
+            value = data[at:at + 8]
+            at += 8
+        elif wire == 5:
+            value = data[at:at + 4]
+            at += 4
+        else:
+            raise ValueError(f'unsupported wire type {wire}')
+        yield key >> 3, value
+
+
+def display_info(data):
+    info = dict(fields(data))
+    name = info.get(2, b'')
+    return info.get(1, 0), name.decode('utf-8', 'replace') if isinstance(name, bytes) else ''
+
+
+class State:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.changed = threading.Event()
+        self.displays = {}       # waywallen display id -> output name
+        self.wallpapers = {}     # waywallen display id -> wallpaper id
+        self.focused = None      # output name
+        self.connected = False
+
+    def update(self, **values):
+        with self.lock:
+            for key, value in values.items():
+                setattr(self, key, value)
+        self.changed.set()
+
+    def handle_event(self, event):
+        for number, value in fields(event):
+            if number == 1:      # DisplaySnapshot
+                self.update(displays=dict(display_info(v) for n, v in fields(value) if n == 1))
+            elif number == 2:    # DisplayChanged
+                for n, v in fields(value):
+                    if n == 1:
+                        display_id, name = display_info(v)
+                        with self.lock:
+                            self.displays = {**self.displays, display_id: name}
+                        self.changed.set()
+            elif number == 3:    # DisplayRemoved
+                removed = dict(fields(value)).get(1, 0)
+                with self.lock:
+                    self.displays = {k: v for k, v in self.displays.items() if k != removed}
+                self.changed.set()
+            elif number == 26:   # WallpaperPresentationSnapshot: full replacement
+                wallpapers = {}
+                for n, presentation in fields(value):
+                    if n != 1:
+                        continue
+                    wallpaper_id, targets, state = '', [], 0
+                    for field, v in fields(presentation):
+                        if field == 1:
+                            wallpaper_id = v.decode('utf-8', 'replace')
+                        elif field == 2:
+                            targets.extend(v2 for f2, v2 in fields(v) if f2 == 1)  # canvases are skipped
+                        elif field == 3:
+                            state = v
+                    if wallpaper_id and state != STOPPED:
+                        for display_id in targets:
+                            wallpapers[display_id] = wallpaper_id
+                self.update(wallpapers=wallpapers)
+
+
+def receive(sock, pending, size):
+    while len(pending) < size:
+        chunk = sock.recv(65536)
+        if not chunk:
+            raise ConnectionError('closed')
+        pending += chunk
+
+
+def send_frame(sock, opcode, payload=b''):
+    mask = os.urandom(4)
+    sock.sendall(bytes([0x80 | opcode, 0x80 | len(payload)]) + mask
+                 + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
+
+def websocket_session(state, port):
+    with socket.create_connection(('127.0.0.1', port), timeout=5) as sock:
+        key = base64.b64encode(os.urandom(16)).decode()
+        sock.sendall((f'GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\n'
+                      f'Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode())
+        pending = bytearray()
+        while b'\r\n\r\n' not in pending:
+            receive(sock, pending, len(pending) + 1)
+        head, _, rest = bytes(pending).partition(b'\r\n\r\n')
+        if b' 101 ' not in head.split(b'\r\n', 1)[0]:
+            raise ConnectionError(head.split(b'\r\n', 1)[0].decode('latin-1'))
+        pending = bytearray(rest)
+        sock.settimeout(None)
+        state.update(connected=True)
+        message = bytearray()
+        while True:
+            receive(sock, pending, 2)
+            final, opcode, size, offset = pending[0] & 0x80, pending[0] & 0x0F, pending[1] & 0x7F, 2
+            if size == 126:
+                receive(sock, pending, 4)
+                size, offset = struct.unpack('>H', pending[2:4])[0], 4
+            elif size == 127:
+                receive(sock, pending, 10)
+                size, offset = struct.unpack('>Q', pending[2:10])[0], 10
+            receive(sock, pending, offset + size)
+            payload = bytes(pending[offset:offset + size])
+            del pending[:offset + size]
+            if opcode == 8:
+                raise ConnectionError('closed by daemon')
+            if opcode == 9:
+                send_frame(sock, 10, payload[:125])
+                continue
+            if opcode in (0, 2):
+                message += payload
+                if final:
+                    for number, value in fields(bytes(message)):
+                        if number == 2:  # ServerFrame.event
+                            state.handle_event(value)
+                    message.clear()
+
+
+def watch_daemon(state):
+    while True:
+        port = daemon_property('WsPort')
+        try:
+            if port and port.isdigit() and int(port):
+                websocket_session(state, int(port))
+        except (OSError, ValueError, IndexError) as error:
+            if state.connected:
+                log(f'lost the waywallen daemon: {error}')
+        state.update(connected=False, displays={}, wallpapers={})
+        time.sleep(3)
+
+
+# --- niri focus ------------------------------------------------------------------------------
+
+def watch_focus(state):
+    while True:
+        try:
+            stream = subprocess.Popen(['niri', 'msg', '-j', 'event-stream'], stdout=subprocess.PIPE)
+        except OSError as error:
+            log(f'cannot follow niri focus: {error}')
+            return
+        workspaces = {}
+        for line in stream.stdout:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if 'WorkspacesChanged' in event:
+                workspaces = {w['id']: w for w in event['WorkspacesChanged']['workspaces']}
+                focused = next((w['output'] for w in workspaces.values() if w.get('is_focused')), None)
+            elif 'WorkspaceActivated' in event and event['WorkspaceActivated'].get('focused'):
+                focused = workspaces.get(event['WorkspaceActivated']['id'], {}).get('output')
+            else:
+                continue
+            if focused and focused != state.focused:
+                state.update(focused=focused)
+        stream.wait()
+        time.sleep(2)
+
+
+# --- wallpaper -> still -> palette -----------------------------------------------------------
+
+def resolve(wallpaper_id):
+    """Returns (type, path, preview path or None) for a waywallen wallpaper id."""
+    if not wallpaper_id.isdigit():
+        return None
+    try:
+        with sqlite3.connect(f'file:{DB}?mode=ro', uri=True, timeout=2) as db:
+            row = db.execute('select i.type, l.path, i.path, i.preview_path from item i '
+                             'join library l on l.id = i.library_id where i.id = ?', (int(wallpaper_id),)).fetchone()
+    except sqlite3.Error:
+        return None
+    if not row:
+        return None
+    kind, root, path, preview = row
+    absolute = lambda value: Path(value) if os.path.isabs(value) else Path(root) / value
+    return kind, absolute(path), absolute(preview) if preview else None
+
+
+def ffmpeg_frame(source, target, seek=None):
+    command = ['ffmpeg', '-v', 'error', '-y']
+    if seek:
+        command += ['-ss', f'{seek:.2f}']
+    command += ['-i', str(source), '-frames:v', '1', '-vf', "scale='min(1280,iw)':-2", str(target)]
+    try:
+        subprocess.run(command, check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=20)
+        return target.is_file()
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def still_for(kind, path, preview):
+    """Returns an image matugen can read for this wallpaper, or None."""
+    target = CACHE / 'still.png'
+    source = path if kind == 'image' else preview
+    if kind == 'video' and path.is_file():
+        try:
+            duration = float(subprocess.run(
+                ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(path)],
+                check=True, capture_output=True, text=True, timeout=10).stdout.strip() or 0)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            duration = 0
+        if ffmpeg_frame(path, target, duration * 0.2 if duration > 5 else None):
+            return target
+    if not source or not source.is_file():
+        return None
+    if source.suffix.lower() in ('.jpg', '.jpeg', '.png'):
+        return source
+    return target if ffmpeg_frame(source, target) else None
+
+
+def settings():
+    """Returns (scheme, mode, {template path: output path}) from the config file."""
+    try:
+        values = tomllib.loads(SETTINGS.read_text())
+    except (OSError, ValueError) as error:
+        log(f'cannot read {SETTINGS}: {error}')
+        values = {}
+    mode = values.get('mode') if values.get('mode') in ('dark', 'light') else 'dark'
+    scheme = values.get('scheme') if isinstance(values.get('scheme'), str) and values.get('scheme') else 'scheme-tonal-spot'
+    outputs = {TEMPLATES / name: Path(os.path.expanduser(target))
+               for name, target in (values.get('outputs') or {}).items()
+               if isinstance(target, str) and (TEMPLATES / name).is_file()}
+    return scheme, mode, outputs
+
+
+def scheme_and_mode():
+    return settings()[:2]
+
+
+def generate(still, scheme, mode):
+    """Renders every template with matugen; returns the files it wrote."""
+    outputs = settings()[2]
+    if not outputs:
+        raise OSError(f'no usable templates listed in {SETTINGS}')
+    for output in outputs.values():
+        output.parent.mkdir(parents=True, exist_ok=True)
+    MATUGEN_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    temporary = MATUGEN_CONFIG.with_name(MATUGEN_CONFIG.name + '.waywallen-tmp')
+    temporary.write_text('# Generated by waywallen-theme-sync from ' + str(SETTINGS) + '\n'
+                         '[config]\nversion_check = false\n' + ''.join(
+        f"\n[templates.t{index}]\ninput_path = '{template}'\noutput_path = '{output}'\n"
+        for index, (template, output) in enumerate(outputs.items())))
+    os.replace(temporary, MATUGEN_CONFIG)
+    subprocess.run(['matugen', '--source-color-index', '0', 'image', str(still), '--mode', mode,
+                    '--type', scheme, '-c', str(MATUGEN_CONFIG)], check=True, stdout=subprocess.DEVNULL, timeout=60)
+    return [path for path in outputs.values() if path.is_file()]
+
+
+def save_palette(folder, source, files):
+    temporary = folder.with_name(folder.name + '.tmp')
+    shutil.rmtree(temporary, ignore_errors=True)
+    temporary.mkdir(parents=True)
+    manifest = {'source': str(source), 'files': {}}
+    for index, path in enumerate(files):
+        shutil.copyfile(path, temporary / str(index))
+        manifest['files'][str(index)] = str(path)
+    (temporary / 'manifest.json').write_text(json.dumps(manifest))
+    shutil.rmtree(folder, ignore_errors=True)
+    temporary.rename(folder)
+    palettes = sorted((p for p in folder.parent.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime)
+    for old in palettes[:-KEPT_PALETTES]:
+        shutil.rmtree(old, ignore_errors=True)
+
+
+def restore_palette(folder, source):
+    """Copies a saved palette into place; returns the files that changed, or None if unusable."""
+    try:
+        manifest = json.loads((folder / 'manifest.json').read_text())
+        if manifest.get('source') != str(source):
+            return None
+        changed = []
+        for index, destination in manifest['files'].items():
+            content = (folder / index).read_bytes()
+            destination = Path(destination)
+            if destination.is_file() and destination.read_bytes() == content:
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            temporary = destination.with_name(destination.name + '.waywallen-tmp')
+            temporary.write_bytes(content)
+            os.replace(temporary, destination)
+            changed.append(destination)
+        os.utime(folder)
+        return changed
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def running(name):
+    for status in Path('/proc').glob('[0-9]*/status'):
+        try:
+            if status.stat().st_uid != os.getuid():
+                continue
+            lines = status.read_text().splitlines()
+            if lines[0].split(None, 1)[1] == name:
+                caught = next((line.split()[1] for line in lines if line.startswith('SigCgt:')), '0')
+                yield int(status.parent.name), int(caught, 16)
+        except (OSError, IndexError, ValueError):
+            continue
+
+
+def reload_consumers(changed):
+    paths = '\n'.join(str(path) for path in changed)
+    # Only signal a process that installed a handler: the default action would kill it.
+    for name, part, number in (('kitty', '/kitty/', signal.SIGUSR1), ('btop', '/btop/', signal.SIGUSR2),
+                               ('cava', '/cava/', signal.SIGUSR2)):
+        if part in paths:
+            for pid, caught in running(name):
+                if caught & (1 << (number - 1)):
+                    try:
+                        os.kill(pid, number)
+                    except OSError:
+                        pass
+    commands = []
+    if '/fcitx5/' in paths and any(running('fcitx5')):
+        commands.append(['fcitx5-remote', '-r'])
+    if '/yazi/' in paths and any(running('yazi')):
+        commands.append(['ya', 'emit-to', '0', 'app:theme'])
+    for command in commands:
+        try:
+            subprocess.run(command, timeout=2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    # Waybar reloads when its root stylesheet changes; niri reloads its included colours by itself.
+    style = CONFIG / 'waybar/style.css'
+    if '/waybar/' in paths and style.exists():
+        style.touch()
+
+
+def activate(wallpaper_id):
+    """Makes the desktop colours those of this wallpaper. Returns a description, or None on failure."""
+    resolved = resolve(wallpaper_id)
+    if not resolved:
+        log(f'wallpaper {wallpaper_id} is not in {DB}')
+        return None
+    kind, path, preview = resolved
+    scheme, mode = scheme_and_mode()
+    folder = CACHE / 'palettes' / f'{wallpaper_id}-{mode}-{scheme}'
+    changed = restore_palette(folder, path) if folder.is_dir() else None
+    how = 'cached'
+    if changed is None:
+        still = still_for(kind, path, preview)
+        if not still:
+            log(f'no usable still for {kind} wallpaper {wallpaper_id} ({path}); colours unchanged')
+            return None
+        try:
+            changed = generate(still, scheme, mode)
+        except (OSError, subprocess.SubprocessError) as error:
+            log(f'matugen failed for wallpaper {wallpaper_id}: {error}')
+            return None
+        save_palette(folder, path, changed)
+        how = 'generated'
+    reload_consumers(changed)
+    return f'{kind} wallpaper {wallpaper_id} ({path.name}), {how}'
+
+
+def wanted(state):
+    """Returns (wallpaper id, output it was taken from or None)."""
+    with state.lock:
+        focused, displays, wallpapers = state.focused, state.displays, state.wallpapers
+    for display_id, name in displays.items():
+        if name == focused and display_id in wallpapers:
+            return wallpapers[display_id], focused
+    if wallpapers:
+        # Focus is on an output waywallen does not draw (or is unknown): any shown wallpaper.
+        return next(iter(wallpapers.values())), None
+    return (daemon_property('CurrentWallpaperId') or None), None
+
+
+def main():
+    once = sys.argv[1:] == ['--once']
+    for tool in ('busctl', 'matugen', 'ffmpeg', 'ffprobe', 'niri'):
+        if not shutil.which(tool):
+            log(f'missing command: {tool}')
+            return 1
+    if not SETTINGS.is_file():
+        log(f'missing {SETTINGS}')
+        return 1
+    (CACHE / 'palettes').mkdir(parents=True, exist_ok=True)
+
+    state = State()
+    threading.Thread(target=watch_daemon, args=(state,), daemon=True).start()
+    threading.Thread(target=watch_focus, args=(state,), daemon=True).start()
+
+    active = None
+    if once:
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline and not (state.focused and state.wallpapers):
+            time.sleep(0.1)
+    while True:
+        if not once:
+            state.changed.wait()
+            time.sleep(0.15)  # let a burst of events settle
+        state.changed.clear()
+        wallpaper_id, output = wanted(state)
+        scheme, mode = scheme_and_mode()
+        key = (wallpaper_id, scheme, mode)
+        if wallpaper_id and (once or key != active):
+            described = activate(wallpaper_id)
+            active = key  # also after a failure: do not retry the same wallpaper on every event
+            if described:
+                log(f'colours follow {described}' + (f' on {output}' if output else ''))
+        if once:
+            return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,53 @@
+/* Power menu: one centred row of six buttons on a rounded panel.
+   Colours come from colors.css, regenerated from the wallpaper. */
+@import "colors.css";
+
+* {
+    background-image: none;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+window {
+    background-color: rgba(0, 0, 0, 0.28);
+}
+
+/* The panel behind the buttons: the grid itself plus a 28px spread around it. */
+grid {
+    background-color: alpha(@panel, 0.88);
+    border-radius: 8px;
+    box-shadow: 0 0 0 28px alpha(@panel, 0.88);
+}
+
+button {
+    margin: 0;
+    border: none;
+    border-radius: 20px;
+    outline: none;
+    background-color: @button;
+    color: @text;
+    background-repeat: no-repeat;
+    background-position: center 36%;
+    background-size: 44px;
+    font-size: 18px;
+    font-weight: 600;
+    transition: background-color 150ms ease, color 150ms ease, background-size 250ms ease;
+}
+
+button:focus,
+button:hover {
+    background-color: @accent;
+    color: @on_accent;
+    background-size: 54px;
+}
+
+button:active {
+    background-color: shade(@accent, 0.88);
+    background-size: 50px;
+}
+
+#lock      { background-image: -gtk-recolor(url("icons/lock-symbolic.svg")); }
+#logout    { background-image: -gtk-recolor(url("icons/logout-symbolic.svg")); }
+#shutdown  { background-image: -gtk-recolor(url("icons/shutdown-symbolic.svg")); }
+#hibernate { background-image: -gtk-recolor(url("icons/hibernate-symbolic.svg")); }
+#reboot    { background-image: -gtk-recolor(url("icons/reboot-symbolic.svg")); }

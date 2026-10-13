@@ -131,29 +131,40 @@ if [[ "$(cat "$fake_repo/configs/config/waybar/colors.css")" != stable-seed ]]; 
     exit 1
 fi
 
-echo "==> test 2c: snapshot excludes Clavis runtime state"
+echo "==> test 2c: snapshot leaves wallpaper-generated files and backups out"
 mkdir -p \
-    "$fake_home/.config/niri/clavis" \
-    "$fake_repo/configs/config/niri/clavis"
-printf 'cursor config\n' >"$fake_home/.config/niri/clavis/cursor.kdl"
-printf 'runtime lock\n' >"$fake_home/.config/niri/clavis/outputs.kdl.lock"
-printf 'runtime backup\n' >"$fake_home/.config/niri/clavis/outputs.kdl.last-good"
-printf 'stale lock\n' >"$fake_repo/configs/config/niri/clavis/outputs.kdl.lock"
-printf 'stale backup\n' >"$fake_repo/configs/config/niri/clavis/outputs.kdl.last-good"
+    "$fake_home/.config/niri/backups" \
+    "$fake_home/.config/wlogout" \
+    "$fake_repo/configs/config/niri" \
+    "$fake_repo/configs/config/wlogout"
+printf 'layout\n' >"$fake_home/.config/niri/outputs.kdl"
+printf 'generated ring\n' >"$fake_home/.config/niri/theme-colors.kdl"
+printf 'old config\n' >"$fake_home/.config/niri/config.kdl.before-something-20260101"
+printf 'old config\n' >"$fake_home/.config/niri/backups/config.kdl"
+printf 'stale generated ring\n' >"$fake_repo/configs/config/niri/theme-colors.kdl"
+printf 'live-generated\n' >"$fake_home/.config/wlogout/colors.css"
+printf 'stable-seed\n' >"$fake_repo/configs/config/wlogout/colors.css"
+printf 'style\n' >"$fake_home/.config/wlogout/style.css"
 SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/niri|configs/config/niri|required"
+    "dir|$HOME/.config/wlogout|configs/config/wlogout|required"
 )
 snapshot_capture_configs "$fake_repo" false >/dev/null
-if [[ ! -f "$fake_repo/configs/config/niri/clavis/cursor.kdl" ]]; then
-    echo "Snapshot omitted the managed Clavis cursor config" >&2
+if [[ ! -f "$fake_repo/configs/config/niri/outputs.kdl" \
+    || ! -f "$fake_repo/configs/config/wlogout/style.css" ]]; then
+    echo "Snapshot omitted managed niri or power menu files" >&2
     exit 1
 fi
-for runtime_file in outputs.kdl.lock outputs.kdl.last-good; do
-    if [[ -e "$fake_repo/configs/config/niri/clavis/$runtime_file" ]]; then
-        echo "Snapshot captured Clavis runtime state: $runtime_file" >&2
+for runtime_file in theme-colors.kdl config.kdl.before-something-20260101 backups; do
+    if [[ -e "$fake_repo/configs/config/niri/$runtime_file" ]]; then
+        echo "Snapshot captured generated or backup state: $runtime_file" >&2
         exit 1
     fi
 done
+if [[ "$(cat "$fake_repo/configs/config/wlogout/colors.css")" != stable-seed ]]; then
+    echo "Snapshot replaced the committed power menu colour seed" >&2
+    exit 1
+fi
 
 echo "==> test 3: optional missing source is skipped"
 SNAPSHOT_MAPPINGS=(
@@ -467,18 +478,18 @@ if ! grep -q -- '--no-pager -C .* diff --check' "$verify_log"; then
     exit 1
 fi
 
-echo "==> test 12: snapshot mappings follow the desktop shell profile"
-DESKTOP_SHELL_PROFILE=quickshell
+echo "==> test 12: snapshot mappings describe the single Waybar desktop"
 build_snapshot_mappings
-if printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}" \
-    | grep -F -e '/waybar|' -e 'wcr-post-apply-waybar' >/dev/null; then
-    echo "QuickShell-only snapshot still requires Waybar files" >&2
-    exit 1
-fi
-DESKTOP_SHELL_PROFILE=dual
-build_snapshot_mappings
-if ! printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}" | grep -Fq '/waybar|'; then
-    echo "Dual snapshot lost Waybar config capture" >&2
+mapping_text="$(printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}")"
+for expected in '/waybar|' '/wlogout|' '/waywallen-theme|' 'local-bin/power-menu|' \
+    'local-bin/waywallen-theme-sync|' 'waywallen-theme-sync.service|'; do
+    if ! grep -Fq -- "$expected" <<<"$mapping_text"; then
+        echo "Snapshot mappings are missing $expected" >&2
+        exit 1
+    fi
+done
+if grep -q -i -e 'desktop-shell' -e 'quickshell' -e 'wcr-post-apply' -e 'Thunar' <<<"$mapping_text"; then
+    echo "Snapshot mappings still reference retired components" >&2
     exit 1
 fi
 

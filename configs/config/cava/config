@@ -1,10 +1,10 @@
-; Matugen — cava 配色（clavis 统一主题管线；其余项沿用 cava 默认）
+; Matugen — cava 配色（waywallen-theme-sync；其余项沿用 cava 默认）
 [color]
 gradient = 1
 gradient_count = 6
-gradient_color_1 = '#ffb2bc'
-gradient_color_2 = '#f6b8ae'
-gradient_color_3 = '#ffb693'
+gradient_color_1 = '#ffb2b9'
+gradient_color_2 = '#f6b8ab'
+gradient_color_3 = '#ffb68f'
 gradient_color_4 = '#ffb4ab'
-gradient_color_5 = '#910035'
-gradient_color_6 = '#673b34'
+gradient_color_5 = '#91002e'
+gradient_color_6 = '#673b32'

@@ -25,9 +25,6 @@ Preview first:
 ./install.sh --dry-run               # preview install
 ./install.sh --install-profile standard --yes
 ./install.sh --install-profile lightweight --yes
-./install.sh --yes --desktop-shell waybar     # Waybar only
-./install.sh --yes --desktop-shell quickshell # QuickShell only
-./install.sh --yes --desktop-shell dual       # switch between both
 ./install.sh --skip-packages         # restore configs only
 ./install.sh --packages-only         # install packages only
 ./install.sh --no-aur                # skip AUR packages
@@ -46,24 +43,24 @@ Preview first:
 
 ## Notes
 
-The current personal Clavis source is maintained in the private
-[`ZChenW/clavis-personal`](https://github.com/ZChenW/clavis-personal) repository.
-For the CMake-based desktop, clone it once and select it explicitly:
+The desktop is niri with Waybar. Each job has one owner:
 
-```bash
-git clone git@github.com:ZChenW/clavis-personal.git ~/Projects/clavis-personal
-QUICKSHELL_LOCAL_SOURCE="$HOME/Projects/clavis-personal" ./install.sh --yes --desktop-shell dual
-```
+| Job | Owner |
+| --- | --- |
+| Idle timeouts, locking, idle hibernate | [IdleFlow](https://github.com/ZChenW/IdleFlow) (`idled`, `idlectl`), installed separately; the lock screen is `swaylock-effects` |
+| Power menu | `power-menu` (wlogout), opened from the rightmost Waybar button |
+| Wallpaper | waywallen, installed separately |
+| Colours | `waywallen-theme-sync`: matugen renders `~/.config/waywallen-theme/templates` from the wallpaper on the focused display |
+| File managers | Nautilus and yazi |
 
-This builds the local source and keeps Waybar/QuickShell switching available.
-Without `QUICKSHELL_LOCAL_SOURCE`, the installer uses the legacy pinned source
-in `packages/quickshell-source.conf`. See [the install guide](docs/INSTALL.md).
+Every lock goes through `idlectl lock`; sleep means hibernate, and suspend is
+turned off (see `docs/INSTALL.md`).
+Do not add a second idle daemon, locker or theme hook beside these.
 
 - Arch Linux only.
 - Installs real files, not symlinks.
 - Existing files are backed up to `~/.dotfiles-backups/`.
 - Private local values belong in `~/.zshrc.local`.
-- The selected desktop shell profile is reused by later installs and updates.
 - Standard is the default complete portable scope; Lightweight is the
   X230-friendly Waybar daily-development scope.
 - The selected installation profile is saved only after a successful real
@@ -71,5 +68,4 @@ in `packages/quickshell-source.conf`. See [the install guide](docs/INSTALL.md).
 - Update only consumes repository state. Snapshot is the explicit publication
   flow and updates only the active profile's package manifests.
 - Profile switching never removes installed packages.
-- `desktop-shell toggle` switches Waybar and QuickShell when the `dual` profile is installed.
 - Full details: `docs/INSTALL.md`.
