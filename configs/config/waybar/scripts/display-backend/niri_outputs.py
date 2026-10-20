@@ -133,6 +133,20 @@ def encode(settings, api):
     return nodes, layout
 
 
+def removal(text, child):
+    """A child's span plus the whitespace before it, so repeated saves do not pile up blank lines."""
+    start = child.source_start
+    while start and text[start - 1] in ' \t\r\n':
+        start -= 1
+    return start, child.source_end, ''
+
+
+def insertion(text, at, nodes, depth, api):
+    body = ''.join(api.render(n) for n in nodes)
+    body = ''.join('    ' * depth + line if line.strip() else line for line in body.splitlines(True))
+    return at, at, ('' if text[:at].endswith('\n') else '\n') + body
+
+
 def edit(graph, path, request, api):
     text = graph.files[path]
     rows = inspect(graph, path)
@@ -162,16 +176,16 @@ def edit(graph, path, request, api):
         if selected:
             node = next(n for n in graph.documents[path].nodes if n.source_start == selected['start'])
             # Splice only managed children; unknown nodes and their comments stay byte-for-byte.
-            edits = [(c.source_start, c.source_end, '') for c in node.nodes if c.name in BASIC]
+            edits = [removal(text, c) for c in node.nodes if c.name in BASIC]
             section = next((c for c in node.nodes if c.name == 'layout'), None)
             if section:
-                edits += [(c.source_start, c.source_end, '') for c in section.nodes if c.name in LAYOUT]
+                edits += [removal(text, c) for c in section.nodes if c.name in LAYOUT]
                 if not hasattr(section, 'children_end'): raise ValueError('Layout override needs a child block')
-                edits.append((section.children_end, section.children_end, '\n'+''.join(api.render(n) for n in layout)))
+                edits.append(insertion(text, section.children_end, layout, 2, api))
             elif layout:
                 basic.append(api.kdl.Node('layout', nodes=layout))
             if not hasattr(node, 'children_end'): raise ValueError('Output configuration needs a child block')
-            edits.append((node.children_end, node.children_end, '\n'+''.join(api.render(n) for n in basic)))
+            edits.append(insertion(text, node.children_end, basic, 1, api))
             changes.extend(edits)
         else:
             if layout: basic.append(api.kdl.Node('layout', nodes=layout))
