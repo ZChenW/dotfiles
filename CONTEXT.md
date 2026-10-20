@@ -16,6 +16,10 @@ _Avoid_: Full profile, full packages
 A resource-constrained computer intended for routine coding, browsing, communication, and desktop use rather than gaming, media production, or heavyweight specialist workloads.
 _Avoid_: Minimal computer, full workstation
 
+**Bootstrap**:
+The step before installation that turns an empty disk into a bootable Arch system with the machine's hardware packages, then hands over to installation on the first login.
+_Avoid_: Base install, setup
+
 **Update**:
 The consumption flow that brings repository state onto the current machine without publishing that machine's local state.
 _Avoid_: Two-way sync, snapshot

@@ -2,6 +2,21 @@
 
 My Arch Linux desktop dotfiles.
 
+## New machine
+
+Boot the Arch ISO in UEFI mode, connect to the network (`iwctl` for Wi-Fi),
+then:
+
+```bash
+curl -LO https://raw.githubusercontent.com/ZChenW/dotfiles/main/bootstrap/arch-install.sh
+bash arch-install.sh
+```
+
+It erases one whole disk, installs the base system (btrfs, GRUB, snapper,
+drivers for the detected CPU and GPU), and runs `./install.sh` on the first
+tty1 login. Other disks, such as a Windows disk, are left alone and appear in
+the GRUB menu. See `docs/INSTALL.md` (Fresh Arch Install).
+
 ## Install
 
 ```bash

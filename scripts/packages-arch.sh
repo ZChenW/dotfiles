@@ -384,7 +384,7 @@ is_app_pkg() {
     [[ "$pkg" =~ ^(nodejs|npm|pnpm|corepack|nvm) ]] && return 0
     [[ "$pkg" =~ ^(nvtop|tokei|tree|fzf|jq|wget|yt-dlp|uv|scratch|tree-sitter-cli) ]] && return 0
     [[ "$pkg" =~ ^(r$|ghc|cabal|stack|happy|alex|namcap) ]] && return 0
-    [[ "$pkg" =~ ^(openai-codex|opencode) ]] && return 0
+    [[ "$pkg" =~ ^opencode ]] && return 0
     [[ "$pkg" =~ ^webkit ]] && return 0
     [[ "$pkg" =~ ^(python-|gcc-fortran|clang|shellcheck|stylua|unzip) ]] && return 0
     return 1

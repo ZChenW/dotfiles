@@ -90,6 +90,12 @@ esac
 EOF
 chmod +x "$fake_bin/pacman"
 
+# Present coding agents keep install.sh from downloading their installers.
+for cmd in claude codex; do
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"
+    chmod +x "$fake_bin/$cmd"
+done
+
 cat >"$fake_bin/git" <<'EOF'
 #!/usr/bin/env bash
 if [[ " $* " == *" pull --ff-only "* ]]; then

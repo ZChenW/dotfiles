@@ -8,6 +8,111 @@ launcher scripts.
 
 Arch Linux only. The installer checks `/etc/os-release` and exits on other distributions.
 
+## Fresh Arch Install
+
+`bootstrap/arch-install.sh` is the step before `install.sh`: it turns an
+empty disk into a bootable Arch system and hands over to `install.sh`.
+
+Before booting the ISO on a machine that also runs Windows:
+
+- Save the BitLocker recovery key if Windows uses BitLocker or device
+  encryption (Settings > Privacy & security > Device encryption, or
+  https://aka.ms/myrecoverykey). Turning Secure Boot off, and starting Windows
+  from the GRUB menu, can make Windows ask for it.
+- Turn Secure Boot off in the firmware; the ISO and this GRUB are not signed.
+  Starting Windows from the firmware's own boot menu instead of GRUB avoids
+  the BitLocker prompt.
+
+Run it from the Arch live ISO booted in UEFI mode:
+
+```bash
+iwctl station wlan0 connect <SSID>     # Wi-Fi only; wired works by itself
+curl -LO https://raw.githubusercontent.com/ZChenW/dotfiles/main/bootstrap/arch-install.sh
+bash arch-install.sh --dry-run          # optional: print every step
+bash arch-install.sh
+```
+
+The live console cannot show Chinese, so every prompt is in English.
+
+To work from another computer (copy and paste, or a coding agent there), set
+a temporary root password on the live ISO with `passwd` and find its address
+with `ip -br a`. The live system runs from RAM and `sshd` is already running,
+so this works before any disk is touched. Then, from the other computer:
+
+```bash
+scp bootstrap/arch-install.sh root@<ip>:   # no need to push first
+ssh -t root@<ip> bash arch-install.sh      # -t: the prompts need a terminal
+```
+
+Type the passwords yourself. The live password and SSH host key are new on
+every boot; `-o UserKnownHostsFile=/dev/null` keeps them out of known_hosts.
+
+It asks for the disk, hostname, user name, password, whether to encrypt, the
+time zone and the installation profile, prints a plan, and erases the disk
+only after you type the disk name. It never touches other disks. With Windows
+on another disk, os-prober adds it to the GRUB menu.
+
+What it installs:
+
+| Part | Choice |
+|------|--------|
+| Partitions | 1 GiB EFI partition at `/boot`, the rest btrfs |
+| Encryption | LUKS2 on the btrfs partition unless you answer `no`; the password is asked at every boot |
+| Subvolumes | `@` `/`, `@home`, `@snapshots` `/.snapshots`, `@log`, `@pkg` (pacman cache), `@swap` |
+| Swap | A swap file as large as RAM in `@swap`, so hibernate fits |
+| Boot | GRUB, plus the removable fallback path; `grub-btrfs` lists snapshots in the menu |
+| Snapshots | snapper `root` config, timeline timers, `snap-pac`, and a "fresh install" snapshot |
+| Packages | `paccache.timer` keeps the last three versions in `@pkg` |
+| Hardware | `intel-ucode` or `amd-ucode`; `nvidia-open`, `vulkan-radeon` or `vulkan-intel` from `lspci`; `nvidia-prime` for hybrid graphics |
+| System | NetworkManager, bluez, PipeWire, greetd with tuigreet, multilib enabled, `en_US` and `zh_CN` locales; the `iTCO_wdt` and `sp5100_tco` watchdog drivers are blacklisted, since `nowatchdog` alone does not stop them |
+| User | In `wheel` with sudo, login shell zsh; root is locked |
+
+It owns what `packages/arch-machine-local.txt` lists, so a new machine does
+not need `--full-packages`. `nvidia-open` needs an RTX 20 / GTX 16 series
+card or newer.
+
+Snapshot entries in the GRUB menu boot the current kernel from `/boot`, which
+is the EFI partition and is in no snapshot. A snapshot taken before a kernel
+update has the older kernel's modules, so it may boot without some drivers,
+including the `vfat` one that mounts `/boot`. Use such a boot to look around
+and copy files. Rolling the system back to a snapshot is a manual step from
+the live ISO and is not automated here.
+
+The repository is cloned to `~/Projects/dotfiles` over HTTPS, with an SSH push
+URL. On the first login on tty1, `~/.dotfiles-first-boot` waits for the
+network (opening `nmtui` when there is none), runs
+`./install.sh --install-profile <profile> --yes`, regenerates the GRUB menu
+from the running system, enables greetd and reboots into the login screen. If `install.sh` fails it runs again at the next tty1
+login; `rm ~/.dotfiles-first-boot` stops that.
+
+Every question can be answered in advance with an environment variable:
+`ARCH_INSTALL_DISK`, `ARCH_INSTALL_HOSTNAME`, `ARCH_INSTALL_USER`,
+`ARCH_INSTALL_PASSWORD`, `ARCH_INSTALL_ENCRYPT` (`yes`/`no`),
+`ARCH_INSTALL_LUKS_PASSWORD`, `ARCH_INSTALL_TIMEZONE`, `ARCH_INSTALL_PROFILE`,
+`ARCH_INSTALL_SWAP_GIB` and `ARCH_INSTALL_REBOOT`. `ARCH_INSTALL_KERNEL_ARGS`
+adds kernel parameters. Erasing still needs `ARCH_INSTALL_CONFIRM=<disk>`.
+
+If anything fails, run the script again; it unmounts and starts over. Because
+root is locked, repairs that need a root shell are done from the live ISO.
+
+Test hibernate once on a new machine: `systemctl hibernate`, power on, and
+check the session is still there. In a QEMU test VM without encryption the
+image always loaded, but the machine reset about 0.3 s later whenever the
+initrd resumed within the first few seconds of boot. With LUKS (the password
+prompt delays the resume) or with a 10 second delay it resumed every time;
+waiting for `udevadm settle` did not help. If a real machine shows the same,
+delay only resume boots (systemd starts this service only when a hibernation
+image is waiting):
+
+```bash
+sudo mkdir -p /etc/systemd/system/systemd-hibernate-resume.service.d
+printf '[Service]\nExecStartPre=/usr/bin/sleep 10\n' |
+    sudo tee /etc/systemd/system/systemd-hibernate-resume.service.d/delay.conf
+printf 'FILES=(/etc/systemd/system/systemd-hibernate-resume.service.d/delay.conf)\nBINARIES=(sleep)\n' |
+    sudo tee /etc/mkinitcpio.conf.d/20-resume-delay.conf
+sudo mkinitcpio -P
+```
+
 ## Quick Start
 
 Interactive flow (default in a terminal):
@@ -192,6 +297,23 @@ The AUR/foreign manifest is rebuilt only from the current successful
 `pacman -Qqem` result. Packages removed from the machine are removed from the
 manifest; if pacman cannot provide a complete result, export stops before
 overwriting any manifest.
+
+## Coding Agents
+
+Claude Code and Codex come from their vendors' own installers, not from
+pacman or the AUR: `extra/openai-codex` and AUR `claude-code` are third-party
+builds, and `openai-codex` is listed in `arch-exclude.txt`. After the packages,
+Install and Update run whichever installer is missing:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+```
+
+Both put the binary in `~/.local/bin` and keep it updated. An agent already on
+`PATH` from another source, such as an npm-installed Codex, is left alone. A
+failed download is a warning, not an install failure. `--skip-packages` skips
+this step.
 
 ## Snapshot Current Machine
 
