@@ -204,7 +204,10 @@ class Preview:
         for name,settings in self.desired.items():
             if not settings.get('enabled',True): continue
             self.command(name,'On')
-            for action in actions(settings): self.command(name,action)
+            # Positions wait until the outputs being switched off are gone: placing an
+            # output over one that is still on makes niri relocate it for a moment.
+            for action in actions(settings):
+                if 'Position' not in action: self.command(name,action)
         self.wait({name:s for name,s in self.desired.items() if s.get('enabled',True)},False)
         for name,settings in self.desired.items():
             if not settings.get('enabled',True): self.command(name,'Off')
@@ -245,11 +248,11 @@ class Preview:
                 except Exception as error: errors.append(str(error))
             # Never disable an output until a restored alternative is actually usable.
             fresh=ipc('Outputs')
-            safe=any(fresh.get(name,{}).get('current_mode') is not None for name in enabled)
+            off=[name for name,settings in restore.items() if name in connected and not settings.get('enabled',True)]
+            # An output the preview never touched counts as the usable alternative too.
+            safe=any(data.get('current_mode') is not None for name,data in fresh.items() if name not in off)
             if safe:
-                for name,settings in restore.items():
-                    if name in connected and not settings.get('enabled',True):
-                        ipc({'Output':{'output':name,'action':'Off'}})
+                for name in off: ipc({'Output':{'output':name,'action':'Off'}})
         except Exception as error: errors.append(str(error))
         return errors
 
@@ -316,6 +319,20 @@ def run_guard(request,directory,parent,lock_fd):
         os.close(lock_fd)
 
 
+def lock_path():
+    return Path(os.environ.get('XDG_RUNTIME_DIR',tempfile.gettempdir()))/('clavis-display-preview-'+str(os.getuid())+'.lock')
+
+
+def active():
+    """True while a guardian owns the outputs (its lock is held)."""
+    try: fd=os.open(lock_path(),os.O_RDWR|os.O_NOFOLLOW)
+    except OSError: return False
+    try: fcntl.flock(fd,fcntl.LOCK_SH|fcntl.LOCK_NB)
+    except BlockingIOError: return True
+    finally: os.close(fd)
+    return False
+
+
 def directory_for(token):
     if not isinstance(token,str) or not token.startswith('clavis-display-') or '/' in token: raise ValueError('Invalid preview token')
     directory=Path(os.environ.get('XDG_RUNTIME_DIR',tempfile.gettempdir()))/token
@@ -328,8 +345,7 @@ def run(request):
     operation=request['operation']
     if operation=='start':
         runtime=Path(os.environ.get('XDG_RUNTIME_DIR',tempfile.gettempdir()))
-        lock_path=runtime/('clavis-display-preview-'+str(os.getuid())+'.lock')
-        fd=os.open(lock_path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+        fd=os.open(lock_path(),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
         info=os.fstat(fd)
         if info.st_uid!=os.getuid() or not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
             os.close(fd); raise ValueError('Unsafe preview lock')
