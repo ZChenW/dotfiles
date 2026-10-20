@@ -35,7 +35,7 @@ SUBVOLUMES=(
 BASE_PACKAGES=(
     base base-devel linux linux-firmware
     btrfs-progs dosfstools grub efibootmgr os-prober fuse3
-    grub-btrfs inotify-tools snapper snap-pac btrfs-assistant
+    grub-btrfs inotify-tools snapper snap-pac btrfs-assistant pacman-contrib
     networkmanager bluez sudo git openssh rsync zsh vim
     pipewire pipewire-alsa pipewire-pulse wireplumber sof-firmware alsa-firmware
     greetd greetd-tuigreet
@@ -269,6 +269,11 @@ prepare_live_system() {
     if mountpoint -q "$TARGET"; then run umount -R "$TARGET"; fi
     if [[ -e /dev/mapper/$MAPPER ]]; then run cryptsetup close "$MAPPER"; fi
     run timeout 120 bash -c 'until systemctl -q is-active pacman-init.service; do sleep 1; done'
+    # pacman's signature checks fail when the clock is far off.
+    run timedatectl set-ntp true
+    # shellcheck disable=SC2016 # expanded by the inner bash on each try
+    run timeout 60 bash -c 'until [[ $(timedatectl show -p NTPSynchronized --value) == yes ]]; do sleep 1; done' ||
+        echo "warning: the clock is not synchronized yet; continuing"
     run sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
     run pacman -Sy --needed --noconfirm archlinux-keyring
 }
@@ -346,6 +351,11 @@ configure_system() {
     in_target passwd -l root
     write_file /etc/sudoers.d/10-wheel 440 <<<"%wheel ALL=(ALL:ALL) ALL"
 
+    # nowatchdog on the kernel line does not stop these drivers from loading.
+    write_file /etc/modprobe.d/nowatchdog.conf 644 <<'EOF'
+blacklist iTCO_wdt
+blacklist sp5100_tco
+EOF
     if [[ $ARCH_INSTALL_ENCRYPT == yes ]]; then
         write_file /etc/mkinitcpio.conf.d/10-encrypt.conf 644 <<'EOF'
 HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)
@@ -369,7 +379,7 @@ command = "tuigreet --time --remember --remember-session --sessions /usr/share/w
 user = "greeter"
 EOF
     in_target systemctl enable NetworkManager.service bluetooth.service systemd-timesyncd.service \
-        snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service
+        snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service paccache.timer
 
     in_target git clone "$DOTFILES_REPO" "$home/Projects/dotfiles"
     in_target git -C "$home/Projects/dotfiles" remote set-url --push origin "$DOTFILES_PUSH_URL"
@@ -398,6 +408,8 @@ if ! "$HOME/Projects/dotfiles/install.sh" --install-profile "$profile" --yes; th
     echo "To stop that: rm ~/.dotfiles-first-boot"
     exit 1
 fi
+# Again from the running system, in case the chroot missed another disk.
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 sudo systemctl enable greetd.service
 rm -f "$HOME/.dotfiles-first-boot"
 sed -i '/dotfiles-first-boot/d' "$HOME/.zprofile"

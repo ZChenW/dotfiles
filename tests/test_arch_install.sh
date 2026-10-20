@@ -70,6 +70,10 @@ expect_contains "$out" "btrfs filesystem mkswapfile --size 8g"
 expect_contains "$out" " os-prober fuse3 "
 # The clone's push URL is SSH.
 expect_contains "$out" " openssh "
+expect_contains "$out" "timedatectl set-ntp true"
+expect_contains "$out" "blacklist sp5100_tco"
+expect_contains "$out" "paccache.timer"
+expect_contains "$out" "sudo grub-mkconfig -o /boot/grub/grub.cfg"
 expect_contains "$out" 'GRUB_CMDLINE_LINUX=\"\"'
 expect_contains "$out" "profile=lightweight"
 expect_absent "$out" "cryptsetup"

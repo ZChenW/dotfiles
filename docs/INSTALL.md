@@ -11,8 +11,19 @@ Arch Linux only. The installer checks `/etc/os-release` and exits on other distr
 ## Fresh Arch Install
 
 `bootstrap/arch-install.sh` is the step before `install.sh`: it turns an
-empty disk into a bootable Arch system and hands over to `install.sh`. Run it
-from the Arch live ISO booted in UEFI mode:
+empty disk into a bootable Arch system and hands over to `install.sh`.
+
+Before booting the ISO on a machine that also runs Windows:
+
+- Save the BitLocker recovery key if Windows uses BitLocker or device
+  encryption (Settings > Privacy & security > Device encryption, or
+  https://aka.ms/myrecoverykey). Turning Secure Boot off, and starting Windows
+  from the GRUB menu, can make Windows ask for it.
+- Turn Secure Boot off in the firmware; the ISO and this GRUB are not signed.
+  Starting Windows from the firmware's own boot menu instead of GRUB avoids
+  the BitLocker prompt.
+
+Run it from the Arch live ISO booted in UEFI mode:
 
 ```bash
 iwctl station wlan0 connect <SSID>     # Wi-Fi only; wired works by itself
@@ -51,19 +62,27 @@ What it installs:
 | Swap | A swap file as large as RAM in `@swap`, so hibernate fits |
 | Boot | GRUB, plus the removable fallback path; `grub-btrfs` lists snapshots in the menu |
 | Snapshots | snapper `root` config, timeline timers, `snap-pac`, and a "fresh install" snapshot |
+| Packages | `paccache.timer` keeps the last three versions in `@pkg` |
 | Hardware | `intel-ucode` or `amd-ucode`; `nvidia-open`, `vulkan-radeon` or `vulkan-intel` from `lspci`; `nvidia-prime` for hybrid graphics |
-| System | NetworkManager, bluez, PipeWire, greetd with tuigreet, multilib enabled, `en_US` and `zh_CN` locales |
+| System | NetworkManager, bluez, PipeWire, greetd with tuigreet, multilib enabled, `en_US` and `zh_CN` locales; the `iTCO_wdt` and `sp5100_tco` watchdog drivers are blacklisted, since `nowatchdog` alone does not stop them |
 | User | In `wheel` with sudo, login shell zsh; root is locked |
 
 It owns what `packages/arch-machine-local.txt` lists, so a new machine does
 not need `--full-packages`. `nvidia-open` needs an RTX 20 / GTX 16 series
 card or newer.
 
+Snapshot entries in the GRUB menu boot the current kernel from `/boot`, which
+is the EFI partition and is in no snapshot. A snapshot taken before a kernel
+update has the older kernel's modules, so it may boot without some drivers,
+including the `vfat` one that mounts `/boot`. Use such a boot to look around
+and copy files. Rolling the system back to a snapshot is a manual step from
+the live ISO and is not automated here.
+
 The repository is cloned to `~/Projects/dotfiles` over HTTPS, with an SSH push
 URL. On the first login on tty1, `~/.dotfiles-first-boot` waits for the
 network (opening `nmtui` when there is none), runs
-`./install.sh --install-profile <profile> --yes`, enables greetd and reboots
-into the login screen. If `install.sh` fails it runs again at the next tty1
+`./install.sh --install-profile <profile> --yes`, regenerates the GRUB menu
+from the running system, enables greetd and reboots into the login screen. If `install.sh` fails it runs again at the next tty1
 login; `rm ~/.dotfiles-first-boot` stops that.
 
 Every question can be answered in advance with an environment variable:
