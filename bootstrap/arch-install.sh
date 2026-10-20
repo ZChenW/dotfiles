@@ -141,12 +141,13 @@ gpu_packages() {
     echo "${pkgs[*]}"
 }
 
-# The disk holding the live USB, so it is never offered as a target.
+# The disk holding the live USB, so it is never offered as a target. The ISO
+# may sit on the disk itself, a partition, or Ventoy's device-mapper node, so
+# walk up the device chain to the whole disk.
 live_disk() {
-    local src parent
+    local src
     src=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null) || return 0
-    parent=$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1)
-    if [[ -n $parent ]]; then printf '/dev/%s' "$parent"; else printf '%s' "$src"; fi
+    lsblk -nslpo NAME,TYPE "$src" 2>/dev/null | awk '$2 == "disk" { print $1; exit }'
 }
 
 ram_gib() {

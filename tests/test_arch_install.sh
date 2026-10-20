@@ -60,7 +60,20 @@ expect_eq "$(gpu_packages '00:01.0 0300: 1234:1111 (rev 02)')" ""
 # An Intel audio device alone is not a GPU.
 expect_eq "$(gpu_packages '00:1f.3 0403: 8086:51ca')" ""
 
-echo "==> test 4: plain install on a SATA disk"
+echo "==> test 4: the live USB is found behind Ventoy and never offered"
+findmnt() { echo /dev/mapper/ventoy; }
+lsblk() { printf '%s\n' '/dev/mapper/ventoy dm' '/dev/sdb1 part' '/dev/sdb disk'; }
+expect_eq "$(live_disk)" /dev/sdb
+DRY_RUN=true
+if valid_disk /dev/sdb; then
+    echo "Expected the live USB to be rejected as a target" >&2
+    exit 1
+fi
+valid_disk /dev/nvme0n1
+DRY_RUN=false
+unset -f findmnt lsblk
+
+echo "==> test 5: plain install on a SATA disk"
 out="$(dry_run ARCH_INSTALL_DISK=/dev/sdz ARCH_INSTALL_ENCRYPT=no)"
 expect_contains "$out" "sgdisk -n 1:0:+1G -t 1:ef00 -c 1:EFI -n 2:0:0 -t 2:8304 -c 2:arch /dev/sdz"
 expect_contains "$out" "mkfs.fat -F 32 -n EFI /dev/sdz1"
@@ -80,7 +93,7 @@ expect_absent "$out" "cryptsetup"
 expect_absent "$out" "sd-encrypt"
 expect_absent "$out" "error:"
 
-echo "==> test 5: encrypted install hides both passwords"
+echo "==> test 6: encrypted install hides both passwords"
 out="$(dry_run ARCH_INSTALL_DISK=/dev/nvme7n1 ARCH_INSTALL_ENCRYPT=yes ARCH_INSTALL_LUKS_PASSWORD='disk secret')"
 expect_contains "$out" "cryptsetup luksFormat --type luks2 --batch-mode --key-file=- /dev/nvme7n1p2 <<< [hidden]"
 expect_contains "$out" "mkfs.btrfs -f -L arch /dev/mapper/cryptroot"
@@ -90,7 +103,7 @@ expect_contains "$out" "chpasswd <<< [hidden]"
 expect_absent "$out" "login secret"
 expect_absent "$out" "disk secret"
 
-echo "==> test 6: a bad preset answer stops before any command"
+echo "==> test 7: a bad preset answer stops before any command"
 if out="$(dry_run ARCH_INSTALL_DISK=/dev/sdz ARCH_INSTALL_ENCRYPT=no ARCH_INSTALL_USER=Root)"; then
     echo "Expected an invalid user name to fail" >&2
     exit 1
@@ -98,7 +111,7 @@ fi
 expect_contains "$out" "ARCH_INSTALL_USER=Root is not valid"
 expect_absent "$out" "+ "
 
-echo "==> test 7: unknown option"
+echo "==> test 8: unknown option"
 if bash "$INSTALLER" --wipe-everything >/dev/null 2>&1; then
     echo "Expected an unknown option to fail" >&2
     exit 1
