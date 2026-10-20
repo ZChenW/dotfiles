@@ -26,7 +26,7 @@
     "interval": 60,
     "format": "󰥔 {:%H:%M}",
     "tooltip-format": "{:%Y/%m/%d %A}\n---\n左键：打开时钟\n右键：打开日历",
-    "max-length": 25,
+    "min-length": 8,
     "on-click": "gnome-clocks",
     "on-click-right": "gnome-calendar",
   },
@@ -346,6 +346,8 @@
   "custom/cava": {
     "tooltip": false,
     "format": "{}",
+    // 空间不足时缩短音频动画，为完整时钟和右侧控件留出位置。
+    "max-length": 10,
     "exec": "~/.config/waybar/scripts/cava.sh",
   },
   //分隔符󰇝 󱋱

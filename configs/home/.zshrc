@@ -42,9 +42,11 @@ fi
 # Initialize completion.
 compinit -d "$HOME/.zcompdump"
 
-# Keep native zsh completion, but allow case-insensitive directory prefix matching.
-# Example: `cd down<Tab>` can complete to `cd Downloads`.
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+# Try case-insensitive prefix matching first, then substring matching.
+# Examples: `cd down<Tab>` -> Downloads; `cd 421<Tab>` -> MATH421.
+zstyle ':completion:*' matcher-list \
+  'm:{a-zA-Z}={A-Za-z}' \
+  'm:{a-zA-Z}={A-Za-z} l:|=* r:|=*'
 # Discover newly installed commands without restarting the current shell.
 zstyle ':completion:*' rehash true
 zmodload zsh/complist
@@ -187,7 +189,11 @@ alias open="xdg-open"
 alias upd='sudo pacman -Syu'
 alias y='yazi'
 alias zshrc='nvim ~/.zshrc'
+
+### Coding Agent
 alias codex-launch="codex-switch launch"
+alias cswap-run-1='cswap run 1 --share-history'
+alias cswap-run-2='cswap run 2 --share-history'
 
 # Directory navigation
 alias cd..='cd ..'

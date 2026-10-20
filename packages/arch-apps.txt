@@ -1,6 +1,7 @@
 # User applications and tools from official repositories.
 acpi
 alex
+appmenu-gtk-module
 cabal-install
 capitaine-cursors
 chromium
@@ -10,6 +11,8 @@ cloudflared
 corepack
 ctags
 discord
+docker
+docker-compose
 evtest
 ex-vi-compat
 feh
@@ -18,7 +21,10 @@ fzf
 gcc-fortran
 ghc
 ghostty
+github-cli
 gnome-keyring
+go
+gpsd
 gst-libav
 gst-plugins-base
 gst-plugins-good
@@ -46,6 +52,7 @@ opencode
 pandoc-cli
 plasma-integration
 pnpm
+pps-tools
 python-dbus
 python-ipykernel
 python-pip
@@ -55,6 +62,7 @@ qt6-lottie
 qtkeychain-qt6
 r
 rime-ice-pinyin-git
+rustup
 satty
 scratch
 shellcheck
@@ -83,6 +91,7 @@ unzip
 uv
 vim
 vlc
+vlc-plugin-ffmpeg
 webkit2gtk-4.1
 webkitgtk-6.0
 wezterm

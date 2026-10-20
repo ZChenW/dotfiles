@@ -674,6 +674,8 @@ binds {
 
     Mod+Shift+8 { spawn "/home/chakew/.config/niri/scripts/edit-screenshot.sh"; }
 
+    Mod+Shift+7 hotkey-overlay-title="Restart Waybar" { spawn-sh "pkill -x waybar; exec waybar"; }
+
 
 }
 
