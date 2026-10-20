@@ -23,7 +23,9 @@ Before booting the ISO on a machine that also runs Windows:
   Starting Windows from the firmware's own boot menu instead of GRUB avoids
   the BitLocker prompt.
 
-Run it from the Arch live ISO booted in UEFI mode:
+Run it from the Arch live ISO booted in UEFI mode. The ISO can be written to
+a USB stick, or copied as a file onto a Ventoy stick; either way the script
+recognizes the stick and never offers it as a target.
 
 ```bash
 iwctl station wlan0 connect <SSID>     # Wi-Fi only; wired works by itself
