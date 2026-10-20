@@ -18,7 +18,7 @@ mkdir -p "$fake_home" "$fake_bin"
 cp -a "$REPO_ROOT" "$fake_repo"
 
 # Stub only optional tools; core host tools stay from the real PATH.
-for cmd in zsh niri waybar kitty fastfetch paru yay; do
+for cmd in zsh niri waybar kitty fastfetch paru yay claude codex; do
     cat >"$fake_bin/$cmd" <<EOF
 #!/usr/bin/env bash
 exit 0

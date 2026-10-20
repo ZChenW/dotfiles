@@ -39,6 +39,12 @@ exit 0
 EOF
 chmod +x "$fake_bin/sudo"
 
+# Present coding agents keep install.sh from downloading their installers.
+for cmd in claude codex; do
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"
+    chmod +x "$fake_bin/$cmd"
+done
+
 echo "==> lightweight profile is selectable through the public installer"
 output="$(
     HOME="$fake_home" \
@@ -72,13 +78,18 @@ package_output="$(
         --debug --ascii --no-color 2>&1
 )"
 
-for required in firefox kitty neovim vim openai-codex visual-studio-code-bin; do
+for required in firefox kitty neovim vim visual-studio-code-bin "[OK] codex"; do
     if [[ "$package_output" != *"$required"* ]]; then
         echo "Expected Lightweight package plan to include: $required" >&2
         printf '%s\n' "$package_output" >&2
         exit 1
     fi
 done
+# Codex comes from OpenAI's installer, never the third-party pacman build.
+if [[ "$package_output" == *"openai-codex"* ]]; then
+    echo "Expected Lightweight package plan to exclude openai-codex" >&2
+    exit 1
+fi
 
 echo "==> successful real install persists the profile and later runs reuse it"
 HOME="$fake_home" \

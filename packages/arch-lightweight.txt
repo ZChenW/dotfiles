@@ -42,7 +42,6 @@ nodejs
 noto-fonts
 noto-fonts-cjk
 noto-fonts-emoji
-openai-codex
 pavucontrol
 playerctl
 pnpm

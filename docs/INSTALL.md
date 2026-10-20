@@ -279,6 +279,23 @@ The AUR/foreign manifest is rebuilt only from the current successful
 manifest; if pacman cannot provide a complete result, export stops before
 overwriting any manifest.
 
+## Coding Agents
+
+Claude Code and Codex come from their vendors' own installers, not from
+pacman or the AUR: `extra/openai-codex` and AUR `claude-code` are third-party
+builds, and `openai-codex` is listed in `arch-exclude.txt`. After the packages,
+Install and Update run whichever installer is missing:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+```
+
+Both put the binary in `~/.local/bin` and keep it updated. An agent already on
+`PATH` from another source, such as an npm-installed Codex, is left alone. A
+failed download is a warning, not an install failure. `--skip-packages` skips
+this step.
+
 ## Snapshot Current Machine
 
 Use this after changing configs or installing/removing packages:

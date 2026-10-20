@@ -1038,6 +1038,9 @@ run_install_workflow() {
             report_install_failure "Package installation failed"
             return 1
         fi
+        # shellcheck source=scripts/agents.sh
+        source "$REPO_ROOT/scripts/agents.sh"
+        install_coding_agents "$DRY_RUN"
     else
         ui_stage 1 3 "Packages"
         ui_warn "Package installation skipped"
