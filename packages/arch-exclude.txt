@@ -2,8 +2,8 @@
 archlinuxcn-keyring
 base
 base-devel
+openai-codex
 paru
 paru-debug
 yay
 yay-debug
-openai-codex

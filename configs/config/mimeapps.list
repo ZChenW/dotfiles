@@ -10,3 +10,4 @@ text/plain=nvim.desktop
 text/markdown=nvim.desktop
 application/json=nvim.desktop
 inode/directory=org.gnome.Nautilus.desktop
+x-scheme-handler/csapply=csapply-desktop-handler.desktop
