@@ -42,6 +42,7 @@ npm
 ntfs-3g
 nvm
 nvtop
+openai-codex
 opencode
 pandoc-cli
 plasma-integration
