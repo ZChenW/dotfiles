@@ -24,7 +24,6 @@ ghostty
 github-cli
 gnome-keyring
 go
-gpsd
 gst-libav
 gst-plugins-base
 gst-plugins-good
@@ -52,7 +51,6 @@ opencode
 pandoc-cli
 plasma-integration
 pnpm
-pps-tools
 python-dbus
 python-ipykernel
 python-pip
