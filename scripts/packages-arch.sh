@@ -393,7 +393,9 @@ is_app_pkg() {
 is_default_excluded_pkg() {
     local pkg="$1"
 
-    [[ "$pkg" =~ ^(yay|paru)(-debug)?$ ]] && return 0
+    [[ "$pkg" =~ ^(yay|paru)$ ]] && return 0
+    # Debug split packages that makepkg builds next to local packages.
+    [[ "$pkg" == *-debug ]] && return 0
     [[ "$pkg" == base || "$pkg" == base-devel ]] && return 0
     [[ "$pkg" == archlinuxcn-keyring ]] && return 0
     return 1

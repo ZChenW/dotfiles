@@ -461,4 +461,16 @@ for profile in standard lightweight; do
     done
 done
 
+echo "==> debug split packages never reach a manifest"
+for pkg in herdcat-git-debug paru-debug yay; do
+    if ! is_default_excluded_pkg "$pkg"; then
+        echo "Expected $pkg to be excluded from export" >&2
+        exit 1
+    fi
+done
+if is_default_excluded_pkg herdcat-git; then
+    echo "Expected herdcat-git itself to be left to arch-exclude.txt" >&2
+    exit 1
+fi
+
 echo "All package helper tests passed."

@@ -2,6 +2,8 @@
 archlinuxcn-keyring
 base
 base-devel
+herdcat-git
+herdcat-git-debug
 openai-codex
 paru
 paru-debug
