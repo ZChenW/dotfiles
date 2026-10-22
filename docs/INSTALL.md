@@ -66,7 +66,7 @@ What it installs:
 | Snapshots | snapper `root` config, timeline timers, `snap-pac`, and a "fresh install" snapshot |
 | Packages | `paccache.timer` keeps the last three versions in `@pkg` |
 | Hardware | `intel-ucode` or `amd-ucode`; `nvidia-open`, `vulkan-radeon` or `vulkan-intel` from `lspci`; `nvidia-prime` for hybrid graphics |
-| System | NetworkManager, bluez, PipeWire, greetd with tuigreet, multilib enabled, `en_US` and `zh_CN` locales; the `iTCO_wdt` and `sp5100_tco` watchdog drivers are blacklisted, since `nowatchdog` alone does not stop them |
+| System | NetworkManager, bluez, PipeWire, greetd with tuigreet (unlocking gnome-keyring at login), multilib enabled, `en_US` and `zh_CN` locales; the `iTCO_wdt` and `sp5100_tco` watchdog drivers are blacklisted, since `nowatchdog` alone does not stop them |
 | User | In `wheel` with sudo, login shell zsh; root is locked |
 
 It owns what `packages/arch-machine-local.txt` lists, so a new machine does
