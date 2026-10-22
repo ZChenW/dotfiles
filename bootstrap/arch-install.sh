@@ -266,9 +266,12 @@ EOF
 
 prepare_live_system() {
     say "Preparing the live system"
-    # A rerun after a failure starts from a clean slate.
-    if mountpoint -q "$TARGET"; then run umount -R "$TARGET"; fi
-    if [[ -e /dev/mapper/$MAPPER ]]; then run cryptsetup close "$MAPPER"; fi
+    # A rerun after a failure starts from a clean slate. A dry run skips this:
+    # it inspects the machine it runs on, which may itself use cryptroot.
+    if ! $DRY_RUN; then
+        if mountpoint -q "$TARGET"; then umount -R "$TARGET"; fi
+        if [[ -e /dev/mapper/$MAPPER ]]; then cryptsetup close "$MAPPER"; fi
+    fi
     run timeout 120 bash -c 'until systemctl -q is-active pacman-init.service; do sleep 1; done'
     # pacman's signature checks fail when the clock is far off.
     run timedatectl set-ntp true
@@ -379,6 +382,9 @@ vt = 1
 command = "tuigreet --time --remember --remember-session --sessions /usr/share/wayland-sessions --cmd niri-session"
 user = "greeter"
 EOF
+    # Unlock gnome-keyring with the login password; without this every app
+    # that stores a secret asks for a separate "Default Keyring" password.
+    run_sh "printf 'auth       optional     pam_gnome_keyring.so\nsession    optional     pam_gnome_keyring.so auto_start\n' >>$TARGET/etc/pam.d/greetd"
     in_target systemctl enable NetworkManager.service bluetooth.service systemd-timesyncd.service \
         snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service paccache.timer
 
