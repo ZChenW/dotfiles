@@ -246,7 +246,7 @@ Two pieces are installed separately and only referenced here:
 | `terminal` | `~/.config/kitty`, fastfetch, cava |
 | `apps` | mimeapps.list, user-dirs.dirs, git/ignore |
 | `editors` | Code/Cursor `settings.json`, `keybindings.json`, optional `snippets/` |
-| `local-bin` | `toggle-wlsunset`, `power-menu`, `waywallen-theme-sync` |
+| `local-bin` | `toggle-wlsunset`, `power-menu`, `kitty-mode` (what `Mod+T` opens), `waywallen-theme-sync` |
 | `media` | `~/Pictures/wallpapers` |
 
 `~/.zshrc.local` is handled only when the `shell` group is selected:

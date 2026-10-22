@@ -1,0 +1,76 @@
+#!/bin/sh
+# Switch what Niri's Mod+T launches; existing terminals keep running.
+set -eu
+
+export PATH="$HOME/.local/bin:$PATH"
+mode_file="${XDG_CONFIG_HOME:-$HOME/.config}/kitty/launch-mode"
+
+usage() {
+    printf '%s\n' \
+        'kitty-mode           切换 Mod+T：普通 Kitty ↔ Kitty + herdr' \
+        'kitty-mode kitty     使用普通 Kitty' \
+        'kitty-mode herdr     使用 Kitty + herdr' \
+        'kitty-mode status    查看当前模式'
+}
+
+if [ "$#" -gt 1 ]; then
+    usage >&2
+    exit 2
+fi
+
+mode=kitty
+if [ -r "$mode_file" ]; then
+    IFS= read -r mode < "$mode_file" || :
+fi
+case "$mode" in
+    kitty|herdr) ;;
+    *) mode=kitty ;;
+esac
+
+case "${1:-toggle}" in
+    launch)
+        if [ "$mode" = herdr ]; then
+            if herdr_bin=$(command -v herdr); then
+                exec kitty "$herdr_bin"
+            fi
+            printf '%s\n' '找不到 herdr，改为打开普通 Kitty。' >&2
+        fi
+        exec kitty
+        ;;
+    toggle)
+        if [ "$mode" = herdr ]; then
+            mode=kitty
+        else
+            mode=herdr
+        fi
+        ;;
+    kitty|herdr) mode=$1 ;;
+    status)
+        if [ "$mode" = herdr ]; then
+            printf '%s\n' 'Mod+T → Kitty + herdr'
+        else
+            printf '%s\n' 'Mod+T → 普通 Kitty'
+        fi
+        exit 0
+        ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+if [ "$mode" = herdr ] && ! command -v herdr >/dev/null 2>&1; then
+    printf '%s\n' '找不到 herdr，启动模式未修改。' >&2
+    exit 1
+fi
+
+mkdir -p "${mode_file%/*}"
+tmp=$(mktemp "${mode_file}.XXXXXX")
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+printf '%s\n' "$mode" > "$tmp"
+mv -f "$tmp" "$mode_file"
+trap - EXIT HUP INT TERM
+
+if [ "$mode" = herdr ]; then
+    printf '%s\n' 'Mod+T → Kitty + herdr（下次打开生效）'
+else
+    printf '%s\n' 'Mod+T → 普通 Kitty（下次打开生效）'
+fi

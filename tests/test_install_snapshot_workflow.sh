@@ -69,6 +69,7 @@ printf '{}\n' >"$fake_home/.config/Cursor/User/settings.json"
 printf '[]\n' >"$fake_home/.config/Cursor/User/keybindings.json"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/toggle-wlsunset"
 printf '#!/usr/bin/env bash\n' >"$fake_home/.local/bin/power-menu"
+printf '#!/bin/sh\n' >"$fake_home/.local/bin/kitty-mode"
 printf '#!/usr/bin/env python3\n' >"$fake_home/.local/bin/waywallen-theme-sync"
 printf 'wallpaper\n' >"$fake_home/Pictures/wallpapers/test-wallpaper.txt"
 

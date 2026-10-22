@@ -174,6 +174,7 @@ verify_installation() {
         paths+=(
             "$HOME/.local/bin/toggle-wlsunset"
             "$HOME/.local/bin/power-menu"
+            "$HOME/.local/bin/kitty-mode"
             "$HOME/.local/bin/waywallen-theme-sync"
         )
     fi

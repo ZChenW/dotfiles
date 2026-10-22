@@ -126,6 +126,7 @@ doctor_check_runtime_deps() {
     local -a runtime_paths=(
         "$HOME/.local/bin/toggle-wlsunset"
         "$HOME/.local/bin/power-menu"
+        "$HOME/.local/bin/kitty-mode"
         "$HOME/.local/bin/waywallen-theme-sync"
     )
     for cmd in brightnessctl swayidle swaylock idlectl wlogout matugen clipse mako fuzzel grim slurp wl-copy kanshi wlsunset ddcutil; do
