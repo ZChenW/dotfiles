@@ -473,4 +473,49 @@ if is_default_excluded_pkg herdcat-git; then
     exit 1
 fi
 
+echo "==> paru bootstrap gives a fresh rustup a toolchain before building"
+stub_bin="$tmp_dir/paru-stubs"
+mkdir -p "$stub_bin"
+export STUB_CALLS="$tmp_dir/paru-calls"
+cat >"$stub_bin/rustup" <<'EOS'
+#!/usr/bin/env bash
+echo "rustup $*" >>"$STUB_CALLS"
+if [[ "$*" == default && ! -e "$STUB_CALLS.toolchain" ]]; then exit 1; fi
+if [[ "$*" == "default stable" ]]; then touch "$STUB_CALLS.toolchain"; fi
+exit 0
+EOS
+cat >"$stub_bin/sudo" <<'EOS'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$STUB_CALLS"
+EOS
+cat >"$stub_bin/git" <<'EOS'
+#!/usr/bin/env bash
+echo "git $*" >>"$STUB_CALLS"
+mkdir -p "${@: -1}"
+EOS
+cat >"$stub_bin/makepkg" <<'EOS'
+#!/usr/bin/env bash
+echo "makepkg $*" >>"$STUB_CALLS"
+EOS
+printf '#!/bin/sh\n' >"$stub_bin/paru"
+chmod +x "$stub_bin"/*
+for state in fresh configured; do
+    : >"$STUB_CALLS"
+    rm -f "$STUB_CALLS.toolchain"
+    [[ "$state" == configured ]] && touch "$STUB_CALLS.toolchain"
+    PATH="$stub_bin:$PATH" bootstrap_paru false true >/dev/null 2>&1
+    calls="$(cat "$STUB_CALLS")"
+    if [[ "$state" == fresh ]]; then
+        expected=$'rustup default\nrustup default stable\ngit clone'
+        if [[ "$calls" != *"$expected"* ]]; then
+            echo "Expected a toolchain to be chosen before cloning paru" >&2
+            printf '%s\n' "$calls" >&2
+            exit 1
+        fi
+    elif [[ "$calls" == *"default stable"* ]]; then
+        echo "Expected a configured rustup to be left alone" >&2
+        exit 1
+    fi
+done
+
 echo "All package helper tests passed."

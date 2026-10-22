@@ -740,6 +740,7 @@ bootstrap_paru() {
         verbose_log "bootstrap paru from AUR"
         debug_log "[dry-run] bootstrap AUR helper: paru"
         debug_log "[dry-run] sudo pacman -S --needed git base-devel"
+        debug_log "[dry-run] rustup default stable (only when rustup has no default toolchain)"
         debug_log "[dry-run] git clone https://aur.archlinux.org/paru.git /tmp/dotfiles-paru-bootstrap/paru"
         debug_log "[dry-run] cd /tmp/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
         return 0
@@ -769,6 +770,11 @@ bootstrap_paru() {
         set -euo pipefail
         trap 'rm -rf "$build_root"' EXIT
         run_logged_command sudo "${pacman_args[@]}"
+        # paru builds with cargo. When rustup provides it, a fresh rustup has
+        # no toolchain and cargo refuses to run until one is chosen.
+        if command -v rustup >/dev/null 2>&1 && ! rustup default >/dev/null 2>&1; then
+            run_logged_command rustup default stable
+        fi
         run_logged_command \
             git clone https://aur.archlinux.org/paru.git "$build_root/paru"
         cd "$build_root/paru"
