@@ -481,7 +481,7 @@ fi
 echo "==> test 12: snapshot mappings describe the single Waybar desktop"
 build_snapshot_mappings
 mapping_text="$(printf '%s\n' "${SNAPSHOT_MAPPINGS[@]}")"
-for expected in '/waybar|' '/wlogout|' '/waywallen-theme|' 'local-bin/power-menu|' \
+for expected in '/waybar|' '/wlogout|' '/waywallen-theme|' 'local-bin/power-menu|' 'local-bin/kitty-mode|' \
     'local-bin/waywallen-theme-sync|' 'waywallen-theme-sync.service|'; do
     if ! grep -Fq -- "$expected" <<<"$mapping_text"; then
         echo "Snapshot mappings are missing $expected" >&2

@@ -37,6 +37,7 @@ build_snapshot_mappings() {
     "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
     "file|$HOME/.local/bin/toggle-wlsunset|configs/local-bin/toggle-wlsunset|required"
     "file|$HOME/.local/bin/power-menu|configs/local-bin/power-menu|required"
+    "file|$HOME/.local/bin/kitty-mode|configs/local-bin/kitty-mode|required"
     "file|$HOME/.local/bin/waywallen-theme-sync|configs/local-bin/waywallen-theme-sync|required"
     "dir|$HOME/Pictures/wallpapers|configs/Pictures/wallpapers|optional"
     )
@@ -305,7 +306,7 @@ snapshot_capture_configs() {
         fi
 
         case "$dest" in
-            configs/local-bin/toggle-wlsunset | configs/local-bin/power-menu | configs/local-bin/waywallen-theme-sync)
+            configs/local-bin/toggle-wlsunset | configs/local-bin/power-menu | configs/local-bin/kitty-mode | configs/local-bin/waywallen-theme-sync)
                 chmod +x "$repo_root/$dest"
                 ;;
         esac

@@ -298,6 +298,7 @@ build_sync_mappings() {
         "editors|$config_root/Cursor/User/snippets|$HOME/.config/Cursor/User/snippets|dir|optional"
         "local-bin|$repo_root/configs/local-bin/toggle-wlsunset|$HOME/.local/bin/toggle-wlsunset|755|required"
         "local-bin|$repo_root/configs/local-bin/power-menu|$HOME/.local/bin/power-menu|755|required"
+        "local-bin|$repo_root/configs/local-bin/kitty-mode|$HOME/.local/bin/kitty-mode|755|required"
         "local-bin|$repo_root/configs/local-bin/waywallen-theme-sync|$HOME/.local/bin/waywallen-theme-sync|755|required"
         "media|$repo_root/configs/Pictures/wallpapers|$HOME/Pictures/wallpapers|dir|required"
     )
@@ -374,6 +375,7 @@ sync_configs() {
         local -a executable_paths=(
             "$HOME/.local/bin/toggle-wlsunset"
             "$HOME/.local/bin/power-menu"
+            "$HOME/.local/bin/kitty-mode"
             "$HOME/.local/bin/waywallen-theme-sync"
         )
         if [[ "$dry_run" == true ]]; then
