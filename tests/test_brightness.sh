@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 script="$repo_root/configs/config/niri/scripts/brightness.sh"
@@ -133,14 +135,19 @@ if grep -Eq '^[[:space:]]*"group/ddcutil"[[:space:]]*:' "$repo_root/configs/conf
     echo "group/ddcutil definition must not be in modules.jsonc; Waybar cannot override it later" >&2
     exit 1
 fi
-grep -Fq '"output": ["eDP-1", "eDP-2"]' "$waybar_config"
-grep -Fq '"output": "DP-8"' "$waybar_config"
-grep -Fq 'brightness-edp.jsonc' "$waybar_config"
-grep -Fq 'brightness-dp.jsonc' "$waybar_config"
+grep -Fq 'brightness-auto.jsonc' "$waybar_config"
+if grep -Eq '"output"[[:space:]]*:' "$waybar_config"; then
+    echo "Default bars must cover every connected output" >&2
+    exit 1
+fi
 grep -Fq '"cffi/brightness"' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
 grep -Fq '"backlight/slider"' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
 grep -Fq -- '--output internal' "$repo_root/configs/config/waybar/brightness-edp.jsonc"
-grep -Fq -- '--output DP-8' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
+grep -Fq -- '--external' "$repo_root/configs/config/waybar/brightness-dp.jsonc"
+if grep -Eq '"device"[[:space:]]*:' "$repo_root/configs/config/waybar/brightness-edp.jsonc"; then
+    echo "Shared backlight configuration must auto-detect the device" >&2
+    exit 1
+fi
 python3 - "$repo_root/configs/config/waybar/config.jsonc" <<'PY'
 import json, re, sys, pathlib
 text = pathlib.Path(sys.argv[1]).read_text()

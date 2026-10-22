@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -125,7 +127,7 @@ public_repo="$tmp_dir/public-repo"
 public_home="$tmp_dir/public-home"
 public_bin="$tmp_dir/public-bin"
 mkdir -p "$public_home/.local/state/dotfiles" "$public_bin"
-cp -a "$REPO_ROOT" "$public_repo"
+rsync -a --exclude=/.tmp --exclude=/.review --exclude=/.git --exclude=/.jj "$REPO_ROOT/" "$public_repo/"
 rm -rf "$public_repo/.git"
 /usr/bin/git -C "$public_repo" init -q
 /usr/bin/git -C "$public_repo" config user.email test@example.com
@@ -189,7 +191,7 @@ if command -v jj >/dev/null 2>&1; then
     jj_remote="$tmp_dir/jj-remote.git"
     jj_seed="$tmp_dir/jj-seed"
     jj_work="$tmp_dir/jj-work"
-    /usr/bin/git init -q --bare "$jj_remote"
+    /usr/bin/git init -q --bare -b main "$jj_remote"
     /usr/bin/git init -q -b main "$jj_seed"
     /usr/bin/git -C "$jj_seed" config user.email test@example.com
     /usr/bin/git -C "$jj_seed" config user.name "Test User"

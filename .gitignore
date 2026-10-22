@@ -9,3 +9,9 @@ configs/config/waybar/brightness-module.json
 
 # Python bytecode
 __pycache__/
+
+# Worktree-local test environments and build artifacts
+.tmp/
+
+# Agent review notes and evidence stay local.
+.review/

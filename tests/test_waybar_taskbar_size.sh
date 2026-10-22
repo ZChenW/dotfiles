@@ -11,6 +11,10 @@ read -r -a gtk_flags <<<"$(pkg-config --cflags --libs gtk+-3.0)"
 cc -shared -fPIC -Wall -Wextra -Werror \
     "$repo_root/tests/test_waybar_taskbar_size.c" \
     -o "$tmp_dir/probe.so" "${gtk_flags[@]}"
+if [[ -z "${WAYLAND_DISPLAY:-}" || -z "${NIRI_SOCKET:-}" ]]; then
+    echo 'SKIP: taskbar interaction requires an isolated niri/Wayland session (C harness compiled)'
+    exit 0
+fi
 python3 - "$tmp_dir/config.json" "$library" <<'PY'
 import json
 import pathlib

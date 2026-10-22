@@ -768,7 +768,7 @@ init_log_once() {
     [[ "$LOG_INITIALIZED" == true ]] && return 0
 
     if [[ "$DRY_RUN" == true || "$SNAPSHOT" == true || "$UPDATE" == true || "$EXPORT_PACKAGES" == true || "$DOCTOR" == true || "$UNINSTALL" == true ]]; then
-        LOG_FILE="/tmp/dotfiles-install-$(date +%Y%m%d-%H%M%S).log"
+        LOG_FILE="$(mktemp -t dotfiles-install.XXXXXX.log)"
     else
         # shellcheck source=scripts/backup.sh
         source "$REPO_ROOT/scripts/backup.sh"

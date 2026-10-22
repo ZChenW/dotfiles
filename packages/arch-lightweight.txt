@@ -48,6 +48,7 @@ pnpm
 polkit-gnome
 power-profiles-daemon
 python
+python-gobject
 python-pip
 qt5-wayland
 qt6-wayland

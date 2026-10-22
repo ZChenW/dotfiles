@@ -42,7 +42,7 @@ verify_installation() {
         if group_selected desktop "${selected_groups[@]}"; then
             ui_ok "niri config"
             verify_detail "niri" "niri validate -c ~/.config/niri/config.kdl"
-            debug_log "[dry-run] verify: niri validate -c \$HOME/.config/niri/config.kdl"
+            debug_log "[dry-run] verify: niri validate -c \${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
             ui_ok "waybar available"
             verify_detail "waybar" "waybar --version"
             debug_log "[dry-run] verify: waybar --version"
@@ -78,10 +78,10 @@ verify_installation() {
 
     if group_selected desktop "${selected_groups[@]}"; then
         if command -v niri >/dev/null 2>&1; then
-            if [[ -f "$HOME/.config/niri/config.kdl" ]]; then
+            if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl" ]]; then
                 verify_detail "niri" "niri validate -c ~/.config/niri/config.kdl"
-                debug_log "verify: niri validate -c $HOME/.config/niri/config.kdl"
-                if niri validate -c "$HOME/.config/niri/config.kdl"; then
+                debug_log "verify: niri validate -c ${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
+                if niri validate -c "${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"; then
                     ui_ok "niri config"
                 else
                     ui_fail "niri config" "validation failed"
@@ -136,38 +136,38 @@ verify_installation() {
     fi
     if group_selected desktop "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.config/niri"
-            "$HOME/.config/waybar"
-            "$HOME/.config/wlogout"
-            "$HOME/.config/waywallen-theme"
-            "$HOME/.config/systemd/user/waywallen-theme-sync.service"
-            "$HOME/.config/fcitx5"
-            "$HOME/.config/mako"
-            "$HOME/.config/environment.d"
-            "$HOME/.config/qt5ct"
-            "$HOME/.config/qt6ct"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/niri"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/waybar"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/wlogout"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/waywallen-theme"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/waywallen-theme-sync.service"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/mako"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/qt5ct"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct"
         )
     fi
     if group_selected terminal "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.config/kitty"
-            "$HOME/.config/fastfetch"
-            "$HOME/.config/cava"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/kitty"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/cava"
         )
     fi
     if group_selected apps "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.config/mimeapps.list"
-            "$HOME/.config/user-dirs.dirs"
-            "$HOME/.config/git/ignore"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.dirs"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
         )
     fi
     if group_selected editors "${selected_groups[@]}"; then
         paths+=(
-            "$HOME/.config/Code/User/settings.json"
-            "$HOME/.config/Code/User/keybindings.json"
-            "$HOME/.config/Cursor/User/settings.json"
-            "$HOME/.config/Cursor/User/keybindings.json"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/settings.json"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/settings.json"
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/keybindings.json"
         )
     fi
     if group_selected local-bin "${selected_groups[@]}"; then
@@ -193,8 +193,8 @@ verify_installation() {
 
     if group_selected editors "${selected_groups[@]}"; then
         for path_item in \
-            "$HOME/.config/Code/User/snippets" \
-            "$HOME/.config/Cursor/User/snippets"; do
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/snippets" \
+            "${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/snippets"; do
             local display_path="$path_item"
             if [[ "$display_path" == "$HOME"* ]]; then
                 display_path="~${display_path#"$HOME"}"

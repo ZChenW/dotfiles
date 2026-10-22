@@ -8,33 +8,35 @@ DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 # shellcheck source=scripts/repo-sync.sh
 source "$DOTFILES_UI_SCRIPT_DIR/repo-sync.sh"
+# shellcheck source=scripts/portability.sh
+source "$DOTFILES_UI_SCRIPT_DIR/portability.sh"
 
 build_snapshot_mappings() {
     SNAPSHOT_MAPPINGS=(
-    "dir|$HOME/.config/niri|configs/config/niri|required"
-    "dir|$HOME/.config/waybar|configs/config/waybar|required"
-    "dir|$HOME/.config/wlogout|configs/config/wlogout|required"
-    "dir|$HOME/.config/waywallen-theme|configs/config/waywallen-theme|required"
-    "file|$HOME/.config/systemd/user/waywallen-theme-sync.service|configs/config/systemd/user/waywallen-theme-sync.service|required"
-    "file|$HOME/.config/idle-control/config.toml|configs/config/idle-control/config.toml|optional"
-    "dir|$HOME/.config/kitty|configs/config/kitty|required"
-    "dir|$HOME/.config/fastfetch|configs/config/fastfetch|required"
-    "dir|$HOME/.config/fcitx5|configs/config/fcitx5|required"
-    "dir|$HOME/.config/mako|configs/config/mako|required"
-    "dir|$HOME/.config/environment.d|configs/config/environment.d|required"
-    "dir|$HOME/.config/qt5ct|configs/config/qt5ct|required"
-    "dir|$HOME/.config/qt6ct|configs/config/qt6ct|required"
-    "dir|$HOME/.config/cava|configs/config/cava|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/niri|configs/config/niri|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/waybar|configs/config/waybar|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/wlogout|configs/config/wlogout|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/waywallen-theme|configs/config/waywallen-theme|required"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/waywallen-theme-sync.service|configs/config/systemd/user/waywallen-theme-sync.service|required"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/idle-control/config.toml|configs/config/idle-control/config.toml|optional"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/kitty|configs/config/kitty|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch|configs/config/fastfetch|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5|configs/config/fcitx5|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/mako|configs/config/mako|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/environment.d|configs/config/environment.d|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/qt5ct|configs/config/qt5ct|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct|configs/config/qt6ct|required"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/cava|configs/config/cava|required"
     "file|$HOME/.zshrc|configs/home/.zshrc|required"
-    "file|$HOME/.config/git/ignore|configs/config/git/ignore|required"
-    "file|$HOME/.config/mimeapps.list|configs/config/mimeapps.list|required"
-    "file|$HOME/.config/user-dirs.dirs|configs/config/user-dirs.dirs|required"
-    "file|$HOME/.config/Code/User/settings.json|configs/config/Code/User/settings.json|optional"
-    "file|$HOME/.config/Code/User/keybindings.json|configs/config/Code/User/keybindings.json|optional"
-    "dir|$HOME/.config/Code/User/snippets|configs/config/Code/User/snippets|optional"
-    "file|$HOME/.config/Cursor/User/settings.json|configs/config/Cursor/User/settings.json|optional"
-    "file|$HOME/.config/Cursor/User/keybindings.json|configs/config/Cursor/User/keybindings.json|optional"
-    "dir|$HOME/.config/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore|configs/config/git/ignore|required"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list|configs/config/mimeapps.list|required"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.dirs|configs/config/user-dirs.dirs|required"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/settings.json|configs/config/Code/User/settings.json|optional"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json|configs/config/Code/User/keybindings.json|optional"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/snippets|configs/config/Code/User/snippets|optional"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/settings.json|configs/config/Cursor/User/settings.json|optional"
+    "file|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/keybindings.json|configs/config/Cursor/User/keybindings.json|optional"
+    "dir|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/snippets|configs/config/Cursor/User/snippets|optional"
     "file|$HOME/.local/bin/toggle-wlsunset|configs/local-bin/toggle-wlsunset|required"
     "file|$HOME/.local/bin/power-menu|configs/local-bin/power-menu|required"
     "file|$HOME/.local/bin/kitty-mode|configs/local-bin/kitty-mode|required"
@@ -140,6 +142,10 @@ SNAPSHOT_SECRET_MARKER_COMMENT_SKIP_FILES=(
 SNAPSHOT_RSYNC_EXCLUDES=(
     .codex
     __pycache__
+    venv/
+    .venv/
+    node_modules/
+    "*.pyc"
     "*.bak"
     "*.bak.*"
     "*.bak-*"
@@ -158,6 +164,7 @@ snapshot_managed_paths() {
     done
 
     snapshot_profile_package_paths "$repo_root"
+    printf 'configs/hosts/%s\n' "$(dotfiles_hostname)"
 }
 
 snapshot_path_is_managed() {
@@ -254,7 +261,7 @@ snapshot_reject_source_symlinks() {
 snapshot_capture_configs() {
     local repo_root="$1"
     local dry_run="$2"
-    local mapping mode src dest required exclude
+    local mapping mode src dest required
     local captured_count=0
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
@@ -283,8 +290,26 @@ snapshot_capture_configs() {
             continue
         fi
 
+        snapshot_capture_mapping "$repo_root" "$mode" "$src" "$dest"
+        ((++captured_count))
+    done
+
+    ui_ok "Managed configs captured" "$captured_count paths"
+}
+
+# Stage before splitting, so live hardware never passes through the shared tree.
+snapshot_capture_mapping() (
+    local repo_root="$1" mode="$2" src="$3" dest="$4" exclude stage target host
+    host="$(dotfiles_hostname)" || exit 1
+    stage="$(mktemp -d)"
+    trap 'rm -rf -- "$stage"' EXIT
+    target="$stage/content"
         if [[ "$mode" == dir ]]; then
-            mkdir -p "$repo_root/$dest"
+            mkdir -p "$target"
+            # Preserve committed first-install seeds, never the generated palette.
+            if [[ "$dest" == configs/config/waybar || "$dest" == configs/config/wlogout ]]; then
+                [[ ! -f "$repo_root/$dest/colors.css" ]] || cp -p "$repo_root/$dest/colors.css" "$target/"
+            fi
             local -a rsync_args=(-a --delete --delete-excluded)
             for exclude in "${SNAPSHOT_RSYNC_EXCLUDES[@]}"; do
                 rsync_args+=(--exclude="$exclude")
@@ -295,14 +320,25 @@ snapshot_capture_configs() {
                     # the committed seed file stable instead of snapshotting the
                     # currently selected wallpaper palette.
                     rsync_args+=(--filter="P /colors.css" --exclude=/colors.css)
+                    if [[ "$dest" == configs/config/waybar ]]; then
+                        rsync_args+=(--exclude=/brightness-module.json)
+                    fi
                     ;;
                 configs/config/niri)
                     rsync_args+=(--exclude=/theme-colors.kdl)
                     ;;
             esac
-            rsync "${rsync_args[@]}" -- "$src/" "$repo_root/$dest/"
+            rsync "${rsync_args[@]}" -- "$src/" "$target/"
         else
-            install -Dm644 -- "$src" "$repo_root/$dest"
+            install -Dm644 -- "$src" "$target"
+        fi
+
+        python3 -B "$DOTFILES_PORTABILITY_PY" capture "$repo_root" "${dest#configs/}" "$target" "$host"
+        if [[ "$mode" == dir ]]; then
+            mkdir -p "$repo_root/$dest"
+            rsync -a --delete -- "$target/" "$repo_root/$dest/"
+        else
+            install -Dm644 -- "$target" "$repo_root/$dest"
         fi
 
         case "$dest" in
@@ -310,11 +346,7 @@ snapshot_capture_configs() {
                 chmod +x "$repo_root/$dest"
                 ;;
         esac
-        ((++captured_count))
-    done
-
-    ui_ok "Managed configs captured" "$captured_count paths"
-}
+)
 
 snapshot_run_package_export() {
     local repo_root="$1"
@@ -366,6 +398,8 @@ snapshot_normalize_captured_files() {
     local repo_root="$1"
     local -a normalize_paths=()
     local mapping _mode _src dest _required path found package_path
+
+    normalize_paths+=("$repo_root/configs/hosts/$(dotfiles_hostname)")
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
         IFS='|' read -r _mode _src dest _required <<<"$mapping"
@@ -476,6 +510,8 @@ snapshot_safety_check() {
     local repo_root="$1"
     local -a scan_paths=()
     local mapping mode _src dest _required rel_path fragment
+
+    scan_paths+=("$repo_root/configs/hosts/$(dotfiles_hostname)")
 
     for mapping in "${SNAPSHOT_MAPPINGS[@]}"; do
         IFS='|' read -r mode _src dest _required <<<"$mapping"

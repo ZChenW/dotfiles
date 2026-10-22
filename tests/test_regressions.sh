@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -58,6 +60,7 @@ printf 'style\n' >"$fake_home/.config/waybar/style.css"
 printf 'style\n' >"$fake_repo/configs/config/waybar/style.css"
 printf 'generated\n' >"$fake_home/.config/waybar/colors.css"
 printf 'seed\n' >"$fake_repo/configs/config/waybar/colors.css"
+printf '{"generated":true}\n' >"$fake_home/.config/waybar/brightness-module.json"
 : >"$backup_log"
 sync_mapping_entry \
     "$backup_root" false "$backup_root/.restore-manifest" \
@@ -69,6 +72,10 @@ if [[ -s "$backup_log" ]]; then
 fi
 if [[ "$(cat "$fake_home/.config/waybar/colors.css")" != generated ]]; then
     echo "Config sync overwrote runtime-generated Waybar colors" >&2
+    exit 1
+fi
+if [[ "$(cat "$fake_home/.config/waybar/brightness-module.json")" != '{"generated":true}' ]]; then
+    echo "Config sync removed the runtime CFFI brightness loader" >&2
     exit 1
 fi
 

@@ -420,7 +420,7 @@ run_random_fastfetch() {
 
   command -v fastfetch >/dev/null || return 0
 
-  local logo_dir="$HOME/.config/fastfetch/logo"
+  local logo_dir="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/logo"
   local -a logos
   logos=("$logo_dir"/braille-logo_*.txt(N-.))
 
@@ -438,7 +438,7 @@ if [[ -o interactive && -z "${__RUN_RANDOM_FASTFETCH_DONE-}" ]]; then
 fi
 
 # (disabled) Fastfetch resize hook.
-# source /home/chakew/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
+# source $HOME/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
 
 # ------------------------------------------------------------------------------
 # 10. Proxy (Clash)
@@ -459,7 +459,9 @@ fi
 # --- jj (Jujutsu) ---
 autoload -U compinit
 compinit
-source <(COMPLETE=zsh jj)
+if command -v jj >/dev/null 2>&1; then
+  source <(COMPLETE=zsh jj)
+fi
 
 # --- codex ---
 codex1() {
@@ -477,12 +479,12 @@ codex2() {
 # API keys and provider auth belong in ~/.zshrc.local (never commit secrets).
 
 # --- bun ---
-[ -s "/home/chakew/.bun/_bun" ] && source "/home/chakew/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # --- grok ---
 
 # kimi-code
-export PATH="/home/chakew/.kimi-code/bin:$PATH"
+export PATH="$HOME/.kimi-code/bin:$PATH"
 
 # ------------------------------------------------------------------------------
 # 12. Local Overrides
@@ -502,4 +504,4 @@ autoload -Uz compinit && compinit -C
 
 
 # Added by Antigravity CLI installer
-export PATH="/home/chakew/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"

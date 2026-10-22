@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import time
 import subprocess
@@ -18,6 +19,8 @@ spec.loader.exec_module(module)
 FIXTURES = ROOT / 'tests/fixtures/waybar-displays'
 
 
+@unittest.skipUnless(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'),
+                     'requires an isolated graphical display')
 class DisplaysGtkTest(unittest.TestCase):
     def setUp(self):
         import warnings
@@ -170,6 +173,9 @@ class DisplaysGtkTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    if not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+        print('SKIP: GTK display workflows require an isolated graphical display')
+        sys.exit(0)
     if len(sys.argv) == 1:
         # GApplication's registration lifecycle is process-scoped, like the app.
         cases = unittest.defaultTestLoader.getTestCaseNames(DisplaysGtkTest)

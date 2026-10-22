@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -137,6 +139,8 @@ mkdir -p \
     "$fake_home/.config/wlogout" \
     "$fake_repo/configs/config/niri" \
     "$fake_repo/configs/config/wlogout"
+mkdir -p "$fake_home/.config/niri/venv/bin"
+printf '#!foreign-home/bin/python\n' >"$fake_home/.config/niri/venv/bin/python"
 printf 'layout\n' >"$fake_home/.config/niri/outputs.kdl"
 printf 'generated ring\n' >"$fake_home/.config/niri/theme-colors.kdl"
 printf 'old config\n' >"$fake_home/.config/niri/config.kdl.before-something-20260101"
@@ -150,12 +154,16 @@ SNAPSHOT_MAPPINGS=(
     "dir|$HOME/.config/wlogout|configs/config/wlogout|required"
 )
 snapshot_capture_configs "$fake_repo" false >/dev/null
-if [[ ! -f "$fake_repo/configs/config/niri/outputs.kdl" \
+if [[ ! -f "$fake_repo/configs/hosts/$(dotfiles_hostname)/config/niri/outputs.kdl" \
     || ! -f "$fake_repo/configs/config/wlogout/style.css" ]]; then
     echo "Snapshot omitted managed niri or power menu files" >&2
     exit 1
 fi
-for runtime_file in theme-colors.kdl config.kdl.before-something-20260101 backups; do
+if [[ -f "$fake_repo/configs/config/niri/outputs.kdl" ]]; then
+    echo "Snapshot put the machine's output layout in the shared tree" >&2
+    exit 1
+fi
+for runtime_file in theme-colors.kdl config.kdl.before-something-20260101 backups venv; do
     if [[ -e "$fake_repo/configs/config/niri/$runtime_file" ]]; then
         echo "Snapshot captured generated or backup state: $runtime_file" >&2
         exit 1

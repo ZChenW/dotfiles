@@ -1,19 +1,6 @@
 [
     {
-        // Waybar include 先写入生效：亮度覆盖必须排在 bar-common/modules 之前。
-        // 混合模式下内屏是 eDP-1（核显），独显直连下是 eDP-2（NVIDIA）。
-        "output": ["eDP-1", "eDP-2"],
-        "include": [
-            "brightness-edp.jsonc",
-            "bar-common.jsonc"
-        ]
-    },
-    {
-        "output": "DP-8",
-        "include": [
-            "brightness-module.json",
-            "brightness-dp.jsonc",
-            "bar-common.jsonc"
-        ]
+        // Apply one bar to every connected output; discover brightness hardware.
+        "include": ["brightness-auto.jsonc", "bar-common.jsonc"]
     }
 ]

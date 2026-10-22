@@ -9,7 +9,7 @@ DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
 
 declare -a ESSENTIAL_PACKAGES=(
-    git rsync zsh
+    git rsync zsh python
     kitty lsd yazi fastfetch
     niri waybar fuzzel mako fcitx5 kanshi swayidle brightnessctl playerctl wl-clipboard
     grim slurp wf-recorder ffmpeg
@@ -741,8 +741,8 @@ bootstrap_paru() {
         debug_log "[dry-run] bootstrap AUR helper: paru"
         debug_log "[dry-run] sudo pacman -S --needed git base-devel"
         debug_log "[dry-run] rustup default stable (only when rustup has no default toolchain)"
-        debug_log "[dry-run] git clone https://aur.archlinux.org/paru.git /tmp/dotfiles-paru-bootstrap/paru"
-        debug_log "[dry-run] cd /tmp/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
+        debug_log "[dry-run] git clone https://aur.archlinux.org/paru.git <TMPDIR>/dotfiles-paru-bootstrap/paru"
+        debug_log "[dry-run] cd <TMPDIR>/dotfiles-paru-bootstrap/paru && makepkg -si --needed"
         return 0
     fi
 

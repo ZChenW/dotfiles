@@ -36,6 +36,7 @@ packagekit-qt6
 pavucontrol
 polkit-gnome
 power-profiles-daemon
+python-gobject
 qdiskinfo
 qt5-wayland
 qt6-wayland

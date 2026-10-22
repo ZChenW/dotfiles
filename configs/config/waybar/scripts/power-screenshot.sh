@@ -5,7 +5,7 @@ set -euo pipefail
 # 配置区域（直接改这里）
 ########################
 
-NIRI_CONFIG="$HOME/.config/niri/config.kdl"   # niri 配置文件
+NIRI_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"   # niri 配置文件
 
 SHOTEDITOR_DEFAULT="satty"                   # 默认截图编辑器：swappy 或 satty
 COPY_CMD="wl-copy"                            # 复制到剪贴板的命令
@@ -18,6 +18,7 @@ MENU_CMD='fuzzel --dmenu'
 # 图片目录
 PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
 SCREEN_DIR="$PICTURES_DIR/Screenshots"
+SHOT_TEMP_ROOT="${TMPDIR:-${XDG_RUNTIME_DIR:-$HOME/.cache}}"
 
 ########################
 # 本地化（中/英）
@@ -89,7 +90,7 @@ fi
 ########################
 
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
-# 旧路径: CONFIG_DIR="$HOME/.config/waybar/waybar-shot"
+# 旧路径: CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/waybar/waybar-shot"
 CONFIG_DIR="$XDG_CACHE_HOME/waybar-power-screenshot-sh"
 
 BACKEND_FILE="$CONFIG_DIR/backend"
@@ -343,7 +344,7 @@ edit_file_image() {
     esac
 
     if [[ -f "$dst" ]]; then
-        if [[ "$backend" == "grim" && "$src" == /tmp/* ]]; then
+        if [[ "$backend" == "grim" && "$src" == "$SHOT_TEMP_ROOT"/waybar-shot.*.png ]]; then
             rm -f "$src"
         fi
         "$COPY_CMD" < "$dst"
@@ -510,8 +511,9 @@ grim_capture_and_maybe_edit() {
     ts="$(date +'%Y-%m-%d_%H-%M-%S')"
 
     if [[ "$need_edit" == "yes" ]]; then
-        # 编辑模式：原图在 /tmp，用完删，只保留编辑后的图
-        shot="/tmp/waybar-shot-$ts.png"
+        # Use a private, unpredictable temporary filename for the editor input.
+        mkdir -p "$SHOT_TEMP_ROOT"
+        shot="$(mktemp "$SHOT_TEMP_ROOT/waybar-shot.XXXXXX.png")"
 
         case "$mode" in
             fullscreen)

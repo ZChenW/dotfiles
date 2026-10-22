@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -20,7 +22,7 @@ mkdir -p \
     "$fake_home/.local/share/zsh/site-functions" \
     "$fake_home/Pictures/wallpapers" \
     "$fake_bin"
-cp -a "$REPO_ROOT" "$fake_repo"
+rsync -a --exclude=/.tmp --exclude=/.review --exclude=/.git --exclude=/.jj "$REPO_ROOT/" "$fake_repo/"
 rm -rf "$fake_repo/.git" "$fake_repo/.jj"
 /usr/bin/git -C "$fake_repo" init -q
 /usr/bin/git -C "$fake_repo" config user.email "test@example.com"
@@ -166,10 +168,13 @@ standard_hash_before="$(
         packages/arch-machine-local.txt \
         packages/arch-exclude.txt
 )"
-lightweight_output="$(
+if ! lightweight_output="$(
     HOME="$fake_home" PATH="$fake_bin:$PATH" \
         "$fake_repo/install.sh" --snapshot --no-commit 2>&1
-)"
+)"; then
+    printf '%s\n' "$lightweight_output" >&2
+    exit 1
+fi
 standard_hash_after="$(
     /usr/bin/git -C "$fake_repo" hash-object \
         packages/arch-essential.txt \

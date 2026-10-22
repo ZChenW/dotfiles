@@ -6,6 +6,8 @@ set -euo pipefail
 DOTFILES_UI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/ui.sh
 source "$DOTFILES_UI_SCRIPT_DIR/ui.sh"
+# shellcheck source=scripts/portability.sh
+source "$DOTFILES_UI_SCRIPT_DIR/portability.sh"
 
 SYNC_MANIFEST_FILE=".restore-manifest"
 
@@ -39,6 +41,34 @@ sync_count_label() {
 }
 
 sync_mapping_entry() {
+    local group src dest mode required
+    IFS='|' read -r group src dest mode required <<<"$4"
+    # Direct/test mappings outside configs keep the same behavior.
+    if [[ "$src" != */configs/* ]]; then
+        sync_mapping_apply "$@"
+        return
+    fi
+    local root="${src%/configs/*}"
+    local relative="${src#"$root/configs/"}"
+    local stage host result=0
+    host="$(dotfiles_hostname)" || return 1
+    if [[ ! -e "$src" && ! -e "$root/configs/hosts/$host/$relative" ]]; then
+        sync_mapping_apply "$@"
+        return
+    fi
+    stage="$(mktemp -d)" || return 1
+    if python3 -B "$DOTFILES_PORTABILITY_PY" prepare "$src" \
+        "$root/configs/hosts/$host/$relative" "$stage/content" "$relative"; then
+        sync_mapping_apply "$1" "$2" "$3" \
+            "$group|$stage/content|$dest|$mode|$required" || result=$?
+    else
+        result=$?
+    fi
+    rm -rf -- "$stage"
+    return "$result"
+}
+
+sync_mapping_apply() {
     local backup_root="$1"
     local dry_run="$2"
     local manifest="$3"
@@ -75,8 +105,8 @@ sync_mapping_entry() {
         verbose_log "backup   $(sync_display_path "$dest")"
     fi
 
-    backup_path "$dest" "$backup_root" "$dry_run"
-    remove_symlink_dest "$dest" "$dry_run"
+    backup_path "$dest" "$backup_root" "$dry_run" || return 1
+    remove_symlink_dest "$dest" "$dry_run" || return 1
 
     if [[ "$dry_run" == true ]]; then
         local action="created"
@@ -105,12 +135,12 @@ sync_mapping_entry() {
         while IFS= read -r runtime_file; do
             rsync_args+=(--exclude="$runtime_file")
         done < <(sync_runtime_excludes "$dest")
-        rsync "${rsync_args[@]}" -- "$src/" "$dest/"
+        rsync "${rsync_args[@]}" -- "$src/" "$dest/" || return 1
         verbose_log "rsync    $(sync_display_path "$dest")/"
         debug_log "rsync ${rsync_args[*]} $src/ -> $dest/"
     else
         ((++SYNC_FILE_COUNT))
-        install -Dm"$mode" -- "$src" "$dest"
+        install -Dm"$mode" -- "$src" "$dest" || return 1
         verbose_log "install  $(sync_display_path "$dest")"
         debug_log "install -Dm$mode $src -> $dest"
     fi
@@ -122,7 +152,8 @@ sync_runtime_excludes() {
     local dest="$1"
     local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
     case "$dest" in
-        "$config_home/waybar" | "$config_home/wlogout") printf '%s\n' /colors.css ;;
+        "$config_home/waybar") printf '%s\n' /colors.css /brightness-module.json /scripts/longshot-sh/venv/ ;;
+        "$config_home/wlogout") printf '%s\n' /colors.css ;;
         "$config_home/niri") printf '%s\n' /theme-colors.kdl ;;
     esac
 }
@@ -273,29 +304,29 @@ build_sync_mappings() {
     local config_root="$repo_root/configs/config"
     SYNC_MAPPINGS=(
         "shell|$repo_root/configs/home/.zshrc|$HOME/.zshrc|644|required"
-        "desktop|$config_root/niri|$HOME/.config/niri|dir|required"
-        "desktop|$config_root/waybar|$HOME/.config/waybar|dir|required"
-        "desktop|$config_root/wlogout|$HOME/.config/wlogout|dir|required"
-        "desktop|$config_root/waywallen-theme|$HOME/.config/waywallen-theme|dir|required"
-        "desktop|$config_root/systemd/user/waywallen-theme-sync.service|$HOME/.config/systemd/user/waywallen-theme-sync.service|644|required"
-        "desktop|$config_root/idle-control/config.toml|$HOME/.config/idle-control/config.toml|644|optional"
-        "desktop|$config_root/fcitx5|$HOME/.config/fcitx5|dir|required"
-        "desktop|$config_root/mako|$HOME/.config/mako|dir|required"
-        "desktop|$config_root/environment.d|$HOME/.config/environment.d|dir|required"
-        "desktop|$config_root/qt5ct|$HOME/.config/qt5ct|dir|required"
-        "desktop|$config_root/qt6ct|$HOME/.config/qt6ct|dir|required"
-        "terminal|$config_root/kitty|$HOME/.config/kitty|dir|required"
-        "terminal|$config_root/fastfetch|$HOME/.config/fastfetch|dir|required"
-        "terminal|$config_root/cava|$HOME/.config/cava|dir|required"
-        "apps|$config_root/mimeapps.list|$HOME/.config/mimeapps.list|644|required"
-        "apps|$config_root/user-dirs.dirs|$HOME/.config/user-dirs.dirs|644|required"
-        "apps|$config_root/git/ignore|$HOME/.config/git/ignore|644|required"
-        "editors|$config_root/Code/User/settings.json|$HOME/.config/Code/User/settings.json|644|required"
-        "editors|$config_root/Code/User/keybindings.json|$HOME/.config/Code/User/keybindings.json|644|required"
-        "editors|$config_root/Code/User/snippets|$HOME/.config/Code/User/snippets|dir|optional"
-        "editors|$config_root/Cursor/User/settings.json|$HOME/.config/Cursor/User/settings.json|644|required"
-        "editors|$config_root/Cursor/User/keybindings.json|$HOME/.config/Cursor/User/keybindings.json|644|required"
-        "editors|$config_root/Cursor/User/snippets|$HOME/.config/Cursor/User/snippets|dir|optional"
+        "desktop|$config_root/niri|${XDG_CONFIG_HOME:-$HOME/.config}/niri|dir|required"
+        "desktop|$config_root/waybar|${XDG_CONFIG_HOME:-$HOME/.config}/waybar|dir|required"
+        "desktop|$config_root/wlogout|${XDG_CONFIG_HOME:-$HOME/.config}/wlogout|dir|required"
+        "desktop|$config_root/waywallen-theme|${XDG_CONFIG_HOME:-$HOME/.config}/waywallen-theme|dir|required"
+        "desktop|$config_root/systemd/user/waywallen-theme-sync.service|${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/waywallen-theme-sync.service|644|required"
+        "desktop|$config_root/idle-control/config.toml|${XDG_CONFIG_HOME:-$HOME/.config}/idle-control/config.toml|644|optional"
+        "desktop|$config_root/fcitx5|${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5|dir|required"
+        "desktop|$config_root/mako|${XDG_CONFIG_HOME:-$HOME/.config}/mako|dir|required"
+        "desktop|$config_root/environment.d|${XDG_CONFIG_HOME:-$HOME/.config}/environment.d|dir|required"
+        "desktop|$config_root/qt5ct|${XDG_CONFIG_HOME:-$HOME/.config}/qt5ct|dir|required"
+        "desktop|$config_root/qt6ct|${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct|dir|required"
+        "terminal|$config_root/kitty|${XDG_CONFIG_HOME:-$HOME/.config}/kitty|dir|required"
+        "terminal|$config_root/fastfetch|${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch|dir|required"
+        "terminal|$config_root/cava|${XDG_CONFIG_HOME:-$HOME/.config}/cava|dir|required"
+        "apps|$config_root/mimeapps.list|${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list|644|required"
+        "apps|$config_root/user-dirs.dirs|${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.dirs|644|required"
+        "apps|$config_root/git/ignore|${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore|644|required"
+        "editors|$config_root/Code/User/settings.json|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/settings.json|644|required"
+        "editors|$config_root/Code/User/keybindings.json|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json|644|required"
+        "editors|$config_root/Code/User/snippets|${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/snippets|dir|optional"
+        "editors|$config_root/Cursor/User/settings.json|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/settings.json|644|required"
+        "editors|$config_root/Cursor/User/keybindings.json|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/keybindings.json|644|required"
+        "editors|$config_root/Cursor/User/snippets|${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/snippets|dir|optional"
         "local-bin|$repo_root/configs/local-bin/toggle-wlsunset|$HOME/.local/bin/toggle-wlsunset|755|required"
         "local-bin|$repo_root/configs/local-bin/power-menu|$HOME/.local/bin/power-menu|755|required"
         "local-bin|$repo_root/configs/local-bin/kitty-mode|$HOME/.local/bin/kitty-mode|755|required"
@@ -402,7 +433,7 @@ enable_desktop_services() {
     local dry_run="${1:-false}"
     local unit="waywallen-theme-sync.service"
 
-    if [[ ! -f "$HOME/.config/systemd/user/$unit" ]]; then
+    if [[ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$unit" ]]; then
         ui_warn "Theme sync service" "unit file is not installed"
         return 0
     fi

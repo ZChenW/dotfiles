@@ -3,7 +3,7 @@
 # 配置
 CHARS="▁▂▃▄▅▆▇█"
 BARS=10
-CONF="/tmp/waybar_cava_config"
+CONF="$(mktemp -t waybar-cava.XXXXXX)"
 
 # 初始化
 len=$((${#CHARS}-1))
@@ -27,6 +27,7 @@ EOF
 cleanup() {
     trap - EXIT INT TERM
     pkill -P $$ 2>/dev/null
+    rm -f -- "$CONF"
     echo "$idle_output"
     exit 0
 }

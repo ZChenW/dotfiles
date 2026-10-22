@@ -57,27 +57,27 @@ class PreviewTest(unittest.TestCase):
 
     def test_revert_switches_a_newly_enabled_output_off_again(self):
         # Only the laptop was patched; the untouched external monitor is the usable alternative.
-        guardian = self.guardian({'DP-8': output('External', True), 'eDP-2': output('Laptop', True)},
+        guardian = self.guardian({'DP-7': output('External', True), 'eDP-2': output('Laptop', True)},
                                  before={'eDP-2': dict(enabled=False)})
         self.assertEqual(guardian.restore(), [])
         self.assertEqual(self.sent, [('eDP-2', 'Off')])
 
     def test_revert_never_switches_off_the_last_usable_output(self):
-        guardian = self.guardian({'DP-8': output('External', True), 'eDP-2': output('Laptop', False)},
+        guardian = self.guardian({'DP-7': output('External', True), 'eDP-2': output('Laptop', False)},
                                  stuck=('eDP-2',),
-                                 before={'DP-8': dict(enabled=False), 'eDP-2': dict(enabled=True, mode=MODE)})
+                                 before={'DP-7': dict(enabled=False), 'eDP-2': dict(enabled=True, mode=MODE)})
         guardian.restore()
-        self.assertNotIn(('DP-8', 'Off'), self.sent)
-        self.assertIsNotNone(self.live['DP-8']['current_mode'])
+        self.assertNotIn(('DP-7', 'Off'), self.sent)
+        self.assertIsNotNone(self.live['DP-7']['current_mode'])
 
     def test_positions_are_applied_after_outputs_are_switched_off(self):
         # The laptop takes over the origin from the monitor that is being switched off.
         laptop = dict(enabled=True, mode=MODE, scale=1, transform='normal', position=dict(x=0, y=0), vrr='off')
-        guardian = self.guardian({'DP-8': output('External', True), 'eDP-2': output('Laptop', True)},
-                                 desired={'DP-8': dict(enabled=False, mode=MODE), 'eDP-2': laptop})
+        guardian = self.guardian({'DP-7': output('External', True), 'eDP-2': output('Laptop', True)},
+                                 desired={'DP-7': dict(enabled=False, mode=MODE), 'eDP-2': laptop})
         guardian.apply()
         self.assertEqual([entry for entry in self.sent if entry[1] in ('Off', 'Position')],
-                         [('DP-8', 'Off'), ('eDP-2', 'Position')])
+                         [('DP-7', 'Off'), ('eDP-2', 'Position')])
 
 
 def lit(x, y, width=2560, height=1440):
@@ -88,21 +88,21 @@ class GuardTest(unittest.TestCase):
     def test_a_saved_off_laptop_panel_is_lit_when_it_is_alone(self):
         # The black screen of 2026-10-14: docked layout saved eDP-2 off, then booted undocked.
         self.assertEqual(guard.plan({'eDP-2': dict(current_mode=None, logical=None)}), [['eDP-2', 'on']])
-        self.assertEqual(guard.plan({'DP-8': dict(current_mode=None, logical=None),
+        self.assertEqual(guard.plan({'DP-7': dict(current_mode=None, logical=None),
                                      'eDP-1': dict(current_mode=None, logical=None)}), [['eDP-1', 'on']])
         self.assertEqual(guard.plan({}), [])
 
     def test_a_lone_display_away_from_the_origin_is_moved_onto_it(self):
         self.assertEqual(guard.plan({'eDP-2': lit(2560, 179, 1706, 1066)}), [['eDP-2', 'position', 'set', '0', '0']])
-        self.assertEqual(guard.plan({'DP-8': lit(-8655, -181)}), [['DP-8', 'position', 'set', '0', '0']])
+        self.assertEqual(guard.plan({'DP-7': lit(-8655, -181)}), [['DP-7', 'position', 'set', '0', '0']])
 
     def test_a_layout_covering_the_origin_is_left_alone(self):
-        self.assertEqual(guard.plan({'DP-8': lit(0, 0), 'eDP-2': lit(2560, 179, 1706, 1066)}), [])
-        self.assertEqual(guard.plan({'eDP-1': lit(-1828, 0, 1828, 1142), 'DP-8': lit(0, 0)}), [])
+        self.assertEqual(guard.plan({'DP-7': lit(0, 0), 'eDP-2': lit(2560, 179, 1706, 1066)}), [])
+        self.assertEqual(guard.plan({'eDP-1': lit(-1828, 0, 1828, 1142), 'DP-7': lit(0, 0)}), [])
 
     def test_a_shifted_pair_keeps_its_arrangement(self):
-        self.assertEqual(guard.plan({'DP-8': lit(-8655, -181), 'eDP-2': lit(-6095, -2, 1706, 1066)}),
-                         [['DP-8', 'position', 'set', '0', '0'], ['eDP-2', 'position', 'set', '2560', '179']])
+        self.assertEqual(guard.plan({'DP-7': lit(-8655, -181), 'eDP-2': lit(-6095, -2, 1706, 1066)}),
+                         [['DP-7', 'position', 'set', '0', '0'], ['eDP-2', 'position', 'set', '2560', '179']])
 
     def test_the_guard_stands_aside_during_a_preview(self):
         with patch.object(guard.display_preview, 'active', lambda: True), \
@@ -116,15 +116,15 @@ class SaveTest(unittest.TestCase):
             main = Path(directory) / 'config.kdl'
             main.write_text('include "outputs.kdl"\n')
             (Path(directory) / 'outputs.kdl').write_text(
-                'output "DP-8" {\n    // kept\n    mode "2560x1440@60.000";\n    position x=5 y=5;\n}\n')
+                'output "DP-7" {\n    // kept\n    mode "2560x1440@60.000";\n    position x=5 y=5;\n}\n')
             key = config.path_key(Path(directory) / 'outputs.kdl')
-            request = dict(outputs=[dict(identifier='DP-8', settings=dict(mode=MODE, position=dict(x=0, y=0)))])
+            request = dict(outputs=[dict(identifier='DP-7', settings=dict(mode=MODE, position=dict(x=0, y=0)))])
             graph, saved = config.Graph(main), []
             for _ in range(3):
                 saved.append(outputs.edit(graph, key, request, config))
                 graph = config.Graph(main, replacements={key: saved[-1]})
             self.assertEqual(saved[0], saved[2])
-            self.assertEqual(saved[0], 'output "DP-8" {\n    // kept\n    mode "2560x1440@60.000";\n'
+            self.assertEqual(saved[0], 'output "DP-7" {\n    // kept\n    mode "2560x1440@60.000";\n'
                                        '    position x=0 y=0;\n}\n')
 
 
