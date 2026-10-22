@@ -22,7 +22,6 @@ ttf-readex-pro
 ttf-rubik-vf
 ttf-twemoji
 visual-studio-code-bin
-waybar-cava-git
 waybar-module-pacman-updates-git
 waybar-niri-taskbar-git
 wechat

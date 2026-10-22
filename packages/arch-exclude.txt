@@ -7,5 +7,6 @@ herdcat-git-debug
 openai-codex
 paru
 paru-debug
+waybar-cava-git
 yay
 yay-debug
