@@ -36,7 +36,7 @@ BASE_PACKAGES=(
     base base-devel linux linux-firmware
     btrfs-progs dosfstools grub efibootmgr os-prober fuse3
     grub-btrfs inotify-tools snapper snap-pac btrfs-assistant pacman-contrib
-    networkmanager bluez sudo git openssh rsync zsh vim
+    networkmanager bluez sudo git openssh rsync zsh vim python
     pipewire pipewire-alsa pipewire-pulse wireplumber sof-firmware alsa-firmware
     greetd greetd-tuigreet
     mesa lib32-mesa
@@ -164,6 +164,7 @@ valid_timezone() { [[ -f /usr/share/zoneinfo/$1 ]]; }
 valid_profile() { [[ $1 == standard || $1 == lightweight ]]; }
 valid_yes_no() { [[ $1 == yes || $1 == no ]]; }
 valid_number() { [[ $1 =~ ^[1-9][0-9]*$ ]]; }
+valid_home() { [[ $1 == /* && $1 != / && $1 != *$'\n'* && $1 != *'|'* ]]; }
 
 # ask VAR QUESTION DEFAULT CHECK: prompt unless VAR is already set.
 ask() {
@@ -218,7 +219,9 @@ ask_questions() {
 
     ask ARCH_INSTALL_DISK "Disk to ERASE for Arch, e.g. /dev/nvme0n1" "" valid_disk
     ask ARCH_INSTALL_HOSTNAME "Hostname" "arch" valid_hostname
-    ask ARCH_INSTALL_USER "User name" "chakew" valid_user
+    ask ARCH_INSTALL_USER "User name" "" valid_user
+    ARCH_INSTALL_HOME="${ARCH_INSTALL_HOME:-/home/$ARCH_INSTALL_USER}"
+    valid_home "$ARCH_INSTALL_HOME" || die "ARCH_INSTALL_HOME must be an absolute home directory"
     ask_password ARCH_INSTALL_PASSWORD "Password for $ARCH_INSTALL_USER (also used for sudo)"
     ask ARCH_INSTALL_ENCRYPT "Encrypt the disk with LUKS? (yes/no)" "yes" valid_yes_no
     if [[ $ARCH_INSTALL_ENCRYPT == yes ]]; then
@@ -340,7 +343,7 @@ install_packages() {
 }
 
 configure_system() {
-    local user=$ARCH_INSTALL_USER home=/home/$ARCH_INSTALL_USER
+    local user=$ARCH_INSTALL_USER home=$ARCH_INSTALL_HOME
     say "Configuring the new system"
     in_target ln -sf "/usr/share/zoneinfo/$ARCH_INSTALL_TIMEZONE" /etc/localtime
     in_target hwclock --systohc
@@ -350,7 +353,7 @@ configure_system() {
     write_file /etc/vconsole.conf 644 <<<"KEYMAP=us"
     write_file /etc/hostname 644 <<<"$ARCH_INSTALL_HOSTNAME"
 
-    in_target useradd -m -G wheel -s /usr/bin/zsh "$user"
+    in_target useradd -m -d "$home" -G wheel -s /usr/bin/zsh "$user"
     run_secret "$user:$ARCH_INSTALL_PASSWORD" arch-chroot "$TARGET" chpasswd
     in_target passwd -l root
     write_file /etc/sudoers.d/10-wheel 440 <<<"%wheel ALL=(ALL:ALL) ALL"
@@ -395,7 +398,7 @@ EOF
 }
 
 write_first_boot() {
-    local home=/home/$ARCH_INSTALL_USER
+    local home=$ARCH_INSTALL_HOME
     {
         echo '#!/usr/bin/env bash'
         echo '# Written by arch-install.sh. Runs on the first tty1 login: installs the'

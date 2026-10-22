@@ -93,6 +93,9 @@ Every question can be answered in advance with an environment variable:
 `ARCH_INSTALL_LUKS_PASSWORD`, `ARCH_INSTALL_TIMEZONE`, `ARCH_INSTALL_PROFILE`,
 `ARCH_INSTALL_SWAP_GIB` and `ARCH_INSTALL_REBOOT`. `ARCH_INSTALL_KERNEL_ARGS`
 adds kernel parameters. Erasing still needs `ARCH_INSTALL_CONFIRM=<disk>`.
+There is no default user name. `ARCH_INSTALL_HOME` optionally chooses an
+absolute home directory (default `/home/<user>`). The existing time-zone prompt
+is a user choice. Existing users can run `install.sh` from any home directory.
 
 If anything fails, run the script again; it unmounts and starts over. Because
 root is locked, repairs that need a root shell are done from the live ISO.
@@ -197,7 +200,7 @@ Other flags:
 - `--restore-only` — same as `--skip-packages`, and skip optional service actions
 - `--dry-run` — preview actions without modifying `$HOME` (also works with `--uninstall`)
 
-Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, `tee`, and `tar` for uninstall). Missing tools fail early with an install hint.
+Before install, snapshot, update, doctor, or uninstall, the installer runs a **preflight** check for required host tools (`bash`, `sudo`, `pacman`, `rsync`, `install`, `git`, `tee`, `python3` from Arch's `python` package, and `tar` for uninstall). Missing tools fail early with an install hint.
 
 With `--yes` and Automatic, AUR packages required by the selected profile are
 installed by default. Pass `--no-aur` to continue without them; the plan lists
@@ -238,6 +241,37 @@ Two pieces are installed separately and only referenced here:
 - **waywallen** draws the wallpaper. `waywallen-theme-sync` follows it.
 
 ## Config Groups
+
+Shared defaults are in `configs/config`, `configs/home` and `configs/local-bin`.
+Install and Update first merge files from `configs/hosts/$(uname -n)/` using the
+same relative paths (`config/niri/outputs.kdl`, for example), then render
+`@HOME@` to the target home and `@CONFIG_HOME@` to its XDG config directory.
+Only UTF-8 text is transformed; binary assets remain byte-identical.
+Native `$HOME`, `~`, PATH lookups and systemd `%h` are preferred where supported.
+Render happens in temporary staging before comparison, backup or copy, so an
+unchanged rendered configuration remains a no-op on subsequent updates.
+
+Host matching is exact and case sensitive. `DOTFILES_HOSTNAME` can override
+`uname -n` for a deliberate offline restore/test; it must be one safe directory
+name. There is no fallback to another machine's overlay. A new hostname gets
+automatic niri output modes and GPU selection, a bar on all connected outputs,
+automatic backlight selection and an external DDC module that hides when no
+readable monitor is available. All hosts use the shared patched taskbar library
+at `@CONFIG_HOME@/waybar/libniri_taskbar.so`, compatible with niri 26.04 on
+x86_64 Arch. The unpatched distribution/AUR library has an event-stream bug;
+see [the patch notes](../tools/niri-taskbar/README.md).
+
+To add a machine, install normally, configure its displays/Waybar, then run
+`./install.sh --snapshot --no-commit` from a clean checkout and review the new
+`configs/hosts/<hostname>/` files. Output layouts, niri GPU overrides, Waybar
+output selection and brightness device files are captured there automatically.
+Use `niri/outputs.kdl` plus `niri/machine.kdl`, included with `optional=true`
+(niri 26.04+). Overlays accept only the machine fragments listed in
+`scripts/portability.py` (`MACHINE_FILES`); other files are rejected.
+The main niri config, Waybar modules and taskbar library always stay shared,
+so edits on CHAKEW or another machine are captured back into shared files.
+To support another machine fragment, explicitly add its path to that list.
+Secrets still belong in `~/.zshrc.local`, never in a host overlay.
 
 | Group | Restored paths |
 |-------|----------------|

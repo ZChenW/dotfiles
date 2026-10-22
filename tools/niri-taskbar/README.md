@@ -1,12 +1,14 @@
 # Fixed icon size for niri-taskbar
 
-The bundled `configs/config/waybar/libniri_taskbar.so` is built from
+The shared library `configs/config/waybar/libniri_taskbar.so` is built from
 [LawnGnome/niri-taskbar](https://github.com/LawnGnome/niri-taskbar/tree/c530349fae638141ec58a9d4db0816d950a9295a),
 revision `c530349fae638141ec58a9d4db0816d950a9295a`, plus `fixed-icon-size.patch`.
-The patch also pins `niri-ipc` to **26.4.0** for this machine's Niri 26.04
+The patch also pins `niri-ipc` to **26.4.0** for Niri 26.04
 and updates the lockfile. Upstream's 25.11 protocol dependency otherwise exits
 the event stream on the new `CastsChanged` event, leaving a stale initial list.
 Upstream source is MIT licensed; its license is included in this directory.
+Install and Update use this patched library on every matching x86_64 Arch
+machine; the unpatched distribution/AUR build has the event-stream bug above.
 
 Upstream sizes each icon from its button's allocated height. When another
 module temporarily makes the bar taller, the resized image retains that new
@@ -41,7 +43,7 @@ Verified on 2026-09-29:
   the new button receives the focused class, with no IPC stream errors.
 - Full diagnostic layout: **29 → 54 → 29px** with the patched binary.
 - Audio, brightness, and power drawers did not independently reproduce growth.
-- Installed live bar: one Waybar process, DP-8 at **2560 × 29px**, patched
+- Installed live bar: one Waybar process, the external output at **2560 × 29px**, patched
   library mapped, no Niri IPC stream error.
 - Original live library/config/style backup:
   `~/.local/state/dotfiles/backups/waybar-taskbar-20260929/`.

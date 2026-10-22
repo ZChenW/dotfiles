@@ -1,22 +1,2 @@
-// Monitor layout: mode, scale and position per output.
-output "DP-8" {
-    mode "2560x1440@99.946";
-    scale 1;
-    transform "normal";
-    position x=0 y=0;
-}
-output "eDP-1" {
-    mode "2560x1600@240.000";
-    scale 1.4;
-    transform "normal";
-    position x=-1828 y=0;
-    variable-refresh-rate on-demand=false;
-}
-output "eDP-2" {
-    // Keep the laptop panel enabled when it is routed through the NVIDIA GPU.
-    off;
-    mode "2560x1600@240.000";
-    scale 1.5;
-    transform "normal";
-    position x=2560 y=179;
-}
+// Automatic output modes, scaling and placement on an unconfigured host.
+// Saved layouts are captured into configs/hosts/<hostname>/config/niri/outputs.kdl.

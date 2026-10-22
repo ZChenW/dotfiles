@@ -7,6 +7,10 @@ trap 'rm -rf "$tmp_dir"' EXIT
 read -r -a gtk_flags <<<"$(pkg-config --cflags --libs gtk+-3.0 gtk-layer-shell-0)"
 cc -O1 -g -Wall -Wextra -Werror "$repo_root/tests/test_waybar_brightness_latency.c" \
     -o "$tmp_dir/probe" "${gtk_flags[@]}" -lm
+if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    echo 'SKIP: brightness latency interaction requires an isolated Wayland display (C harness compiled)'
+    exit 0
+fi
 mkdir -p "$tmp_dir/config/niri/scripts"
 cat >"$tmp_dir/config/niri/scripts/brightness.sh" <<'HELPER'
 #!/usr/bin/env bash

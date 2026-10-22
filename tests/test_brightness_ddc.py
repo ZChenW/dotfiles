@@ -22,7 +22,7 @@ class BrightnessDdcTest(unittest.TestCase):
         backlight = root / 'backlight'
         backlight.mkdir()
         gpu = root / 'gpu'
-        connector = gpu / 'drm/card0/card0-DP-8'
+        connector = gpu / 'drm/card0/card0-DP-7'
         connector.mkdir(parents=True)
         (connector / 'status').write_text('connected\n')
         (connector / 'device').symlink_to(connector.parent)
@@ -36,14 +36,14 @@ class BrightnessDdcTest(unittest.TestCase):
                         BRIGHTNESS_DRM_SYSFS_ROOT=str(drm),
                         BRIGHTNESS_HELPER=str(bindir / 'helper'),
                         XDG_CACHE_HOME=str(root / 'cache'),
-                        TEST_LOG=str(self.log), TEST_FOCUS='DP-8',
+                        TEST_LOG=str(self.log), TEST_FOCUS='DP-7',
                         TEST_VCP='VCP 10 C 80 200', TEST_DETECT='''Invalid display
    I2C bus: /dev/i2c-2
    DRM connector: card1-eDP-1
 
 Display 3
    I2C bus: /dev/i2c-24
-   DRM connector: card0-DP-8
+   DRM connector: card0-DP-7
 ''')
         commands = {
             'niri': 'printf \'Output "Monitor" (%s)\\n\' "$TEST_FOCUS"',
@@ -97,21 +97,28 @@ esac''',
         self.assertNotEqual(self.run_script('--external', '+5%').returncode, 0)
         self.assertEqual(self.log.read_text(), '')
 
+    def test_external_autodetection_rechecks_uniqueness_after_hotplug(self):
+        self.env['TEST_FOCUS'] = 'eDP-1'
+        self.assertEqual(self.run_script('--external', '--get').returncode, 0)
+        self.env['TEST_DETECT'] += '\nDisplay 1\n I2C bus: /dev/i2c-25\n DRM connector: card0-HDMI-A-1\n'
+        self.assertNotEqual(self.run_script('--external', '--get').returncode, 0)
+        self.assertEqual(self.log.read_text(), '')
+
     def test_explicit_external_ignores_internal_focus(self):
         self.env['TEST_FOCUS'] = 'eDP-1'
-        result = self.run_script('--output', 'DP-8', '-5%')
+        result = self.run_script('--output', 'DP-7', '-5%')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 70\n')
 
     def test_explicit_external_read(self):
         self.env['TEST_FOCUS'] = 'eDP-1'
-        result = self.run_script('--output', 'DP-8', '--get')
+        result = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'DP-8,80,80,40,200\n')
+        self.assertEqual(result.stdout, 'DP-7,80,80,40,200\n')
         self.assertEqual(self.log.read_text(), '')
 
     def test_explicit_external_never_selects_different_external(self):
-        self.env['TEST_FOCUS'] = 'DP-8'
+        self.env['TEST_FOCUS'] = 'DP-7'
         result = self.run_script('--output', 'HDMI-A-1', '--set-percent', '65')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.log.read_text(), '')
@@ -159,27 +166,27 @@ esac''',
         self.assertNotEqual(self.run_script('+5%').returncode, 0)
 
     def test_cached_bus_skips_detect_on_later_reads(self):
-        first = self.run_script('--output', 'DP-8', '--get')
+        first = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(first.returncode, 0, first.stderr)
         self.env['TEST_DETECT_EXIT'] = '1'
-        second = self.run_script('--output', 'DP-8', '--get')
+        second = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(second.stdout, first.stdout)
 
     def test_cached_max_lets_set_percent_skip_getvcp(self):
-        primed = self.run_script('--output', 'DP-8', '--get')
+        primed = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(primed.returncode, 0, primed.stderr)
         self.env['TEST_READ_EXIT'] = '1'
-        result = self.run_script('--output', 'DP-8', '--set-percent', '65')
+        result = self.run_script('--output', 'DP-7', '--set-percent', '65')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 130\n')
 
     def test_scroll_burst_coalesces_into_latest_target(self):
-        primed = self.run_script('--output', 'DP-8', '--get')
+        primed = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(primed.returncode, 0, primed.stderr)
         self.env['TEST_READ_EXIT'] = '1'
         self.env['TEST_WRITE_SLEEP'] = '0.3'
-        burst = [subprocess.Popen([str(SCRIPT), '--output', 'DP-8', '+5%'], env=self.env)
+        burst = [subprocess.Popen([str(SCRIPT), '--output', 'DP-7', '+5%'], env=self.env)
                  for _ in range(6)]
         self.assertEqual([process.wait() for process in burst], [0] * 6)
         writes = self.log.read_text().splitlines()
@@ -187,12 +194,12 @@ esac''',
         self.assertEqual(writes[-1], 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 140')
 
     def test_stale_target_is_reread_before_relative_step(self):
-        primed = self.run_script('--output', 'DP-8', '--get')
+        primed = self.run_script('--output', 'DP-7', '--get')
         self.assertEqual(primed.returncode, 0, primed.stderr)
-        target = Path(self.env['XDG_CACHE_HOME']) / 'dotfiles/brightness/target-DP-8'
+        target = Path(self.env['XDG_CACHE_HOME']) / 'dotfiles/brightness/target-DP-7'
         os.utime(target, (0, 0))
         self.env['TEST_VCP'] = 'VCP 10 C 120 200'
-        result = self.run_script('--output', 'DP-8', '+5%')
+        result = self.run_script('--output', 'DP-7', '+5%')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text(), 'DDC -b 24 --noverify --skip-ddc-checks setvcp 10 130\n')
 

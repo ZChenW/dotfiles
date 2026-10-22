@@ -76,6 +76,15 @@ Do not add a second idle daemon, locker or theme hook beside these.
 - Installs real files, not symlinks.
 - Existing files are backed up to `~/.dotfiles-backups/`.
 - Private local values belong in `~/.zshrc.local`.
+- Shared configs use native `$HOME`/`~`/PATH where possible. Literal `@HOME@`
+  (and `@CONFIG_HOME@`) paths are rendered during install/update and encoded
+  again by Snapshot; only text files are transformed.
+- `configs/hosts/<hostname>/` supplies only machine fragments for that exact
+  host (`uname -n`, case sensitive): niri outputs/GPU and Waybar bar/brightness
+  settings. Main niri config, Waybar modules and the patched taskbar library
+  stay shared. New hosts get automatic outputs and brightness discovery.
+  Configure a new machine, then run `./install.sh --snapshot --no-commit` to
+  capture its hardware settings.
 - Standard is the default complete portable scope; Lightweight is the
   X230-friendly Waybar daily-development scope.
 - The selected installation profile is saved only after a successful real

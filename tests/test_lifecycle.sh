@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -15,7 +17,7 @@ fake_home="$tmp_dir/home"
 fake_repo="$tmp_dir/repo"
 fake_bin="$tmp_dir/bin"
 mkdir -p "$fake_home" "$fake_bin"
-cp -a "$REPO_ROOT" "$fake_repo"
+rsync -a --exclude=/.tmp --exclude=/.review --exclude=/.git --exclude=/.jj "$REPO_ROOT/" "$fake_repo/"
 
 # Stub only optional tools; core host tools stay from the real PATH.
 for cmd in zsh niri waybar kitty fastfetch paru yay claude codex; do

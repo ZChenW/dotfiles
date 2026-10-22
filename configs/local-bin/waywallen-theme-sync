@@ -37,7 +37,7 @@ from pathlib import Path
 HOME = Path.home()
 CONFIG = Path(os.environ.get('XDG_CONFIG_HOME') or HOME / '.config')
 DATA = Path(os.environ.get('XDG_DATA_HOME') or HOME / '.local/share')
-CACHE = HOME / '.cache/waywallen-theme'
+CACHE = Path(os.environ.get('XDG_CACHE_HOME') or HOME / '.cache') / 'waywallen-theme'
 DB = Path(os.environ.get('WAYWALLEN_DB') or DATA / 'waywallen/waywallen-v2.db')
 SETTINGS = CONFIG / 'waywallen-theme/config.toml'
 TEMPLATES = CONFIG / 'waywallen-theme/templates'

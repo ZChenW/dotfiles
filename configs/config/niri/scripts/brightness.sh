@@ -53,8 +53,7 @@ path_is_within() {
     [[ "$candidate" == "$parent" || "$candidate" == "$parent/"* ]]
 }
 
-# The laptop panel is eDP-1 on the iGPU in hybrid mode and eDP-2 on the dGPU
-# in discrete mode; "internal" lets callers avoid hard-coding either.
+# "internal" selects a connected eDP, LVDS or DSI panel by connector type.
 if [[ "$explicit_output" == internal ]]; then
     shopt -s nullglob
     for entry in "$drm_root"/card*-*; do
@@ -72,10 +71,16 @@ if [[ -z "$focused_connector" ]]; then
     if focused_output="$(niri msg focused-output 2>/dev/null)" \
         && [[ "$focused_output" =~ \(([^()]*)\) ]]; then
         focused_connector="$(normalize_connector "${BASH_REMATCH[1]}")"
-    else
+    elif [[ "$external_only" != true ]]; then
         echo "Cannot determine the output for brightness control" >&2
         exit 1
     fi
+fi
+
+# DDC discovery below selects the focused external monitor or a unique external
+# monitor. A sentinel also allows discovery without a running compositor.
+if [[ "$external_only" == true && ( -z "$focused_connector" || "$focused_connector" =~ ^(eDP|LVDS|DSI)- ) ]]; then
+    focused_connector="external"
 fi
 
 # GPU backlight nodes do not control external DP/HDMI monitors. Resolve DDC
@@ -90,7 +95,9 @@ if [[ "$external_only" == true ]] || { [[ -n "$focused_connector" ]] && [[ ! "$f
     bus_cache="$cache_root/bus-$cache_key"
     selected_bus=""
     cached_maximum=""
-    if [[ -f "$bus_cache" ]]; then
+    # A generic external selector must rediscover uniqueness after hotplug.
+    # Connector-specific callers can still use the fast per-connector cache.
+    if [[ "$focused_connector" != external && -f "$bus_cache" ]]; then
         {
             IFS= read -r selected_bus || true
             IFS= read -r cached_maximum || true

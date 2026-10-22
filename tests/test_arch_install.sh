@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Each fixture supplies its own HOME; its XDG defaults must follow that HOME.
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -31,7 +33,7 @@ expect_absent() {
 }
 
 dry_run() {
-    env -i PATH="$PATH" \
+    env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:?}" \
         ARCH_INSTALL_HOSTNAME=newbox \
         ARCH_INSTALL_USER=tester \
         ARCH_INSTALL_PASSWORD='login secret' \
@@ -117,5 +119,12 @@ if bash "$INSTALLER" --wipe-everything >/dev/null 2>&1; then
     echo "Expected an unknown option to fail" >&2
     exit 1
 fi
+
+echo "==> test 9: a nonstandard home is passed to useradd and first boot"
+out="$(dry_run ARCH_INSTALL_DISK=/dev/sdz ARCH_INSTALL_ENCRYPT=no ARCH_INSTALL_HOME=/srv/people/tester)"
+expect_contains "$out" 'useradd -m -d /srv/people/tester'
+expect_contains "$out" '/srv/people/tester/Projects/dotfiles'
+expect_contains "$out" '/srv/people/tester/.dotfiles-first-boot'
+expect_absent "$out" '/home/tester'
 
 echo "All arch-install tests passed."

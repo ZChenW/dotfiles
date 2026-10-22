@@ -20,7 +20,7 @@ class DisplaysTest(unittest.TestCase):
         self.rows = displays.build_rows(self.live, self.saved)
 
     def test_connector_and_identity_matching(self):
-        self.saved[0]['identifier'] = displays.identity(self.live['DP-8']).upper()
+        self.saved[0]['identifier'] = displays.identity(self.live['DP-7']).upper()
         rows = displays.build_rows(self.live, self.saved)
         self.assertEqual(rows[0]['identifier'], self.saved[0]['identifier'])
         self.assertEqual(rows[1]['identifier'], 'eDP-1')
@@ -28,13 +28,13 @@ class DisplaysTest(unittest.TestCase):
 
     def test_identifier_without_saved_configuration(self):
         rows = displays.build_rows(self.live, [])
-        self.assertEqual(rows[0]['identifier'], displays.identity(self.live['DP-8']))
+        self.assertEqual(rows[0]['identifier'], displays.identity(self.live['DP-7']))
         self.assertEqual(rows[1]['identifier'], 'eDP-1')
-        self.live['DP-9'] = copy.deepcopy(self.live['DP-8'])
-        self.assertEqual(displays.build_rows(self.live, [])[0]['identifier'], 'DP-8')
+        self.live['DP-9'] = copy.deepcopy(self.live['DP-7'])
+        self.assertEqual(displays.build_rows(self.live, [])[0]['identifier'], 'DP-7')
 
     def test_duplicate_or_unmanaged_rows_are_read_only(self):
-        self.saved.append(dict(self.saved[0], identifier=displays.identity(self.live['DP-8'])))
+        self.saved.append(dict(self.saved[0], identifier=displays.identity(self.live['DP-7'])))
         self.assertFalse(displays.build_rows(self.live, self.saved)[0]['editable'])
         self.saved = self.saved[:2]
         self.saved[0]['managed'] = False
@@ -45,7 +45,7 @@ class DisplaysTest(unittest.TestCase):
         self.assertFalse(row['settings']['enabled'])
         self.assertEqual(row['settings']['mode'], '2560x1600@240.000')
         self.assertEqual(row['settings']['position'], dict(x=0, y=0))
-        output = copy.deepcopy(self.live['DP-8'])
+        output = copy.deepcopy(self.live['DP-7'])
         output['logical']['transform'] = 'Flipped90'
         self.assertEqual(displays.defaults(output, {})['transform'], 'flipped-90')
 
@@ -66,12 +66,12 @@ class DisplaysTest(unittest.TestCase):
         self.assertEqual(displays.patches(self.rows), [])
         self.rows[0]['settings']['scale'] = 1.5
         self.assertEqual(len(displays.patches(self.rows)), 1)
-        self.assertEqual(displays.patches(self.rows)[0]['identity']['name'], 'DP-8')
+        self.assertEqual(displays.patches(self.rows)[0]['identity']['name'], 'DP-7')
         self.rows[0]['editable'] = False
         self.assertEqual(displays.patches(self.rows), [])
 
     def test_mode_format_grouping_deduplication_and_sort(self):
-        modes = self.live['DP-8']['modes']
+        modes = self.live['DP-7']['modes']
         self.assertEqual(displays.mode_string(modes[1]), '2560x1440@99.946')
         groups = displays.mode_groups(modes)
         self.assertEqual(next(iter(groups)), (2560, 1440))

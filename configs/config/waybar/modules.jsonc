@@ -53,7 +53,7 @@
     "spacing": 7,
     // 自定义图标
     //"icons": {
-    //     "blueman": "/home/shorin/.config/waybar/logo/bluetooth.png",
+    //     "blueman": "@CONFIG_HOME@/waybar/logo/bluetooth.png",
     //},
   },
   //工作区和窗口名字
@@ -122,7 +122,7 @@
     //连接状态下的图标和提示
     "tooltip-format-connected": " {device_alias}\n---\n右键：打开面板",
     //点击功能
-    "on-click": "~/.config/waybar/scripts/toggle-bluetooth.sh",
+    "on-click": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/toggle-bluetooth.sh\"",
     "on-click-right": "kitty --class bluetui  -e bluetui",
   },
   //左键循环切换性能模式
@@ -140,19 +140,19 @@
   "custom/screenshot": {
     "format": "",
     "tooltip-format": "左键：快速截图（仅保存到剪贴板）\n右键：打开截图菜单\n中键：打开长截图菜单",
-    "on-click": "~/.config/waybar/scripts/screenshot.sh",
-    "on-click-right": "~/.config/waybar/scripts/power-screenshot.sh",
-    "on-click-middle": "~/.config/waybar/scripts/longshot-sh/longshot.sh"
+    "on-click": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/screenshot.sh\"",
+    "on-click-right": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/power-screenshot.sh\"",
+    "on-click-middle": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/longshot-sh/longshot.sh\""
   },
   //wf-recorder
   "custom/wfrec": {
-    "exec": "~/.config/waybar/scripts/wf-recorder.sh status-json",
+    "exec": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/wf-recorder.sh\" status-json",
     "return-type": "json",
     //"interval": 1,                 // 每秒刷新一次
     "signal": 9, // 与脚本里的 WAYBAR_SIG 对应
     "tooltip": true,
-    "on-click": "~/.config/waybar/scripts/wf-recorder.sh toggle", // 左键：开始/停止
-    "on-click-right": "~/.config/waybar/scripts/wf-recorder.sh stop"
+    "on-click": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/wf-recorder.sh\" toggle", // 左键：开始/停止
+    "on-click-right": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/wf-recorder.sh\" stop"
   },
   //声音模块
   "group/audio": {
@@ -248,12 +248,12 @@
     "on-click-right": "waywallen"
   },
   "custom/idle-control": {
-    "exec": "~/.config/waybar/scripts/idle-control-status.sh",
+    "exec": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/idle-control-status.sh\"",
     "return-type": "json",
     "interval": 5,
     "signal": 8,
     "format": "{}",
-    "on-click": "~/.config/waybar/scripts/idle-control-toggle.sh",
+    "on-click": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/idle-control-toggle.sh\"",
     "on-click-right": "idle-control-desktop"
   },
   //电源菜单
@@ -340,7 +340,7 @@
   "custom/displays": {
     "format": "󰍹",
     "tooltip-format": "左键：显示器设置",
-    "on-click": "~/.config/waybar/scripts/display-settings.py"
+    "on-click": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/display-settings.py\""
   },
   //音频可视化
   "custom/cava": {
@@ -348,7 +348,7 @@
     "format": "{}",
     // 空间不足时缩短音频动画，为完整时钟和右侧控件留出位置。
     "max-length": 10,
-    "exec": "~/.config/waybar/scripts/cava.sh",
+    "exec": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/cava.sh\"",
   },
   //分隔符󰇝 󱋱
   "custom/separator#1": {
@@ -363,7 +363,7 @@
       "has-updates": "",
       "updated": ""
     },
-    "exec": "~/.config/waybar/scripts/check-updates.sh",
+    "exec": "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/check-updates.sh\"",
     "interval": 3600,
     //"on-click": "kitty -e sysup",
   },
@@ -382,7 +382,7 @@
   },
   "cffi/niri-taskbar": {
     // module_path
-    "module_path": "/home/chakew/.config/waybar/libniri_taskbar.so",
+    "module_path": "@CONFIG_HOME@/waybar/libniri_taskbar.so",
     "show_all_outputs": true,
     "icon-size": 30,
     "use_desktop_entry": true,
