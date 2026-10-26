@@ -17,6 +17,7 @@ evtest
 ex-vi-compat
 feh
 ffmpegthumbnailer
+firefox
 fzf
 gcc-fortran
 ghc
@@ -24,6 +25,7 @@ ghostty
 github-cli
 gnome-keyring
 go
+gpsd
 gst-libav
 gst-plugins-base
 gst-plugins-good
@@ -49,8 +51,10 @@ nvm
 nvtop
 opencode
 pandoc-cli
+perf
 plasma-integration
 pnpm
+pps-tools
 python-dbus
 python-ipykernel
 python-pip
@@ -67,6 +71,7 @@ shellcheck
 songrec
 stack
 steam
+strace
 stylua
 sway
 tesseract-data-chi_sim

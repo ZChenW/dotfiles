@@ -9,7 +9,6 @@ mkdir -p "$CONFIG_DIR"
 
 FILE_MODE="$CONFIG_DIR/mode"       # PREVIEW / EDIT / SAVE
 FILE_BACKEND="$CONFIG_DIR/backend" # WF / GRIM
-SETUP_LOG="$CONFIG_DIR/setup.log"
 
 # 初始化默认值
 [ ! -f "$FILE_MODE" ] && echo "PREVIEW" > "$FILE_MODE"
@@ -39,7 +38,7 @@ if env | grep -q "zh_CN"; then
     # 初始化提示
     TXT_MSG_INIT="首次运行，正在初始化环境..."
     TXT_MSG_SETUP_DONE="环境初始化完成！"
-    TXT_ERR_SETUP="环境安装失败，请查看 $SETUP_LOG"
+    TXT_ERR_SETUP="环境安装失败，请查看 /tmp/longshot_setup.log"
     TXT_ERR_NO_SETUP="未找到 setup.sh 文件"
 
     # 新增：依赖缺失提示
@@ -68,7 +67,7 @@ else
     # Init messages
     TXT_MSG_INIT="First run, initializing environment..."
     TXT_MSG_SETUP_DONE="Environment initialized!"
-    TXT_ERR_SETUP="Setup failed, check $SETUP_LOG"
+    TXT_ERR_SETUP="Setup failed, check /tmp/longshot_setup.log"
     TXT_ERR_NO_SETUP="setup.sh not found"
 
     # New: Dependency error
@@ -107,7 +106,7 @@ if [ ! -f "$VENV_PYTHON" ]; then
 
     if [ -f "$SCRIPT_DIR/setup.sh" ]; then
         chmod +x "$SCRIPT_DIR/setup.sh"
-        "$SCRIPT_DIR/setup.sh" > "$SETUP_LOG" 2>&1
+        "$SCRIPT_DIR/setup.sh" > /tmp/longshot_setup.log 2>&1
 
         if [ ! -f "$VENV_PYTHON" ]; then
             notify-send -u critical "Error" "$TXT_ERR_SETUP"

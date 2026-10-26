@@ -39,12 +39,16 @@ fi
 # 2. 用户配置与安全初始化
 # ==============================================================================
 SAVE_DIR="$HOME/Pictures/Screenshots/longshots"
-TMP_DIR="$(mktemp -d -t niri-longshot.XXXXXX)"
+TMP_BASE_NAME="niri_longshot"
+TMP_DIR="/tmp/${TMP_BASE_NAME}_$(date +%s)"
 FILENAME="longshot_$(date +%Y%m%d_%H%M%S).png"
 RESULT_PATH="$SAVE_DIR/$FILENAME"
 TMP_STITCHED="$TMP_DIR/stitched_temp.png"
 
-# Each invocation owns only its mktemp directory; never clean another user's files.
+# --- [保险措施 1] 启动时清理陈旧垃圾 ---
+# 查找 /tmp 下名字包含 niri_longshot 且修改时间超过 10 分钟的目录并删除
+# 这可以防止因断电或 kill -9 导致的垃圾堆积，同时不影响刚启动的其他实例
+find /tmp -maxdepth 1 -type d -name "${TMP_BASE_NAME}_*" -mmin +10 -exec rm -rf {} + 2>/dev/null
 
 # 创建目录
 mkdir -p "$SAVE_DIR"

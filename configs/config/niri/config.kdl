@@ -74,7 +74,8 @@ input {
     focus-follows-mouse max-scroll-amount="0%"
 }
 
-// Output modes and GPU selection belong in the matching host overlay.
+
+
 
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
@@ -238,14 +239,14 @@ layout {
 // See the binds section below for more spawn examples.
 
 // The bar (its brightness module is rebuilt first if needed) and notifications.
-spawn-sh-at-startup "\"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/cffi/build.sh\"; exec waybar"
+spawn-sh-at-startup "$HOME/.config/waybar/cffi/build.sh; exec waybar"
 spawn-at-startup "mako"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 spawn-at-startup "fcitx5"
-spawn-sh-at-startup "command -v herdcat >/dev/null 2>&1 && exec herdcat -w"
+spawn-at-startup "herdcat" "-w"
 spawn-at-startup "/usr/bin/kanshi"
 // Keeps connected displays usable whatever outputs.kdl says (laptop panel saved off, lone display off the origin).
-spawn-sh-at-startup "exec python3 \"${XDG_CONFIG_HOME:-$HOME/.config}/waybar/scripts/display-backend/display_guard.py\""
+spawn-sh-at-startup "exec python3 \"$HOME/.config/waybar/scripts/display-backend/display_guard.py\""
 spawn-sh-at-startup "clipse --listen"
 
 
@@ -357,12 +358,12 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
-    Mod+T hotkey-overlay-title="Open Kitty (switch: kitty-mode)" { spawn "kitty-mode" "launch"; }
-    Mod+Shift+T repeat=false hotkey-overlay-title="Herdr 快捷键速查" { spawn "herdr-keys"; }
-    Mod+Alt+V repeat=false hotkey-overlay-title="Voxtype: start/stop voice typing" { spawn "voxtype" "record" "toggle"; }
-    Mod+Alt+C repeat=false hotkey-overlay-title="Voxtype: cancel voice typing" { spawn "voxtype" "record" "cancel"; }
+    Mod+T hotkey-overlay-title="Open Kitty (switch: kitty-mode)" { spawn "@HOME@/.local/bin/kitty-mode" "launch"; }
+    Mod+Shift+T repeat=false hotkey-overlay-title="Herdr 快捷键速查" { spawn "@HOME@/.local/bin/herdr-keys"; }
+    Mod+Alt+V repeat=false hotkey-overlay-title="Voxtype: start/stop voice typing" { spawn "@HOME@/.local/bin/voxtype" "record" "toggle"; }
+    Mod+Alt+C repeat=false hotkey-overlay-title="Voxtype: cancel voice typing" { spawn "@HOME@/.local/bin/voxtype" "record" "cancel"; }
     Mod+D hotkey-overlay-title="Application Launcher" { spawn "fuzzel"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "idlectl" "lock"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "@HOME@/.local/bin/idlectl" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
@@ -386,8 +387,8 @@ binds {
     XF86AudioNext        allow-when-locked=true { spawn-sh "playerctl next"; }
 
     // Map the focused connector to its backlight instead of trusting an arbitrary default device.
-    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "\"${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/brightness.sh\" +10%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "\"${XDG_CONFIG_HOME:-$HOME/.config}/niri/scripts/brightness.sh\" -10%"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "$HOME/.config/niri/scripts/brightness.sh +10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "$HOME/.config/niri/scripts/brightness.sh -10%"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -618,7 +619,7 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 
     Mod+Shift+0 hotkey-overlay-title="Open Waywallen" {
-        spawn "waywallen"
+        spawn "@HOME@/.local/bin/waywallen"
     }
 
 
@@ -647,7 +648,7 @@ layer-rule {
     geometry-corner-radius 12
 }
 
-// include "~/.config/niri/current-output.kdl"
+// include "@CONFIG_HOME@/niri/current-output.kdl"
 
 
 // workspace "main" {
@@ -667,5 +668,6 @@ cursor {
     xcursor-theme "Adwaita"
     xcursor-size 26
 }
+
 
 include optional=true "machine.kdl"

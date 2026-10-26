@@ -194,6 +194,7 @@ alias zshrc='nvim ~/.zshrc'
 alias codex-launch="codex-switch launch"
 alias cswap-run-1='cswap run 1 --share-history'
 alias cswap-run-2='cswap run 2 --share-history'
+alias cswap-run-3='cswap run 3 --share-history'
 
 # Directory navigation
 alias cd..='cd ..'
@@ -420,7 +421,7 @@ run_random_fastfetch() {
 
   command -v fastfetch >/dev/null || return 0
 
-  local logo_dir="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/logo"
+  local logo_dir="$HOME/.config/fastfetch/logo"
   local -a logos
   logos=("$logo_dir"/braille-logo_*.txt(N-.))
 
@@ -438,7 +439,7 @@ if [[ -o interactive && -z "${__RUN_RANDOM_FASTFETCH_DONE-}" ]]; then
 fi
 
 # (disabled) Fastfetch resize hook.
-# source $HOME/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
+# source @HOME@/Downloads/project/fastfetch/scripts/fastfetch-resize.zsh
 
 # ------------------------------------------------------------------------------
 # 10. Proxy (Clash)
@@ -459,9 +460,7 @@ fi
 # --- jj (Jujutsu) ---
 autoload -U compinit
 compinit
-if command -v jj >/dev/null 2>&1; then
-  source <(COMPLETE=zsh jj)
-fi
+source <(COMPLETE=zsh jj)
 
 # --- codex ---
 codex1() {
@@ -479,12 +478,12 @@ codex2() {
 # API keys and provider auth belong in ~/.zshrc.local (never commit secrets).
 
 # --- bun ---
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+[ -s "@HOME@/.bun/_bun" ] && source "@HOME@/.bun/_bun"
 
 # --- grok ---
 
 # kimi-code
-export PATH="$HOME/.kimi-code/bin:$PATH"
+export PATH="@HOME@/.kimi-code/bin:$PATH"
 
 # ------------------------------------------------------------------------------
 # 12. Local Overrides
@@ -504,4 +503,4 @@ autoload -Uz compinit && compinit -C
 
 
 # Added by Antigravity CLI installer
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="@HOME@/.local/bin:$PATH"

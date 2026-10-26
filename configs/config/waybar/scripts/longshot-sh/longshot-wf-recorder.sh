@@ -10,8 +10,7 @@ SAVE_DIR="$HOME/Pictures/Screenshots/longshots"
 mkdir -p "$SAVE_DIR"
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-TMP_VIDEO="$(mktemp --suffix=.mp4 -t longshot.XXXXXX)"
-trap 'rm -f -- "$TMP_VIDEO"' EXIT
+TMP_VIDEO="/tmp/longshot_${TIMESTAMP}.mp4"
 OUTPUT_IMG="${SAVE_DIR}/longshot_${TIMESTAMP}.png"
 
 # 语言

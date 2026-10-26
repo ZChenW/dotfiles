@@ -20,7 +20,7 @@ CONFIG_DIR="$HOME/.cache/longshot-sh"
 CONFIG_FILE="$CONFIG_DIR/mode"
 SAVE_DIR="$HOME/Pictures/Screenshots/longshots"
 
-TMP_DIR="$(mktemp -d -t longshot-grim.XXXXXX)"
+TMP_DIR="/tmp/longshot_grim_$(date +%s)"
 FILENAME="longshot_$(date +%Y%m%d_%H%M%S).png"
 RESULT_PATH="$SAVE_DIR/$FILENAME"
 TMP_STITCHED="$TMP_DIR/stitched.png"
