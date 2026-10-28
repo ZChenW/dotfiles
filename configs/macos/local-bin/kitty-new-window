@@ -1,0 +1,13 @@
+#!/bin/zsh
+# Open a new kitty window, like niri's Mod+T. Bound to Option+T in
+# configs/macos/skhd/skhdrc.
+
+kitten=/Applications/kitty.app/Contents/MacOS/kitten
+
+# kitty.conf listens on unix:/tmp/kitty-$USER; kitty appends -<pid> to it.
+pid=$(pgrep -xn kitty)
+if [[ -n "$pid" && -S "/tmp/kitty-$USER-$pid" ]]; then
+    "$kitten" @ --to "unix:/tmp/kitty-$USER-$pid" launch --type=os-window --cwd="$HOME" >/dev/null 2>&1
+fi
+# Starts kitty when it is not running, and brings the new window to the front.
+open -a kitty

@@ -1,0 +1,23 @@
+# Homebrew formulae installed by scripts/macos.sh, one per line. A third-party
+# formula is written owner/tap/name; the script taps and trusts just that one.
+# Rollback uninstalls only what the script installed, and removes taps it added.
+koekeishiya/formulae/skhd
+
+# zsh plugins and the tools configs/home/.zshrc aliases (ls, n, y, z)
+zsh-autosuggestions
+zsh-syntax-highlighting
+lsd
+yazi
+fastfetch
+zoxide
+
+# Neovim with nvimdots; the rest are what nvimdots calls out to
+# (git, make and unzip ship with macOS / the Command Line Tools).
+neovim
+ripgrep
+fd
+lazygit
+tree-sitter-cli
+node
+# Go: gopls, gofumpt, goimports and delve are built with `go install`.
+go

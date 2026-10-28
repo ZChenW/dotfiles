@@ -1,0 +1,78 @@
+# OmniWM hotkeys: <action id><TAB><binding>. Mirrors configs/config/niri/config.kdl.
+# Mod is the LEFT Option key; Right Option stays Alt/Meta for the terminal.
+# Any OmniWM action not listed here is unassigned (including its own defaults).
+# Ids are checked against the settings.toml OmniWM generated, see omniwm_patch.py.
+# They match OmniWM 0.7.6 (settings schemaVersion 4).
+
+# Focus (niri Mod+H/J/K/L, Mod+Home/End)
+focus.left	Left Option+H
+focus.down	Left Option+J
+focus.up	Left Option+K
+focus.right	Left Option+L
+focusColumnFirst	Left Option+Home
+focusColumnLast	Left Option+End
+focusPrevious	Left Option+Tab
+
+# Move (niri Mod+Ctrl+H/J/K/L, Mod+Ctrl+Home/End)
+moveColumn.left	Control+Left Option+H
+moveWindowDown	Control+Left Option+J
+moveWindowUp	Control+Left Option+K
+moveColumn.right	Control+Left Option+L
+moveColumnToFirst	Control+Left Option+Home
+moveColumnToLast	Control+Left Option+End
+
+# Monitors (niri Mod+Shift+H/L, Mod+Shift+Ctrl+H/J/K/L)
+focusMonitorPrevious	Left Option+Shift+H
+focusMonitorNext	Left Option+Shift+L
+moveWindowToMonitor.left	Control+Left Option+Shift+H
+moveWindowToMonitor.down	Control+Left Option+Shift+J
+moveWindowToMonitor.up	Control+Left Option+Shift+K
+moveWindowToMonitor.right	Control+Left Option+Shift+L
+
+# Workspaces (niri Mod+U/I, Mod+Ctrl+U/I, Mod+1-9, Mod+Ctrl+1-9). N is zero-based.
+switchWorkspace.next	Left Option+U
+switchWorkspace.previous	Left Option+I
+moveColumnToWorkspaceDown	Control+Left Option+U
+moveColumnToWorkspaceUp	Control+Left Option+I
+switchWorkspace.0	Left Option+1
+switchWorkspace.1	Left Option+2
+switchWorkspace.2	Left Option+3
+switchWorkspace.3	Left Option+4
+switchWorkspace.4	Left Option+5
+switchWorkspace.5	Left Option+6
+switchWorkspace.6	Left Option+7
+switchWorkspace.7	Left Option+8
+switchWorkspace.8	Left Option+9
+moveColumnToWorkspace.0	Control+Left Option+1
+moveColumnToWorkspace.1	Control+Left Option+2
+moveColumnToWorkspace.2	Control+Left Option+3
+moveColumnToWorkspace.3	Control+Left Option+4
+moveColumnToWorkspace.4	Control+Left Option+5
+moveColumnToWorkspace.5	Control+Left Option+6
+moveColumnToWorkspace.6	Control+Left Option+7
+moveColumnToWorkspace.7	Control+Left Option+8
+moveColumnToWorkspace.8	Control+Left Option+9
+
+# Windows and columns
+closeFocusedWindow	Left Option+Q
+toggleOverview	Left Option+O
+cycleSizeForward	Left Option+R
+cycleWindowSecondarySpanForward	Left Option+Shift+R
+resetWindowSecondarySpan	Control+Left Option+R
+toggleContainerFullPrimarySpan	Left Option+F
+toggleFullscreen	Left Option+Shift+F
+expandContainerToAvailablePrimarySpan	Control+Left Option+F
+centerColumn	Left Option+C
+centerVisibleColumns	Control+Left Option+C
+setContainerPrimarySpan.decrease10Percent	Left Option+Minus
+setContainerPrimarySpan.increase10Percent	Left Option+Equal
+setWindowSecondarySpan.decrease10Percent	Left Option+Shift+Minus
+setWindowSecondarySpan.increase10Percent	Left Option+Shift+Equal
+consumeWindowIntoColumn	Left Option+Left Bracket
+expelWindowFromColumn	Left Option+Right Bracket
+toggleFocusedWindowFloating	Left Option+V
+toggleFloatingFocus	Left Option+Shift+V
+toggleColumnTabbed	Left Option+W
+
+# Hotkey overview (niri Mod+Shift+/): the command palette lists every action.
+openCommandPalette	Left Option+Shift+Slash

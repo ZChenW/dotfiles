@@ -1,0 +1,5 @@
+# skhd: hotkeys that start programs, which OmniWM cannot bind.
+# Mod is the LEFT Option key, as in configs/macos/omniwm/hotkeys.tsv.
+
+# niri Mod+T: new kitty window
+lalt - t : ~/.local/bin/kitty-new-window

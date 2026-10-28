@@ -1,0 +1,50 @@
+# macOS preferences set by `scripts/macos.sh apply --system`.
+# <domain><TAB><keypath><TAB><JSON value>. keypath is /-separated; a domain
+# prefixed with currentHost: is a ByHost preference. Every original value is
+# saved first and `scripts/macos.sh rollback` puts it back.
+
+# Dock: auto-hide, and keep Spaces in a fixed order.
+com.apple.dock	autohide	true
+com.apple.dock	mru-spaces	false
+
+# Stage Manager, click-wallpaper-to-show-desktop and native window tiling all
+# fight a tiling window manager (Option-drag tiling clashes with OmniWM).
+com.apple.WindowManager	GloballyEnabled	false
+com.apple.WindowManager	EnableStandardClickToShowDesktop	false
+com.apple.WindowManager	EnableTilingByEdgeDrag	false
+com.apple.WindowManager	EnableTopTilingByEdgeDrag	false
+com.apple.WindowManager	EnableTilingOptionAccelerator	false
+
+# No zoom animation when windows open.
+NSGlobalDomain	NSAutomaticWindowAnimationsEnabled	false
+
+# Free the trackpad gestures OmniWM takes over: 3 fingers sideways (columns),
+# 3 fingers up/down (workspaces), 4 fingers up (overview). 4 fingers sideways
+# still switches macOS Spaces and full-screen apps.
+com.apple.AppleMultitouchTrackpad	TrackpadThreeFingerHorizSwipeGesture	0
+com.apple.AppleMultitouchTrackpad	TrackpadThreeFingerVertSwipeGesture	0
+com.apple.AppleMultitouchTrackpad	TrackpadFourFingerVertSwipeGesture	0
+com.apple.driver.AppleBluetoothMultitouch.trackpad	TrackpadThreeFingerHorizSwipeGesture	0
+com.apple.driver.AppleBluetoothMultitouch.trackpad	TrackpadThreeFingerVertSwipeGesture	0
+com.apple.driver.AppleBluetoothMultitouch.trackpad	TrackpadFourFingerVertSwipeGesture	0
+currentHost:NSGlobalDomain	com.apple.trackpad.threeFingerHorizSwipeGesture	0
+currentHost:NSGlobalDomain	com.apple.trackpad.threeFingerVertSwipeGesture	0
+currentHost:NSGlobalDomain	com.apple.trackpad.fourFingerVertSwipeGesture	0
+com.apple.dock	showMissionControlGestureEnabled	false
+com.apple.dock	showAppExposeGestureEnabled	false
+
+# Spotlight on Option+D (niri Mod+D launcher). 100 = "d", 2 = its key code,
+# 524288 = Option.
+com.apple.symbolichotkeys	AppleSymbolicHotKeys/64	{"enabled": true, "value": {"parameters": [100, 2, 524288], "type": "standard"}}
+
+# Key repeat as niri's defaults: 600 ms delay, ~25 repeats/s (units of 15 ms).
+NSGlobalDomain	InitialKeyRepeat	40
+NSGlobalDomain	KeyRepeat	3
+
+# Tap to click, as niri's `touchpad { tap }`.
+com.apple.AppleMultitouchTrackpad	Clicking	true
+com.apple.driver.AppleBluetoothMultitouch.trackpad	Clicking	true
+currentHost:NSGlobalDomain	com.apple.mouse.tapBehavior	1
+
+# Finder shows every file extension.
+NSGlobalDomain	AppleShowAllExtensions	true

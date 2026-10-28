@@ -17,6 +17,12 @@ drivers for the detected CPU and GPU), and runs `./install.sh` on the first
 tty1 login. Other disks, such as a Windows disk, are left alone and appear in
 the GRUB menu. See `docs/INSTALL.md` (Fresh Arch Install).
 
+## macOS
+
+On a Mac, `./install.sh` sets up OmniWM and kitty with the niri keys on top of
+stock macOS instead, and `./install.sh rollback` undoes all of it. See
+`docs/MACOS.md`.
+
 ## Install
 
 ```bash
@@ -72,7 +78,7 @@ Every lock goes through `idlectl lock`; sleep means hibernate, and suspend is
 turned off (see `docs/INSTALL.md`).
 Do not add a second idle daemon, locker or theme hook beside these.
 
-- Arch Linux only.
+- Arch Linux only; macOS gets the separate layer in `docs/MACOS.md`.
 - Installs real files, not symlinks.
 - Existing files are backed up to `~/.dotfiles-backups/`.
 - Private local values belong in `~/.zshrc.local`.

@@ -1,0 +1,46 @@
+# OmniWM settings: <table.key><TAB><TOML value>. Only keys that differ from
+# OmniWM's defaults, matched to configs/config/niri/config.kdl.
+# Defaults already equal to niri: gaps 16, centerFocusedColumn "never",
+# presets 1/3 1/2 2/3, new columns 1/2 wide.
+
+# Mod+Minus/Equal resize by 10%, like niri.
+niri.resizeStepPercent	10
+
+# niri focus-ring: width 4, #7fc8ff.
+borders.width	4.0
+borders.color.red	0.498
+borders.color.green	0.784
+borders.color.blue	1.0
+borders.color.alpha	1.0
+
+# niri touchpad: 3 fingers sideways scroll columns, 3 fingers up/down switch
+# workspaces, 4 fingers up opens the overview.
+gestures.fingerCount	3
+gestures.workspaceSwipeEnabled	true
+gestures.workspaceSwipeFingerCount	3
+gestures.workspaceSwipeAxis	"vertical"
+gestures.overviewGestureEnabled	true
+gestures.overviewGestureFingerCount	4
+# Fingers move the content the other way round from OmniWM's default; this one
+# switch flips both column scrolling and workspace swipes.
+gestures.invertDirection	false
+
+# The workspace bar (our Waybar) sits below the macOS menu bar instead of
+# covering it, and tiled windows leave room for it.
+workspaceBar.position	"belowMenuBar"
+workspaceBar.reserveLayoutSpace	true
+# Workspace swipes draw their preview at the screensaver level; keep the bar
+# at the same level so it stays visible instead of blinking on every swipe.
+workspaceBar.windowLevel	"screensaver"
+
+# niri keeps a lone window at its column width and never stretches columns to
+# fill the screen; OmniWM's defaults ("fill", and widening columns while fewer
+# than visibleContainerCount are open) do both. With a count of 1 the widening
+# never applies; new columns still open at defaultContainerPrimarySpan (1/2).
+niri.singleWindowFit	"container_primary_span"
+niri.visibleContainerCount	1
+
+# Place the bar ourselves: notch mode ignores the offsets. yOffset moves it
+# down (negative) so the gap under the notch matches the gap to the windows.
+workspaceBar.notchMode	"off"
+workspaceBar.yOffset	-6.0
