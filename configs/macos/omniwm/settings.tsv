@@ -37,8 +37,12 @@ workspaceBar.windowLevel	"screensaver"
 # fill the screen; OmniWM's defaults ("fill", and widening columns while fewer
 # than visibleContainerCount are open) do both. With a count of 1 the widening
 # never applies; new columns still open at defaultContainerPrimarySpan (1/2).
+# That key is optional and OmniWM can drop it when it saves; without it a new
+# column takes 1/visibleContainerCount, the full screen, and Mod+F has nothing
+# to toggle back to. So set it here rather than rely on the generated file.
 niri.singleWindowFit	"container_primary_span"
 niri.visibleContainerCount	1
+niri.defaultContainerPrimarySpan	0.5
 
 # Place the bar ourselves: notch mode ignores the offsets. yOffset moves it
 # down (negative) so the gap under the notch matches the gap to the windows.
