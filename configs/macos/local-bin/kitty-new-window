@@ -5,7 +5,8 @@
 kitten=/Applications/kitty.app/Contents/MacOS/kitten
 
 # kitty.conf listens on unix:/tmp/kitty-$USER; kitty appends -<pid> to it.
-pid=$(pgrep -xn kitty)
+# -a: macOS pgrep skips its own ancestors, i.e. kitty when run from a kitty shell.
+pid=$(pgrep -axn kitty)
 if [[ -n "$pid" && -S "/tmp/kitty-$USER-$pid" ]]; then
     "$kitten" @ --to "unix:/tmp/kitty-$USER-$pid" launch --type=os-window --cwd="$HOME" >/dev/null 2>&1
 fi

@@ -72,6 +72,7 @@ arrow-key variants of the niri binds are not bound.
 | Mod+Shift+/ | command palette (search every action) |
 | Mod+Tab | previously focused window |
 | Mod+T | new kitty window (skhd) |
+| Mod+S | new Safari window on this workspace (skhd); opening Safari from Spotlight jumps to its existing window |
 | Option+D | Spotlight (`--system`) |
 
 

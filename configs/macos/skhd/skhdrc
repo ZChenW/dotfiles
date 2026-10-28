@@ -3,3 +3,6 @@
 
 # niri Mod+T: new kitty window
 lalt - t : ~/.local/bin/kitty-new-window
+
+# Mod+S: new Safari window on this workspace (Spotlight would jump to the old one)
+lalt - s : ~/.local/bin/safari-new-window
