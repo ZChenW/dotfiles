@@ -84,6 +84,8 @@ export PATH="$stub_bin:$PATH"
     printf 'workspaceSwipeEnabled = false\nworkspaceSwipeFingerCount = 3\n\n'
     printf '[niri]\ncenterFocusedColumn = "never"\nvisibleContainerCount = 2\n\n'
     printf '[workspaceBar]\nposition = "overlappingMenuBar"\nreserveLayoutSpace = false\nwindowLevel = "popup"\n\n'
+    printf '[focus]\nfollowsMouse = false\n\n'
+    printf '[[appRules]]\nbundleId = "com.apple.Safari"\nid = "81426D13-C1A5-475E-AFBC-00BBA05042D0"\nminWidth = 574.0\n\n'
     grep -v '^#' "$REPO_ROOT/configs/macos/omniwm/hotkeys.tsv" | grep . | cut -f1 |
         while read -r id; do printf '[[hotkeys]]\nbinding = "Unassigned"\nid = "%s"\n\n' "$id"; done
     printf '[[hotkeys]]\nbinding = "Option+Shift+O"\nid = "toggleWorkspaceLayout"\n\n'
@@ -178,6 +180,11 @@ grep -qx 'overviewGestureEnabled = true' "$settings" || fail "optional gesture k
 grep -qx 'resizeStepPercent = 10' "$settings" || fail "optional niri key not added"
 grep -q '^\[\[workspaces\]\]' "$settings" || fail "workspaces lost"
 grep -qx 'position = "belowMenuBar"' "$settings" || fail "workspace bar still covers the menu bar"
+grep -qx 'followsMouse = true' "$settings" || fail "focus does not follow the mouse"
+grep -q 'bundleId = "com.apple.Safari"' "$settings" || fail "OmniWM's own app rules lost"
+[[ "$(grep -c 'bundleId = "com.apple.systempreferences"' "$settings")" == 1 ]] || fail "float rule missing or duplicated"
+awk '/com.apple.Safari/ { s = NR } /com.apple.systempreferences/ { o = NR } END { exit !(s && o > s) }' "$settings" ||
+    fail "our app rules are not after OmniWM's"
 [[ -s "$state/prefs" ]] && fail "trial apply changed preferences"
 
 # --- system apply, then re-apply: idempotent -----------------------------------
@@ -186,6 +193,7 @@ macos apply --system
 [[ "$(wc -l <"$state/casks" | tr -d ' ')" == 3 ]] || fail "casks recorded twice"
 [[ "$(sort "$state/files" | uniq -d)" == "" ]] || fail "files recorded twice"
 [[ "$(sort "$state/prefs" | uniq -d)" == "" ]] || fail "prefs recorded twice"
+[[ "$(grep -c 'bundleId = "com.apple.systempreferences"' "$settings")" == 1 ]] || fail "re-apply duplicated app rules"
 python3 -I "$REPO_ROOT/scripts/macos/prefs.py" get com.apple.dock autohide | grep -qx true || fail "dock autohide not set"
 python3 -I "$REPO_ROOT/scripts/macos/prefs.py" get com.apple.symbolichotkeys AppleSymbolicHotKeys/64 |
     grep -q '524288' || fail "Spotlight hotkey not set"

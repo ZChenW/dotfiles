@@ -391,7 +391,8 @@ omniwm_patch() {
     python3 -I "$HELPERS/omniwm_patch.py" "$@" \
         --defaults "$STATE_DIR/omniwm-default-settings.toml" \
         --hotkeys "$MACOS_CONFIG/omniwm/hotkeys.tsv" \
-        --settings "$MACOS_CONFIG/omniwm/settings.tsv"
+        --settings "$MACOS_CONFIG/omniwm/settings.tsv" \
+        --app-rules "$MACOS_CONFIG/omniwm/app-rules.toml"
 }
 
 apply_omniwm() {
@@ -421,7 +422,8 @@ apply_omniwm() {
             python3 -I "$HELPERS/omniwm_patch.py" "$settings" --dry-run \
                 --defaults "$settings" \
                 --hotkeys "$MACOS_CONFIG/omniwm/hotkeys.tsv" \
-                --settings "$MACOS_CONFIG/omniwm/settings.tsv" | sed 's/^/  /'
+                --settings "$MACOS_CONFIG/omniwm/settings.tsv" \
+                --app-rules "$MACOS_CONFIG/omniwm/app-rules.toml" | sed 's/^/  /'
             return 0
         fi
         cp -p "$settings" "$STATE_DIR/omniwm-default-settings.toml"

@@ -8,7 +8,9 @@ place:
 
 * every [[hotkeys]] block is replaced by the bindings in hotkeys.tsv (actions
   left out are unassigned, which is what OmniWM does with missing ids);
-* each `table.key` in settings.tsv has its value replaced where it already is.
+* each `table.key` in settings.tsv has its value replaced where it already is;
+* the [[appRules]] in app-rules.toml are added after OmniWM's own rules,
+  replacing any earlier copy with the same id.
 
 Ids are checked against the pristine default file, so a typo or an id removed
 by an OmniWM update stops the patch before anything is written.
@@ -90,6 +92,36 @@ def replace_hotkeys(sections, rows):
     return result
 
 
+def merge_app_rules(sections, rule_lines):
+    """Add our [[appRules]] after OmniWM's, dropping older copies by id."""
+    ours = [s for s in split_sections(rule_lines) if s[0] == "appRules" and s[1] == "array"]
+    ids = []
+    for section in ours:
+        found = [ID_RE.match(line).group(1) for line in section[2] if ID_RE.match(line)]
+        if not found:
+            raise SystemExit("app-rules.toml: every [[appRules]] needs a fixed id")
+        ids.extend(found)
+    if len(set(ids)) != len(ids):
+        raise SystemExit("app-rules.toml: duplicate rule id")
+
+    def is_ours(section):
+        return section[0] == "appRules" and section[1] == "array" and any(
+            ID_RE.match(line) and ID_RE.match(line).group(1) in ids for line in section[2]
+        )
+
+    kept = [s for s in sections if not is_ours(s)]
+    last = max((i for i, s in enumerate(kept) if s[0] == "appRules" and s[1] == "array"), default=None)
+    blocks = []
+    for section in ours:
+        body = section[2]
+        while body and not body[-1].strip():
+            body = body[:-1]
+        blocks.append([section[0], section[1], body + [""]])
+    if last is None:
+        return kept + blocks, len(ours)
+    return kept[: last + 1] + blocks + kept[last + 1 :], len(ours)
+
+
 def set_in_line(line, key, value):
     """Replace `key = old` in a plain line, or `key = x` inside an inline table."""
     plain = re.match(r"^(\s*" + re.escape(key) + r"\s*=\s*)(.*?)\s*$", line)
@@ -151,6 +183,7 @@ def main():
     parser.add_argument("--defaults", required=True, help="pristine OmniWM-generated settings.toml")
     parser.add_argument("--hotkeys", required=True)
     parser.add_argument("--settings", required=True)
+    parser.add_argument("--app-rules")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -195,12 +228,19 @@ def main():
         if note:
             notes.append(note)
 
+    rule_count = 0
+    if args.app_rules:
+        with open(args.app_rules, encoding="utf-8") as handle:
+            sections, rule_count = merge_app_rules(sections, handle.read().splitlines())
+
     lines = [line for section in sections for line in section[2]]
     text = "\n".join(lines).rstrip("\n") + "\n"
 
     for note in notes:
         print(f"note: {note}")
     print(f"{len(rows)} hotkeys bound; {len(known) - len(rows)} other actions unassigned")
+    if args.app_rules:
+        print(f"{rule_count} app rules")
     if text == original:
         print("settings.toml already up to date")
         return

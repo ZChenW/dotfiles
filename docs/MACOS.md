@@ -18,7 +18,7 @@ left to macOS. All of it can be undone with one command.
 
 | Linux | macOS |
 | --- | --- |
-| niri | OmniWM (`configs/macos/omniwm`) |
+| niri | OmniWM (`configs/macos/omniwm`); focus follows the mouse as in niri, and `app-rules.toml` floats small utility windows (System Settings, Calculator, Installer, Archive Utility, System Information) |
 | niri focus ring | OmniWM border |
 | Waybar | macOS menu bar + OmniWM workspace bar |
 | kitty | kitty (`configs/macos/kitty/kitty.conf` + the shared theme files) |

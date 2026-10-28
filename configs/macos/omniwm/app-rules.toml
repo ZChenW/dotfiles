@@ -1,0 +1,28 @@
+# OmniWM app rules added after OmniWM's own (which only set minimum sizes).
+# Each rule keeps a fixed id so re-applying replaces it instead of adding a copy.
+
+# Small utility windows float instead of taking a column.
+[[appRules]]
+bundleId = "com.apple.systempreferences"
+id = "D07F11E5-0001-4A11-9B5E-5E771465F10A"
+layout = "float"
+
+[[appRules]]
+bundleId = "com.apple.calculator"
+id = "D07F11E5-0002-4A11-9B5E-5E771465F10A"
+layout = "float"
+
+[[appRules]]
+bundleId = "com.apple.installer"
+id = "D07F11E5-0003-4A11-9B5E-5E771465F10A"
+layout = "float"
+
+[[appRules]]
+bundleId = "com.apple.archiveutility"
+id = "D07F11E5-0004-4A11-9B5E-5E771465F10A"
+layout = "float"
+
+[[appRules]]
+bundleId = "com.apple.SystemProfiler"
+id = "D07F11E5-0005-4A11-9B5E-5E771465F10A"
+layout = "float"

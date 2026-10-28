@@ -44,3 +44,6 @@ niri.visibleContainerCount	1
 # down (negative) so the gap under the notch matches the gap to the windows.
 workspaceBar.notchMode	"off"
 workspaceBar.yOffset	-6.0
+
+# niri's `focus-follows-mouse`: focus follows the pointer without a click.
+focus.followsMouse	true
