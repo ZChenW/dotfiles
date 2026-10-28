@@ -48,3 +48,9 @@ currentHost:NSGlobalDomain	com.apple.mouse.tapBehavior	1
 
 # Finder shows every file extension.
 NSGlobalDomain	AppleShowAllExtensions	true
+
+# Swap fn and Control on the built-in keyboard, so Control sits in the corner
+# as on a PC keyboard (System Settings > Keyboard > Modifier Keys writes the
+# same key; Apple silicon's built-in keyboard is 0-0-0). 30064771296 is
+# 0x7000000E0, left Control; 1095216660483 is 0xFF00000003, fn.
+currentHost:NSGlobalDomain	com.apple.keyboard.modifiermapping.0-0-0	[{"HIDKeyboardModifierMappingSrc": 30064771296, "HIDKeyboardModifierMappingDst": 1095216660483}, {"HIDKeyboardModifierMappingSrc": 1095216660483, "HIDKeyboardModifierMappingDst": 30064771296}]

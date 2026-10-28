@@ -21,3 +21,6 @@ tree-sitter-cli
 node
 # Go: gopls, gofumpt, goimports and delve are built with `go install`.
 go
+
+# GitHub CLI, for pushing this repository and opening PRs
+gh
