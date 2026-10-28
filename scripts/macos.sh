@@ -380,7 +380,7 @@ deploy() {
 apply_kitty() {
     step "kitty"
     local name
-    for name in hyde.conf theme.conf matugen.conf; do
+    for name in hyde.conf theme.conf matugen.conf focus_opacity.py; do
         deploy "$SHARED_CONFIG/kitty/$name" "$HOME/.config/kitty/$name"
     done
     deploy "$MACOS_CONFIG/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
@@ -472,7 +472,8 @@ manual_steps() {
     step "Manual steps (macOS does not let scripts do these)"
     cat <<'EOF'
   1. System Settings > Privacy & Security > Accessibility: turn on OmniWM and
-     skhd. Input Monitoring: turn on OmniWM.
+     skhd. Input Monitoring: turn on OmniWM. Screen & System Audio Recording:
+     turn on OmniWM (window previews in the workspace bar and the overview).
   2. Squirrel (after a first install, log out and back in first): System
      Settings > Keyboard > Input Sources > Edit > + > Chinese, Simplified >
      Squirrel. Remove "Pinyin - Simplified" there, and in "All Input Sources"
@@ -579,6 +580,7 @@ rollback_casks() {
     if state_has casks omniwm; then
         run tccutil reset Accessibility "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true
         run tccutil reset ListenEvent "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true
+        run tccutil reset ScreenCapture "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true
         $DRY_RUN || ok "OmniWM permissions reset"
     fi
 }

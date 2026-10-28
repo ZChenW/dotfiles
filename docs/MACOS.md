@@ -21,7 +21,7 @@ left to macOS. All of it can be undone with one command.
 | niri | OmniWM (`configs/macos/omniwm`); focus follows the mouse as in niri, and `app-rules.toml` floats small utility windows (System Settings, Calculator, Installer, Archive Utility, System Information) |
 | niri focus ring | OmniWM border |
 | Waybar | macOS menu bar + OmniWM workspace bar |
-| kitty | kitty (`configs/macos/kitty/kitty.conf` + the shared theme files) |
+| kitty | kitty (`configs/macos/kitty/kitty.conf` + the shared theme files and `focus_opacity.py`, which makes unfocused windows translucent) |
 | niri `spawn` binds | skhd (`configs/macos/skhd/skhdrc`) |
 | fuzzel | Spotlight on Option+D |
 | clipse | Spotlight clipboard history |
@@ -84,7 +84,9 @@ gestures on those fingers.
 macOS keeps these out of reach of scripts:
 
 1. System Settings > Privacy & Security > Accessibility: turn on OmniWM and
-   skhd; Input Monitoring: turn on OmniWM. Rollback resets OmniWM's; remove
+   skhd; Input Monitoring and Screen & System Audio Recording (window
+   previews in the workspace bar and the overview): turn on OmniWM. Rollback
+   resets OmniWM's; remove
    skhd from the list by hand, as macOS only lets scripts reset app bundles.
    skhd is built from source, so an upgrade needs the switch turned on again.
 2. Squirrel: log out and in after its first install, then System Settings >
