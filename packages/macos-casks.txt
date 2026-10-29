@@ -1,0 +1,7 @@
+# Homebrew casks installed by scripts/macos.sh, one per line.
+# Rollback uninstalls only the casks that script installed itself.
+omniwm
+kitty
+font-maple-mono-nf
+# Rime, as fcitx5-rime on Linux (a .pkg: installing asks for your password)
+squirrel-app

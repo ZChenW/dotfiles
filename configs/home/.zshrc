@@ -107,6 +107,8 @@ unset history_search_up_widget history_search_down_widget
 ZSH_PLUGIN_HOME="${ZSH_PLUGIN_HOME:-$HOME/.oh-my-zsh/custom/plugins}"
 ZSH_ARCH_PLUGIN_HOME="/usr/share/zsh/plugins"
 ZSH_LEGACY_PLUGIN_HOME="$HOME/.zsh/plugins"
+# Homebrew keeps each plugin in its own share/<name> directory.
+ZSH_BREW_PLUGIN_HOME="${HOMEBREW_PREFIX:-/opt/homebrew}/share"
 
 # git
 if [[ -r "$ZSH_LEGACY_PLUGIN_HOME/git/git.plugin.zsh" ]]; then
@@ -130,6 +132,9 @@ if [[ -r "$ZSH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
 elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
   source "$ZSH_ARCH_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh"
   bindkey '^\' autosuggest-accept
+elif [[ -r "$ZSH_BREW_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  source "$ZSH_BREW_PLUGIN_HOME/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  bindkey '^\' autosuggest-accept
 fi
 
 # syntax highlighting (load last)
@@ -137,39 +142,47 @@ if [[ -r "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" 
   source "$ZSH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 elif [[ -r "$ZSH_ARCH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
   source "$ZSH_ARCH_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+elif [[ -r "$ZSH_BREW_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+  source "$ZSH_BREW_PLUGIN_HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
 
-unset ZSH_PLUGIN_HOME ZSH_ARCH_PLUGIN_HOME ZSH_LEGACY_PLUGIN_HOME
+unset ZSH_PLUGIN_HOME ZSH_ARCH_PLUGIN_HOME ZSH_LEGACY_PLUGIN_HOME ZSH_BREW_PLUGIN_HOME
 
 # ------------------------------------------------------------------------------
 # 5. PATH
 # ------------------------------------------------------------------------------
 
-# Remove stray node_modules home entries.
-path=(${path:#/usr/lib/node_modules/bin/home/*})
+if [[ "$OSTYPE" == linux* ]]; then
+  # Remove stray node_modules home entries.
+  path=(${path:#/usr/lib/node_modules/bin/home/*})
 
-# Prepend core user directories.
-path=(
-  /usr/lib/node_modules/bin
-  "$HOME/.npm-global/bin"
-  "$HOME/.local/bin"
-  $path
-)
-export PATH
+  # Prepend core user directories.
+  path=(
+    /usr/lib/node_modules/bin
+    "$HOME/.npm-global/bin"
+    "$HOME/.local/bin"
+    $path
+  )
+  export PATH
 
-# Prepend ~/bin for user scripts.
-path=("$HOME/bin" $path)
-export PATH
+  # Prepend ~/bin for user scripts.
+  path=("$HOME/bin" $path)
+  export PATH
 
-# Prepend npm global (re-prioritize).
-export PATH="$HOME/.npm-global/bin:$PATH"
+  # Prepend npm global (re-prioritize).
+  export PATH="$HOME/.npm-global/bin:$PATH"
 
-# Prepend ~/.local/bin (cursor / general user tools).
-export PATH="$HOME/.local/bin:$PATH"
+  # Prepend ~/.local/bin (cursor / general user tools).
+  export PATH="$HOME/.local/bin:$PATH"
 
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+  # bun
+  export BUN_INSTALL="$HOME/.bun"
+  export PATH="$BUN_INSTALL/bin:$PATH"
+else
+  # ~/.zprofile already put Homebrew on PATH.
+  path=("$HOME/.local/bin" "$HOME/bin" $path)
+  export PATH
+fi
 
 # ------------------------------------------------------------------------------
 # 6. Aliases
@@ -179,21 +192,30 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 alias cfast='nvim ~/.config/fastfetch/'
 alias ckitty='nvim ~/.config/kitty'
 alias cl='clear'
-alias down='sudo pacman -S'
 alias l="ls -a"
 alias ll='lsd -l'
 alias lla='lsd -la'
 alias ls='lsd'
 alias n='nvim'
-alias open="xdg-open"
-alias upd='sudo pacman -Syu'
 alias y='yazi'
 alias zshrc='nvim ~/.zshrc'
 
-### Coding Agent
-alias codex-launch="codex-switch launch"
-alias cswap-run-1='cswap run 1 --share-history'
-alias cswap-run-2='cswap run 2 --share-history'
+if [[ "$OSTYPE" == linux* ]]; then
+  alias down='sudo pacman -S'
+  alias open="xdg-open"
+  alias upd='sudo pacman -Syu'
+else
+  # macOS has its own `open`.
+  alias down='brew install'
+  alias upd='brew update && brew upgrade'
+fi
+
+### Coding Agent (account switchers set up on the Linux machine)
+if [[ "$OSTYPE" == linux* ]]; then
+  alias codex-launch="codex-switch launch"
+  alias cswap-run-1='cswap run 1 --share-history'
+  alias cswap-run-2='cswap run 2 --share-history'
+fi
 
 # Directory navigation
 alias cd..='cd ..'
@@ -208,14 +230,16 @@ alias gl='git pull'
 alias gp='git push'
 alias gst='git status'
 
-# Conda environments
-alias condaa='conda activate'
-alias condac='conda create -n'
-alias condad='conda deactivate'
-alias 2048llm="conda activate 2048llm"
+if [[ "$OSTYPE" == linux* ]]; then
+  # Conda environments
+  alias condaa='conda activate'
+  alias condac='conda create -n'
+  alias condad='conda deactivate'
+  alias 2048llm="conda activate 2048llm"
 
-alias codex-pro='env -u CODEX_HOME codex --profile deepseek-pro'
-alias codex-flash='env -u CODEX_HOME codex --profile deepseek-flash'
+  alias codex-pro='env -u CODEX_HOME codex --profile deepseek-pro'
+  alias codex-flash='env -u CODEX_HOME codex --profile deepseek-flash'
+fi
 
 # Python venv
 alias uva='source .venv/bin/activate'
@@ -229,6 +253,7 @@ fi
 # 7. Conda (Lazy Loading)
 # ------------------------------------------------------------------------------
 
+if [[ "$OSTYPE" == linux* ]]; then
 __load_conda() {
   unset -f conda __load_conda
 
@@ -252,6 +277,7 @@ conda() {
   __load_conda
   conda "$@"
 }
+fi
 
 # ------------------------------------------------------------------------------
 # 8. Prompt (Agnoster-like, without Oh My Zsh)
@@ -456,6 +482,7 @@ fi
 # 11. Tools & CLI Integrations
 # ------------------------------------------------------------------------------
 
+if [[ "$OSTYPE" == linux* ]]; then
 # --- jj (Jujutsu) ---
 autoload -U compinit
 compinit
@@ -485,6 +512,12 @@ codex2() {
 
 # kimi-code
 export PATH="$HOME/.kimi-code/bin:$PATH"
+else
+# --- zoxide: `z` here; Linux uses the z plugin above ---
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+fi
 
 # ------------------------------------------------------------------------------
 # 12. Local Overrides
@@ -496,6 +529,7 @@ if [[ -r "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
 
+if [[ "$OSTYPE" == linux* ]]; then
 # >>> grok installer >>>
 export PATH="$HOME/.grok/bin:$PATH"
 fpath=(~/.grok/completions/zsh $fpath)
@@ -505,3 +539,4 @@ autoload -Uz compinit && compinit -C
 
 # Added by Antigravity CLI installer
 export PATH="$HOME/.local/bin:$PATH"
+fi

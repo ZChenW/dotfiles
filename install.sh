@@ -5,6 +5,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
+
+# macOS has its own reversible layer; everything below is Arch Linux only.
+if [[ "$(uname -s)" == Darwin ]]; then
+    exec "$REPO_ROOT/scripts/macos.sh" "$@"
+fi
+
 CLI_ARGS_PROVIDED=false
 if (($# > 0)); then
     CLI_ARGS_PROVIDED=true

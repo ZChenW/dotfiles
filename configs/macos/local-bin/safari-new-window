@@ -1,0 +1,16 @@
+#!/bin/zsh
+# Open a new Safari window on the current workspace. Bound to Option+S in
+# configs/macos/skhd/skhdrc.
+#
+# Opening Safari from Spotlight or the Dock only activates the running app,
+# so OmniWM follows it to the workspace that holds its window. Making the
+# window first and activating after keeps focus here, on the new window.
+
+if ! pgrep -axq Safari; then
+    # A fresh launch opens its own window; making another would give two.
+    exec open -a Safari
+fi
+osascript -e 'tell application "Safari"
+    make new document
+    activate
+end tell' >/dev/null
