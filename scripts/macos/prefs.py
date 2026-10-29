@@ -90,6 +90,12 @@ def main(argv):
         else:
             remove(data, keys)
         import_(domain, data)
+        # `defaults import` merges top-level keys into the domain rather than
+        # replacing it, so a key that was unset has to be deleted outright.
+        # (A nested key goes with its parent, which import does replace.)
+        if not record["present"] and len(keys) == 1:
+            delete = defaults_cmd(domain, "delete")[:-1] + [keys[0]]
+            subprocess.run(delete, capture_output=True)
     else:
         raise SystemExit(f"unknown command {command!r}")
 

@@ -17,9 +17,6 @@ com.apple.WindowManager	EnableTilingOptionAccelerator	false
 
 # No zoom animation when windows open.
 NSGlobalDomain	NSAutomaticWindowAnimationsEnabled	false
-# Except kitty: without it a new window pops in at a cascaded spot and jumps
-# into its column; the zoom-in covers that, like niri's window-open animation.
-net.kovidgoyal.kitty	NSAutomaticWindowAnimationsEnabled	true
 
 # Free the trackpad gestures OmniWM takes over: 3 fingers sideways (columns),
 # 3 fingers up/down (workspaces), 4 fingers up (overview). 4 fingers sideways

@@ -61,9 +61,20 @@ cat >"$stub_bin/defaults" <<'EOF'
 host=""
 if [[ "$1" == -currentHost ]]; then host="byhost-"; shift; fi
 file="$PREFS_DIR/$host$2.plist"
+# Like the real one, import merges top-level keys into the domain.
 case "$1" in
     export) [[ -f "$file" ]] && cat "$file" || printf '' ;;
-    import) cat >"$file" ;;
+    import) python3 -c 'import plistlib, sys, os
+f = sys.argv[1]
+old = plistlib.load(open(f, "rb")) if os.path.exists(f) else {}
+old.update(plistlib.loads(sys.stdin.buffer.read()))
+plistlib.dump(old, open(f, "wb"))' "$file" ;;
+    delete) python3 -c 'import plistlib, sys
+f = sys.argv[1]
+data = plistlib.load(open(f, "rb"))
+if sys.argv[2] not in data: sys.exit(1)
+del data[sys.argv[2]]
+plistlib.dump(data, open(f, "wb"))' "$file" "$3" ;;
     read) exit 1 ;;
 esac
 EOF
@@ -211,6 +222,8 @@ sys.exit(a != b)
 EOF
 python3 -I "$REPO_ROOT/scripts/macos/prefs.py" get com.apple.symbolichotkeys AppleSymbolicHotKeys/64 |
     grep -qx '<unset>' || fail "Spotlight hotkey not removed"
+python3 -I "$REPO_ROOT/scripts/macos/prefs.py" get currentHost:NSGlobalDomain com.apple.trackpad.threeFingerVertSwipeGesture |
+    grep -qx '<unset>' || fail "unset top-level key left behind"
 [[ -f "$settings" ]] || fail "system-only rollback removed OmniWM settings"
 
 # --- full rollback ----------------------------------------------------------------
