@@ -71,7 +71,7 @@ arrow-key variants of the niri binds are not bound.
 | Mod+W | tabbed column |
 | Mod+Shift+/ | command palette (search every action) |
 | Mod+Tab | previously focused window |
-| Mod+T | new kitty window (skhd) |
+| Mod+T | new kitty window (skhd), opened where OmniWM will place it, read over OmniWM's IPC, so it does not flash at a cascaded spot first |
 | Mod+S | new Safari window on this workspace (skhd); opening Safari from Spotlight jumps to its existing window |
 | Option+D | Spotlight (`--system`) |
 

@@ -51,3 +51,7 @@ workspaceBar.yOffset	-6.0
 
 # niri's `focus-follows-mouse`: focus follows the pointer without a click.
 focus.followsMouse	true
+
+# kitty-new-window reads the layout through omniwmctl to open a window where
+# OmniWM will put it (a local socket; only processes of this user can use it).
+general.ipcEnabled	true

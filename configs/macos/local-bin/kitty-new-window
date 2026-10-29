@@ -4,11 +4,74 @@
 
 kitten=/Applications/kitty.app/Contents/MacOS/kitten
 
+# kitty draws a new window at a cascaded spot before OmniWM can move it, so it
+# flashes there and then jumps. Work out where OmniWM will put it instead and
+# open it there; OmniWM then only slides it up into place. Prints nothing when
+# the layout cannot be read, and kitty falls back to its own spot.
+predict_position() {
+    python3 -I - <<'EOF'
+import json, os, re, subprocess
+
+# kitty places the content area; the title bar sits this far above it.
+TITLE_BAR = 32
+# OmniWM starts a new window this far below its slot and slides it up.
+OPEN_OFFSET = 16
+
+def query(*args):
+    out = subprocess.run(["omniwmctl", "query", *args, "--format", "json"],
+                         capture_output=True, text=True, timeout=1).stdout
+    return json.loads(out)["result"]["payload"]
+
+def setting(table, key, default):
+    try:
+        text = open(os.path.expanduser("~/.config/omniwm/settings.toml")).read()
+    except OSError:
+        return default
+    body = re.search(r"^\[" + re.escape(table) + r"\]\n(.*?)(?=^\[|\Z)", text, re.M | re.S)
+    value = body and re.search(r"^" + key + r"\s*=\s*(\S+)", body.group(1), re.M)
+    return value.group(1) if value else default
+
+try:
+    displays = query("displays")["displays"]
+    windows = query("windows", "--fields", "frame,mode,is-focused,workspace,display")["windows"]
+except Exception:
+    raise SystemExit
+display = next(d for d in displays if d["isCurrent"])
+main_height = next(d for d in displays if d["isMain"])["frame"]["height"]
+area, gap = display["visibleFrame"], display["innerGap"]
+border = float(setting("borders", "width", "0")) if setting("borders", "enabled", "true") == "true" else 0
+span = float(setting("niri", "defaultContainerPrimarySpan", "0.5"))
+
+# Frames are AppKit's: origin at the bottom left of the main display.
+left = area["x"] + display["outerGapLeft"] + border + gap
+right = area["x"] + area["width"] - display["outerGapRight"] - border - gap
+width = (area["width"] - display["outerGapLeft"] - display["outerGapRight"] - 2 * border - gap) * span - gap
+
+tiled = [w for w in windows if w["mode"] == "tiling" and w.get("display", {}).get("id", display["id"]) == display["id"]]
+here = [w for w in tiled if w["workspace"]["id"] == display["activeWorkspace"]["id"]]
+focused = next((w for w in here if w["isFocused"]), None)
+if not tiled or (here and not focused):
+    raise SystemExit  # no row height to copy, or a floating window has focus
+if focused:
+    # A new column opens right of the focused one; the view scrolls only as
+    # far as it takes to show it whole.
+    frame = focused["frame"]
+    x = max(left, min(frame["x"] + frame["width"] + gap, right - width))
+else:
+    x = left
+frame = tiled[0]["frame"]
+top = main_height - (frame["y"] + frame["height"])
+print(f"{round(x)}x{round(top + OPEN_OFFSET + TITLE_BAR)}")
+EOF
+}
+
 # kitty.conf listens on unix:/tmp/kitty-$USER; kitty appends -<pid> to it.
 # -a: macOS pgrep skips its own ancestors, i.e. kitty when run from a kitty shell.
 pid=$(pgrep -axn kitty)
 if [[ -n "$pid" && -S "/tmp/kitty-$USER-$pid" ]]; then
-    "$kitten" @ --to "unix:/tmp/kitty-$USER-$pid" launch --type=os-window --cwd="$HOME" >/dev/null 2>&1
+    position=$(predict_position 2>/dev/null)
+    "$kitten" @ --to "unix:/tmp/kitty-$USER-$pid" launch --type=os-window --cwd="$HOME" \
+        ${position:+--os-window-position=$position} >/dev/null 2>&1
 fi
 # Starts kitty when it is not running, and brings the new window to the front.
 open -a kitty
