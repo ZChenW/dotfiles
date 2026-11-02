@@ -443,6 +443,12 @@ apply_omniwm() {
     fi
     # OmniShell (0.8.0), the bar: OmniWM owns shell/default/, this file is ours.
     deploy "$MACOS_CONFIG/omniwm/shell.toml" "$OMNIWM_CONFIG/shell/shell.toml"
+    # Copies of bundled widgets (omniwmctl shell eject) with small changes,
+    # marked "dotfiles:"; a widget in shell/widgets/ overrides the bundled one.
+    local file
+    for file in "$MACOS_CONFIG"/omniwm/shell-widgets/*/*; do
+        deploy "$file" "$OMNIWM_CONFIG/shell/widgets/${file#"$MACOS_CONFIG"/omniwm/shell-widgets/}"
+    done
 }
 
 apply_system() {

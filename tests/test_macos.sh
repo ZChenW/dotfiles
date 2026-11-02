@@ -201,6 +201,7 @@ grep -qx 'followsMouse = true' "$settings" || fail "focus does not follow the mo
 grep -qx "ipcEnabled = true" "$settings" || fail "OmniWM IPC not enabled for kitty-new-window"
 grep -q '^displayName' "$settings" && fail "workspace emoji names not removed"
 cmp -s "$REPO_ROOT/configs/macos/omniwm/shell.toml" "$HOME/.config/omniwm/shell/shell.toml" || fail "OmniShell shell.toml not deployed"
+cmp -s "$REPO_ROOT/configs/macos/omniwm/shell-widgets/volume/init.luau" "$HOME/.config/omniwm/shell/widgets/volume/init.luau" || fail "volume widget override not deployed"
 grep -q 'bundleId = "com.apple.Safari"' "$settings" || fail "OmniWM's own app rules lost"
 [[ "$(grep -c 'bundleId = "com.apple.systempreferences"' "$settings")" == 1 ]] || fail "float rule missing or duplicated"
 awk '/com.apple.Safari/ { s = NR } /com.apple.systempreferences/ { o = NR } END { exit !(s && o > s) }' "$settings" ||
