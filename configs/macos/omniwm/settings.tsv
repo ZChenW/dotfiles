@@ -55,3 +55,11 @@ focus.followsMouse	true
 # kitty-new-window reads the layout through omniwmctl to open a window where
 # OmniWM will put it (a local socket; only processes of this user can use it).
 general.ipcEnabled	true
+
+# OmniWM 0.8.0. Animating a resize writes the real frame of every window on
+# every step, so it is only as smooth as the slowest app, and Chromium could
+# stop part way. snapshot animates a still capture instead and writes the final
+# frame once (needs Screen Recording, falls back to a glass panel without it).
+gestures.resizePreviewStyle	"snapshot"
+# Stop at the first and last workspace instead of wrapping 1 <-> 9 on a swipe.
+gestures.workspaceSwipeEdgeBehavior	"none"

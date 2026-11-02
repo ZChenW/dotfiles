@@ -64,10 +64,10 @@ toggleFullscreen	Left Option+Shift+F
 expandContainerToAvailablePrimarySpan	Control+Left Option+F
 centerColumn	Left Option+C
 centerVisibleColumns	Control+Left Option+C
-setContainerPrimarySpan.decrease10Percent	Left Option+Minus
-setContainerPrimarySpan.increase10Percent	Left Option+Equal
-setWindowSecondarySpan.decrease10Percent	Left Option+Shift+Minus
-setWindowSecondarySpan.increase10Percent	Left Option+Shift+Equal
+resizeContainerPrimarySpan.shrink	Left Option+Minus
+resizeContainerPrimarySpan.grow	Left Option+Equal
+resizeWindowSecondarySpan.shrink	Left Option+Shift+Minus
+resizeWindowSecondarySpan.grow	Left Option+Shift+Equal
 consumeWindowIntoColumn	Left Option+Left Bracket
 expelWindowFromColumn	Left Option+Right Bracket
 toggleFocusedWindowFloating	Left Option+V

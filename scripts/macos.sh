@@ -142,7 +142,7 @@ read_list() {
 # rollback can stash them without touching anything the user already had.
 created_paths_for() {
     case "$1" in
-        omniwm)
+        omniwm | omniwm@canary)
             printf '%s\n' "$OMNIWM_CONFIG" "$HOME/.local/state/omniwm" \
                 "$HOME/Library/Logs/OmniWM" "$HOME/Library/Preferences/$OMNIWM_BUNDLE_ID.plist"
             ;;
@@ -578,7 +578,7 @@ rollback_casks() {
     while IFS= read -r path; do
         [[ -e "$path" ]] && stash "$path"
     done < <(state_reversed created)
-    if state_has casks omniwm; then
+    if state_has casks omniwm || state_has casks omniwm@canary; then
         run tccutil reset Accessibility "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true
         run tccutil reset ListenEvent "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true
         run tccutil reset ScreenCapture "$OMNIWM_BUNDLE_ID" >/dev/null 2>&1 || true

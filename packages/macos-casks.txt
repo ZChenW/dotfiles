@@ -1,6 +1,9 @@
 # Homebrew casks installed by scripts/macos.sh, one per line.
 # Rollback uninstalls only the casks that script installed itself.
-omniwm
+# OmniWM's canary until 0.8.0 is released (its resize previews and swipe edge
+# setting are used in configs/macos/omniwm); then back to `omniwm`, after
+# `brew uninstall --cask omniwm@canary`.
+omniwm@canary
 kitty
 font-maple-mono-nf
 # Rime, as fcitx5-rime on Linux (a .pkg: installing asks for your password)

@@ -162,9 +162,9 @@ grep -q 'brew install' "$STUB_LOG" && fail "dry run installed a cask"
 
 # --- trial apply -------------------------------------------------------------
 macos apply
-grep -qx 'brew install --cask omniwm' "$STUB_LOG" || fail "omniwm not installed"
+grep -qx 'brew install --cask omniwm@canary' "$STUB_LOG" || fail "omniwm not installed"
 grep -qx 'brew install --cask font-maple-mono-nf' "$STUB_LOG" && fail "installed an already present cask"
-[[ "$(cat "$state/casks")" == $'omniwm\nkitty\nsquirrel-app' ]] || fail "casks state: $(cat "$state/casks")"
+[[ "$(cat "$state/casks")" == $'omniwm@canary\nkitty\nsquirrel-app' ]] || fail "casks state: $(cat "$state/casks")"
 [[ -f "$HOME/Library/Rime/rime_ice.schema.yaml" ]] || fail "rime-ice not copied"
 cmp -s "$REPO_ROOT/configs/home/.zshrc" "$HOME/.zshrc" || fail ".zshrc not deployed"
 [[ -f "$HOME/.zshrc.local" ]] || fail ".zshrc.local not created from the template"
@@ -238,7 +238,7 @@ macos rollback
 grep -qx 'brew uninstall neovim' "$STUB_LOG" || fail "neovim not uninstalled"
 grep -qx 'brew autoremove' "$STUB_LOG" || fail "leftover dependencies not removed"
 grep -qx 'brew uninstall --cask kitty' "$STUB_LOG" || fail "kitty not uninstalled"
-grep -qx 'brew uninstall --cask omniwm' "$STUB_LOG" || fail "omniwm not uninstalled"
+grep -qx 'brew uninstall --cask omniwm@canary' "$STUB_LOG" || fail "omniwm not uninstalled"
 grep -qx 'brew uninstall --cask squirrel-app' "$STUB_LOG" || fail "squirrel not uninstalled"
 [[ ! -e "$HOME/Library/Rime" ]] || fail "rime-ice left behind"
 grep -q 'brew uninstall --cask font-maple-mono-nf' "$STUB_LOG" && fail "uninstalled a cask the user had"

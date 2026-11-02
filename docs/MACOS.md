@@ -98,9 +98,19 @@ macOS keeps these out of reach of scripts:
 
 ## Known gaps
 
-- Switching workspaces from the keyboard has no animation: OmniWM 0.7.6
-  switches instantly and has no setting for it. Swiping between workspaces
-  does animate.
+- OmniWM comes from its canary cask (`omniwm@canary`) until 0.8.0 is
+  released: the configuration uses 0.8.0's snapshot resize previews (smooth
+  Mod+F/R/-/= even for slow apps such as Chromium) and stops workspace swipes
+  at 1 and 9. When 0.8.0 is out, `brew uninstall --cask omniwm@canary`, put
+  `omniwm` back in `packages/macos-casks.txt` and run apply.
+- After an OmniWM upgrade that changes `schemaVersion`, apply stops before
+  writing. Start OmniWM once with no settings.toml to get the new defaults,
+  save them as `~/.local/state/dotfiles-macos/omniwm-default-settings.toml`,
+  put your settings.toml back (OmniWM migrates it) and fix any renamed ids in
+  `hotkeys.tsv`.
+- Switching workspaces from the keyboard has no animation: OmniWM switches
+  instantly and has no setting for it. Swiping between workspaces does
+  animate.
 - macOS still moves windows on its own a little; OmniWM keeps a sliver of
   off-screen windows visible.
 
