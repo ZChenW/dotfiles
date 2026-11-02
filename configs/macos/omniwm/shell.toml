@@ -6,6 +6,10 @@ profile = "default"
 # Those menus stay searchable in the command palette's menu mode.
 profiles.default.leading = ["apple-menu", "omniwm", "workspaces", "scratchpads"]
 
+# The default trailing lane in macOS menu-bar order: status first, then
+# volume, Wi-Fi, battery and Control Center, the clock last.
+profiles.default.trailing = ["media", "system-stats", "notifications", "volume", "wifi", "battery-details", "control-center", "clock"]
+
 # The centre lane sits right of the notch, where the trailing widgets leave
 # little room; a long title ran into them.
 [profiles.default.widgets.active-window]
