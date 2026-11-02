@@ -1,0 +1,19 @@
+#!/bin/zsh
+# Open a new Chromium window on the current workspace. Bound to Option+B in
+# configs/macos/skhd/skhdrc.
+#
+# Chromium draws a new window at its last saved spot (often the left edge, over
+# the window already there) before OmniWM moves it into its column, so it
+# flashes there and jumps. Open it where OmniWM will put it instead.
+
+app=/Applications/Chromium.app
+args=(--new-window)
+read -r x y width height <<<"$(~/.local/bin/omniwm-new-window-frame 2>/dev/null)"
+[[ -n "$height" ]] && args+=(--window-position="$x,$y" --window-size="$width,$height")
+
+if pgrep -xq Chromium; then
+    # Handed to the running browser, which opens the window and exits.
+    "$app/Contents/MacOS/Chromium" "${args[@]}" >/dev/null 2>&1
+else
+    open -a "$app" --args "${args[@]}"
+fi

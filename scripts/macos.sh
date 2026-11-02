@@ -321,6 +321,7 @@ apply_skhd() {
     deploy "$MACOS_CONFIG/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
     deploy "$MACOS_CONFIG/local-bin/safari-new-window" "$HOME/.local/bin/safari-new-window" 755
     deploy "$MACOS_CONFIG/local-bin/omniwm-close-window" "$HOME/.local/bin/omniwm-close-window" 755
+    deploy "$MACOS_CONFIG/local-bin/chromium-new-window" "$HOME/.local/bin/chromium-new-window" 755
     if state_has services skhd; then
         $DRY_RUN || skhd --restart-service >/dev/null 2>&1 || true
         return 0
@@ -387,6 +388,7 @@ apply_kitty() {
     done
     deploy "$MACOS_CONFIG/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
     deploy "$MACOS_CONFIG/local-bin/kitty-new-window" "$HOME/.local/bin/kitty-new-window" 755
+    deploy "$MACOS_CONFIG/local-bin/omniwm-new-window-frame" "$HOME/.local/bin/omniwm-new-window-frame" 755
 }
 
 omniwm_patch() {

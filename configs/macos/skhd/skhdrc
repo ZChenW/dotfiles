@@ -10,3 +10,7 @@ lalt - q : ~/.local/bin/omniwm-close-window
 
 # Mod+S: new Safari window on this workspace (Spotlight would jump to the old one)
 lalt - s : ~/.local/bin/safari-new-window
+
+# Mod+B: new Chromium window, opened in its column instead of flashing at
+# Chromium's own spot first
+lalt - b : ~/.local/bin/chromium-new-window

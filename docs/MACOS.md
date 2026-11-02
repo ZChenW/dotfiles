@@ -73,6 +73,7 @@ arrow-key variants of the niri binds are not bound.
 | Mod+Tab | previously focused window |
 | Mod+T | new kitty window (skhd), opened where OmniWM will place it, read over OmniWM's IPC, so it does not flash at a cascaded spot first |
 | Mod+S | new Safari window on this workspace (skhd); opening Safari from Spotlight jumps to its existing window |
+| Mod+B | new Chromium window (skhd), opened straight in its column; from the Dock or Spotlight it first flashes at Chromium's own spot |
 | Option+D | Spotlight (`--system`) |
 | Option+Shift+1 | screenshot of an area (`--system`) |
 | Control+C / Control+V | copy / paste in every app's Edit menu (`--system`); terminals keep Command+C/V so Control+C still interrupts |
