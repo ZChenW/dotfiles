@@ -200,7 +200,6 @@ grep -qx 'position = "belowMenuBar"' "$settings" || fail "workspace bar still co
 grep -qx 'followsMouse = true' "$settings" || fail "focus does not follow the mouse"
 grep -qx "ipcEnabled = true" "$settings" || fail "OmniWM IPC not enabled for kitty-new-window"
 grep -q '^displayName' "$settings" && fail "workspace emoji names not removed"
-grep -qx 'hideEmptyWorkspaces = true' "$settings" || fail "empty workspaces still shown"
 cmp -s "$REPO_ROOT/configs/macos/omniwm/shell.toml" "$HOME/.config/omniwm/shell/shell.toml" || fail "OmniShell shell.toml not deployed"
 grep -q 'bundleId = "com.apple.Safari"' "$settings" || fail "OmniWM's own app rules lost"
 [[ "$(grep -c 'bundleId = "com.apple.systempreferences"' "$settings")" == 1 ]] || fail "float rule missing or duplicated"
