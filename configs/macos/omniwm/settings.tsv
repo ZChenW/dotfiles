@@ -68,3 +68,8 @@ gestures.workspaceSwipeEdgeBehavior	"none"
 # their numbers like the rest. `[[workspaces]]` entries are picked by name.
 workspaces[name="6"].displayName	unset
 workspaces[name="7"].displayName	unset
+
+# niri's window-movement spring (stiffness 800, critical damping) settles in
+# about 0.2-0.25 s; OmniWM at 1.0 took about 0.33 s to scroll a column into
+# view. Fewer frames also means fewer chances for a slow app to stutter.
+general.animationSpeed	1.5
