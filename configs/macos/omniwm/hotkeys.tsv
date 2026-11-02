@@ -54,7 +54,6 @@ moveColumnToWorkspace.7	Control+Left Option+8
 moveColumnToWorkspace.8	Control+Left Option+9
 
 # Windows and columns
-closeFocusedWindow	Left Option+Q
 toggleOverview	Left Option+O
 cycleSizeForward	Left Option+R
 cycleWindowSecondarySpanForward	Left Option+Shift+R

@@ -61,7 +61,7 @@ arrow-key variants of the niri binds are not bound.
 | Mod+U/I, Mod+Ctrl+U/I | next / previous workspace, move column there |
 | Mod+1–9, Mod+Ctrl+1–9 | workspace N, move column there |
 | Mod+O | overview |
-| Mod+Q | close window |
+| Mod+Q | close window (skhd): focus moves to the neighbour and the window is parked on another workspace before it closes, so no gap or border flash |
 | Mod+R, Mod+Shift+R, Mod+Ctrl+R | cycle column width, cycle window height, reset height |
 | Mod+F, Mod+Shift+F, Mod+Ctrl+F | maximize column, fullscreen, expand to free width |
 | Mod+C, Mod+Ctrl+C | center column, center visible columns |

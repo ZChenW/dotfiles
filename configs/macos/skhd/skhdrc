@@ -4,5 +4,9 @@
 # niri Mod+T: new kitty window
 lalt - t : ~/.local/bin/kitty-new-window
 
+# niri Mod+Q: close the window without the gap and border flash of OmniWM's own
+# close (closeFocusedWindow is left unbound in configs/macos/omniwm/hotkeys.tsv)
+lalt - q : ~/.local/bin/omniwm-close-window
+
 # Mod+S: new Safari window on this workspace (Spotlight would jump to the old one)
 lalt - s : ~/.local/bin/safari-new-window

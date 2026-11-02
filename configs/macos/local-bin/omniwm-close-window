@@ -1,0 +1,67 @@
+#!/bin/zsh
+# Close the focused window, like niri's Mod+Q. Bound to Option+Q in
+# configs/macos/skhd/skhdrc.
+#
+# OmniWM's own close makes the window vanish, then waits for macOS to report it
+# (and 80 ms more when focus lands on another window of the same app) before it
+# relays out: the gap shows the wallpaper for about 0.2 s and the border flashes
+# on the old spot. Instead: move focus to the neighbour, park the window on
+# another workspace (OmniWM's own move, so the gap closes at once, animated),
+# then close it there.
+
+plan=$(python3 -I - <<'EOF'
+import json, subprocess
+
+def query(*args):
+    out = subprocess.run(["omniwmctl", "query", *args, "--format", "json"],
+                         capture_output=True, text=True, timeout=1).stdout
+    return json.loads(out)["result"]["payload"]
+
+try:
+    current = query("workspaces", "--current", "--fields", "id,number")["workspaces"][0]
+    windows = query("windows", "--fields", "id,mode,is-focused,column-index,frame,workspace")["windows"]
+except Exception:
+    raise SystemExit
+here = [w for w in windows if w["workspace"]["id"] == current["id"]]
+focused = next((w for w in here if w["isFocused"]), None)
+if not focused:
+    raise SystemExit
+
+# Where focus goes: another window of the column, else the column to the
+# right, else the one to the left (niri's order).
+direction = "-"
+if focused["mode"] == "tiling":
+    column = focused.get("columnIndex")
+    tiled = [w for w in here if w["mode"] == "tiling"]
+    stacked = [w for w in tiled if w.get("columnIndex") == column and w["id"] != focused["id"]]
+    columns = {w.get("columnIndex") for w in tiled}
+    if stacked:
+        # AppKit frames: a smaller y is lower on screen.
+        direction = "down" if any(w["frame"]["y"] < focused["frame"]["y"] for w in stacked) else "up"
+    elif column is not None and column + 1 in columns:
+        direction = "right"
+    elif column is not None and column - 1 in columns:
+        direction = "left"
+
+park = 8 if current["number"] == 9 else 9
+print(focused["id"], current["number"], park, direction)
+EOF
+)
+if [[ -z "$plan" ]]; then
+    # Not a window OmniWM manages; let it try anyway.
+    exec omniwmctl command close-focused-window >/dev/null
+fi
+read -r id home park direction <<<"$plan"
+
+[[ "$direction" != - ]] && omniwmctl command focus "$direction" >/dev/null
+omniwmctl window move-to-workspace "$id" "$park" >/dev/null
+omniwmctl window close "$id" >/dev/null
+
+# A window that asks first (unsaved changes) is still there: bring it back so
+# its dialog is not left on the other workspace.
+for _ in 1 2 3 4 5; do
+    sleep 0.1
+    omniwmctl query windows --fields id --format tsv 2>/dev/null | grep -qF "$id" || exit 0
+done
+omniwmctl window move-to-workspace "$id" "$home" >/dev/null
+omniwmctl window focus "$id" >/dev/null

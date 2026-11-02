@@ -188,6 +188,8 @@ cmp -s "$REPO_ROOT/configs/macos/kitty/kitty.conf" "$HOME/.config/kitty/kitty.co
 cmp -s "$REPO_ROOT/configs/config/kitty/focus_opacity.py" "$HOME/.config/kitty/focus_opacity.py" || fail "focus_opacity.py not deployed"
 [[ -x "$HOME/.local/bin/kitty-new-window" ]] || fail "kitty-new-window not executable"
 [[ -x "$HOME/.local/bin/safari-new-window" ]] || fail "safari-new-window not executable"
+[[ -x "$HOME/.local/bin/omniwm-close-window" ]] || fail "omniwm-close-window not executable"
+grep -A1 -x 'binding = "Left Option+Q"' "$settings" | grep -q . && fail "Mod+Q still bound in OmniWM"
 grep -A1 -x 'binding = "Left Option+H"' "$settings" | grep -qx 'id = "focus.left"' || fail "focus.left not bound"
 grep -q 'toggleWorkspaceLayout' "$settings" && fail "unlisted default hotkey kept"
 grep -qx 'width = 4.0' "$settings" || fail "border width not set"
