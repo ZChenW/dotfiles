@@ -97,6 +97,9 @@ export PATH="$stub_bin:$PATH"
     printf '[workspaceBar]\nposition = "overlappingMenuBar"\nreserveLayoutSpace = false\nwindowLevel = "popup"\n\n'
     printf '[focus]\nfollowsMouse = false\n\n'
     printf '[general]\nipcEnabled = false\n\n'
+    for n in 6 7; do
+        printf '[[workspaces]]\ndisplayName = "x"\nid = "W%s"\nname = "%s"\n\n[workspaces.monitorAssignment]\ntype = "main"\n\n' "$n" "$n"
+    done
     printf '[[appRules]]\nbundleId = "com.apple.Safari"\nid = "81426D13-C1A5-475E-AFBC-00BBA05042D0"\nminWidth = 574.0\n\n'
     grep -v '^#' "$REPO_ROOT/configs/macos/omniwm/hotkeys.tsv" | grep . | cut -f1 |
         while read -r id; do printf '[[hotkeys]]\nbinding = "Unassigned"\nid = "%s"\n\n' "$id"; done
@@ -196,6 +199,8 @@ grep -q '^\[\[workspaces\]\]' "$settings" || fail "workspaces lost"
 grep -qx 'position = "belowMenuBar"' "$settings" || fail "workspace bar still covers the menu bar"
 grep -qx 'followsMouse = true' "$settings" || fail "focus does not follow the mouse"
 grep -qx "ipcEnabled = true" "$settings" || fail "OmniWM IPC not enabled for kitty-new-window"
+grep -q '^displayName' "$settings" && fail "workspace emoji names not removed"
+grep -qx 'hideEmptyWorkspaces = true' "$settings" || fail "empty workspaces still shown"
 cmp -s "$REPO_ROOT/configs/macos/omniwm/shell.toml" "$HOME/.config/omniwm/shell/shell.toml" || fail "OmniShell shell.toml not deployed"
 grep -q 'bundleId = "com.apple.Safari"' "$settings" || fail "OmniWM's own app rules lost"
 [[ "$(grep -c 'bundleId = "com.apple.systempreferences"' "$settings")" == 1 ]] || fail "float rule missing or duplicated"

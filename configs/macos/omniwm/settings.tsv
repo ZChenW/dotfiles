@@ -63,3 +63,11 @@ general.ipcEnabled	true
 gestures.resizePreviewStyle	"snapshot"
 # Stop at the first and last workspace instead of wrapping 1 <-> 9 on a swipe.
 gestures.workspaceSwipeEdgeBehavior	"none"
+
+# Show only the workspaces in use, plus the current one, as niri's
+# workspaces module in Waybar did; Mod+1-9 still reach all nine.
+workspaceBar.hideEmptyWorkspaces	true
+# OmniWM names workspaces 6 and 7 with emoji (a heart and a rocket); show
+# their numbers like the rest. `[[workspaces]]` entries are picked by name.
+workspaces[name="6"].displayName	unset
+workspaces[name="7"].displayName	unset

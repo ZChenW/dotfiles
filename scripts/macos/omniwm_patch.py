@@ -9,6 +9,8 @@ place:
 * every [[hotkeys]] block is replaced by the bindings in hotkeys.tsv (actions
   left out are unassigned, which is what OmniWM does with missing ids);
 * each `table.key` in settings.tsv has its value replaced where it already is;
+* `table[field=value].key` picks one [[table]] entry instead, and the value
+  `unset` removes the key there;
 * the [[appRules]] in app-rules.toml are added after OmniWM's own rules,
   replacing any earlier copy with the same id.
 
@@ -145,8 +147,33 @@ def set_inline(line, outer, key, value):
     return match.group(1) + inner + match.group(3)
 
 
+SELECTOR_RE = re.compile(r'^(\w+)\[(\w+)=("[^"]*"|[^\]]+)\]\.(\w+)$')
+
+
+def apply_array_setting(sections, selector, value):
+    """`table[field=value].key`: set or `unset` a key in one [[table]] entry."""
+    table, field, wanted, key = selector.groups()
+    field_re = re.compile(r"^\s*" + re.escape(field) + r"\s*=\s*" + re.escape(wanted) + r"\s*$")
+    hits = [s for s in sections if s[0] == table and s[1] == "array" and any(field_re.match(l) for l in s[2])]
+    if len(hits) != 1:
+        raise SystemExit(f"settings.tsv: {len(hits)} [[{table}]] entries with {field} = {wanted}")
+    body = hits[0][2]
+    for index, line in enumerate(body):
+        if re.match(r"^\s*" + re.escape(key) + r"\s*=", line):
+            if value == "unset":
+                del body[index]
+            else:
+                body[index] = set_in_line(line, key, value)
+            return
+    if value != "unset":
+        body.insert(1, f"{key} = {value}")
+
+
 def apply_setting(sections, path, value):
     """Set `path` (dotted) to `value`. Returns a note when the key was added."""
+    selector = SELECTOR_RE.match(path)
+    if selector:
+        return apply_array_setting(sections, selector, value)
     parts = path.split(".")
     # Try [a.b] key=, then [a] b.key= / b = {key=...}, and so on outwards.
     for split in range(len(parts) - 1, 0, -1):
