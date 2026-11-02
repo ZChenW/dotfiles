@@ -36,6 +36,20 @@ com.apple.dock	showAppExposeGestureEnabled	false
 # Spotlight on Option+D (niri Mod+D launcher). 100 = "d", 2 = its key code,
 # 524288 = Option.
 com.apple.symbolichotkeys	AppleSymbolicHotKeys/64	{"enabled": true, "value": {"parameters": [100, 2, 524288], "type": "standard"}}
+# Area screenshot to a file on Option+Shift+1 instead of Command+Shift+4.
+# 49 = "1", 18 = its key code, 655360 = Option + Shift.
+com.apple.symbolichotkeys	AppleSymbolicHotKeys/30	{"enabled": true, "value": {"parameters": [49, 18, 655360], "type": "standard"}}
+
+# Copy and paste on Control+C/V, as on Linux: every app's Edit menu items
+# "Copy" and "Paste" (System Settings > Keyboard > App Shortcuts).
+NSGlobalDomain	NSUserKeyEquivalents/Copy	"^c"
+NSGlobalDomain	NSUserKeyEquivalents/Paste	"^v"
+# Terminals keep Command+C/V so Control+C still interrupts and Control+V
+# reaches the program. An app's own list replaces the global one.
+net.kovidgoyal.kitty	NSUserKeyEquivalents/Copy	"@c"
+net.kovidgoyal.kitty	NSUserKeyEquivalents/Paste	"@v"
+com.apple.Terminal	NSUserKeyEquivalents/Copy	"@c"
+com.apple.Terminal	NSUserKeyEquivalents/Paste	"@v"
 
 # Key repeat as niri's defaults: 600 ms delay, ~25 repeats/s (units of 15 ms).
 NSGlobalDomain	InitialKeyRepeat	40

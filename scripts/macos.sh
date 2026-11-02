@@ -441,6 +441,8 @@ apply_omniwm() {
     else
         omniwm_patch "$settings" | sed 's/^/  /'
     fi
+    # OmniShell (0.8.0), the bar: OmniWM owns shell/default/, this file is ours.
+    deploy "$MACOS_CONFIG/omniwm/shell.toml" "$OMNIWM_CONFIG/shell/shell.toml"
 }
 
 apply_system() {

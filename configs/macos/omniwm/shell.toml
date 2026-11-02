@@ -1,0 +1,12 @@
+# OmniShell, OmniWM 0.8.0's bar, keeps its default style; only these differ.
+# Deployed to ~/.config/omniwm/shell/shell.toml (OmniWM owns shell/default/).
+profile = "default"
+
+# The default leading lane without app-menu, the focused app's icon and menus.
+# Those menus stay searchable in the command palette's menu mode.
+profiles.default.leading = ["apple-menu", "omniwm", "workspaces", "scratchpads"]
+
+# The centre lane sits right of the notch, where the trailing widgets leave
+# little room; a long title ran into them.
+[profiles.default.widgets.active-window]
+maxWidth = 140

@@ -20,7 +20,7 @@ left to macOS. All of it can be undone with one command.
 | --- | --- |
 | niri | OmniWM (`configs/macos/omniwm`); focus follows the mouse as in niri, and `app-rules.toml` floats small utility windows (System Settings, Calculator, Installer, Archive Utility, System Information) |
 | niri focus ring | OmniWM border |
-| Waybar | macOS menu bar + OmniWM workspace bar |
+| Waybar | OmniShell, OmniWM 0.8.0's bar over the menu bar, in its default style; `configs/macos/omniwm/shell.toml` drops the app-menu slot and caps the window title |
 | kitty | kitty (`configs/macos/kitty/kitty.conf` + the shared theme files and `focus_opacity.py`, which makes unfocused windows translucent) |
 | niri `spawn` binds | skhd (`configs/macos/skhd/skhdrc`) |
 | fuzzel | Spotlight on Option+D |
@@ -29,7 +29,7 @@ left to macOS. All of it can be undone with one command.
 | IdleFlow, swaylock | macOS lock and sleep settings; Control+Command+Q locks |
 | fcitx5 + Rime (rime-ice) | Squirrel + rime-ice, pinned to a tag; left Shift switches Chinese/English (macOS Pinyin has no Shift switch) |
 | wlogout | Apple menu |
-| screenshots | Command+Shift+4 / 5 |
+| screenshots | Option+Shift+1 (area to a file, `--system`); Command+Shift+5 for the rest |
 | wlsunset | Night Shift |
 | waywallen + matugen | macOS wallpaper and accent colour; kitty keeps the last matugen colours |
 | kanshi, brightness, volume | macOS |
@@ -74,6 +74,8 @@ arrow-key variants of the niri binds are not bound.
 | Mod+T | new kitty window (skhd), opened where OmniWM will place it, read over OmniWM's IPC, so it does not flash at a cascaded spot first |
 | Mod+S | new Safari window on this workspace (skhd); opening Safari from Spotlight jumps to its existing window |
 | Option+D | Spotlight (`--system`) |
+| Option+Shift+1 | screenshot of an area (`--system`) |
+| Control+C / Control+V | copy / paste in every app's Edit menu (`--system`); terminals keep Command+C/V so Control+C still interrupts |
 
 
 Trackpad: 3 fingers sideways scroll columns, 3 fingers up/down switch
