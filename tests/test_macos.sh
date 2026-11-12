@@ -171,6 +171,9 @@ grep -qx 'brew install --cask font-maple-mono-nf' "$STUB_LOG" && fail "installed
 [[ -f "$HOME/Library/Rime/rime_ice.schema.yaml" ]] || fail "rime-ice not copied"
 cmp -s "$REPO_ROOT/configs/home/.zshrc" "$HOME/.zshrc" || fail ".zshrc not deployed"
 [[ -f "$HOME/.zshrc.local" ]] || fail ".zshrc.local not created from the template"
+cmp -s "$REPO_ROOT/configs/macos/zprofile" "$HOME/.zprofile" || fail ".zprofile not deployed"
+cmp -s "$REPO_ROOT/configs/macos/gitconfig" "$HOME/.gitconfig" || fail ".gitconfig not deployed"
+cmp -s "$REPO_ROOT/configs/macos/herdr/config.toml" "$HOME/.config/herdr/config.toml" || fail "herdr config not deployed"
 [[ -f "$HOME/.config/git/ignore" ]] || fail "global gitignore not deployed"
 grep -q "\"source\": \"$HOME/.config/fastfetch/logo/" "$HOME/.config/fastfetch/config.jsonc" ||
     fail "fastfetch placeholders not rendered"

@@ -1,0 +1,4 @@
+# Login shells: Homebrew first (macOS does not put /opt/homebrew on PATH),
+# then ~/.local/bin for the scripts scripts/macos.sh installs and user tools.
+eval "$(/opt/homebrew/bin/brew shellenv)"
+export PATH="$HOME/.local/bin:$PATH"

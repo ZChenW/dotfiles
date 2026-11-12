@@ -260,7 +260,10 @@ apply_shell() {
     else
         deploy "$REPO_ROOT/templates/zshrc.local.example" "$HOME/.zshrc.local" 600
     fi
+    deploy "$MACOS_CONFIG/zprofile" "$HOME/.zprofile"
     deploy "$SHARED_CONFIG/git/ignore" "$HOME/.config/git/ignore"
+    deploy "$MACOS_CONFIG/gitconfig" "$HOME/.gitconfig"
+    deploy "$MACOS_CONFIG/herdr/config.toml" "$HOME/.config/herdr/config.toml"
 }
 
 # Copy a config tree, rendering the @HOME@/@CONFIG_HOME@ placeholders the

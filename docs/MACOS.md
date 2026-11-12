@@ -34,6 +34,7 @@ left to macOS. All of it can be undone with one command.
 | waywallen + matugen | macOS wallpaper and accent colour; kitty keeps the last matugen colours |
 | kanshi, brightness, volume | macOS |
 | zsh (`configs/home/.zshrc`) | the same file: its `linux*` blocks hold the pacman aliases, `open=xdg-open`, conda, npm/bun paths and Linux-only tools; macOS gets brew aliases and zoxide for `z` |
+| login shell, git, herdr (`configs/macos/zprofile`, `gitconfig`, `herdr/`) | `~/.zprofile` puts Homebrew and `~/.local/bin` on PATH; `~/.gitconfig` holds the commit identity; herdr skips its first-run onboarding |
 | neovim + nvimdots | nvimdots pinned to a commit of its `main` branch (Neovim 0.12), plugins restored from its `lazy-lock.json` |
 | fastfetch, git ignore | the shared files |
 

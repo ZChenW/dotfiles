@@ -56,11 +56,11 @@ focus.followsMouse	true
 # OmniWM will put it (a local socket; only processes of this user can use it).
 general.ipcEnabled	true
 
-# OmniWM 0.8.0. Animating a resize writes the real frame of every window on
-# every step, so it is only as smooth as the slowest app, and Chromium could
-# stop part way. snapshot animates a still capture instead and writes the final
-# frame once (needs Screen Recording, falls back to a glass panel without it).
-gestures.resizePreviewStyle	"snapshot"
+# OmniWM 0.8.0. live writes the real frame of every window on every step of a
+# resize, so it is only as smooth as the slowest app. snapshot stretches a still
+# capture instead (text grows, then snaps back when the real frame is written);
+# glass covers the window with a panel and its app icon.
+gestures.resizePreviewStyle	"live"
 # Stop at the first and last workspace instead of wrapping 1 <-> 9 on a swipe.
 gestures.workspaceSwipeEdgeBehavior	"none"
 
@@ -73,3 +73,6 @@ workspaces[name="7"].displayName	unset
 # about 0.2-0.25 s; OmniWM at 1.0 took about 0.33 s to scroll a column into
 # view. Fewer frames also means fewer chances for a slow app to stutter.
 general.animationSpeed	1.5
+
+# Keep the Mac awake while OmniWM runs (Settings > General > Prevent Sleep).
+general.preventSleepEnabled	true

@@ -24,3 +24,6 @@ go
 
 # GitHub CLI, for pushing this repository and opening PRs
 gh
+
+# herdr, the terminal workspace manager (as on Linux)
+herdr
